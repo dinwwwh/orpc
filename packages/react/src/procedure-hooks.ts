@@ -5,6 +5,8 @@ import type {
   SchemaOutput,
 } from '@orpc/contract'
 import {
+  type FetchInfiniteQueryOptions,
+  type FetchQueryOptions,
   type InfiniteData,
   type UseInfiniteQueryOptions,
   type UseInfiniteQueryResult,
@@ -18,6 +20,8 @@ import {
   type UseSuspenseQueryResult,
   useInfiniteQuery,
   useMutation,
+  usePrefetchInfiniteQuery,
+  usePrefetchQuery,
   useQuery,
   useSuspenseInfiniteQuery,
   useSuspenseQuery,
@@ -49,6 +53,8 @@ export interface ProcedureHooks<
     >,
   ) => UseQueryResult<SchemaOutput<TOutputSchema, THandlerOutput>, unknown>
   useInfiniteQuery: (
+    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
+      Record<string | number | symbol, any>,
     options: OptionalUndefined<
       SetOptional<
         UseInfiniteQueryOptions<
@@ -56,14 +62,12 @@ export interface ProcedureHooks<
           unknown,
           InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', SchemaInput<TInputSchema>>,
+          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'
       >
-    > & {
-      input: SchemaInput<TInputSchema>
-    },
+    >,
   ) => UseInfiniteQueryResult<
     InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
     unknown
@@ -85,6 +89,8 @@ export interface ProcedureHooks<
     unknown
   >
   useSuspenseInfiniteQuery: (
+    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
+      Record<string | number | symbol, any>,
     options: OptionalUndefined<
       SetOptional<
         UseSuspenseInfiniteQueryOptions<
@@ -92,18 +98,40 @@ export interface ProcedureHooks<
           unknown,
           InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', SchemaInput<TInputSchema>>,
+          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'
       >
-    > & {
-      input: SchemaInput<TInputSchema> & Record<string | number | symbol, any>
-    },
+    >,
   ) => UseSuspenseInfiniteQueryResult<
     InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
     unknown
   >
+
+  usePrefetchQuery: (
+    input: SchemaInput<TInputSchema>,
+    options?: FetchQueryOptions<
+      SchemaOutput<TOutputSchema, THandlerOutput>,
+      unknown,
+      SchemaOutput<TOutputSchema, THandlerOutput>,
+      QueryKey<'query', SchemaInput<TInputSchema>>
+    >,
+  ) => void
+  usePrefetchInfiniteQuery: (
+    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
+      Record<string | number | symbol, any>,
+    options: SetOptional<
+      FetchInfiniteQueryOptions<
+        SchemaOutput<TOutputSchema, THandlerOutput>,
+        unknown,
+        SchemaOutput<TOutputSchema, THandlerOutput>,
+        QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+        SchemaInput<TInputSchema>['cursor']
+      >,
+      'queryKey' | 'queryFn'
+    >,
+  ) => void
 
   useMutation: (
     options?: SetOptional<
@@ -154,8 +182,7 @@ export function createProcedureHooks<
         context.queryClient,
       )
     },
-    useInfiniteQuery(options_) {
-      const { input, ...rest } = options_
+    useInfiniteQuery(input, options_) {
       const context = useORPCContext(options.context)
       const client = get(context.client, options.path) as any
       return useInfiniteQuery(
@@ -165,7 +192,7 @@ export function createProcedureHooks<
             type: 'infinite',
           }),
           queryFn: ({ pageParam }) => client({ ...input, cursor: pageParam }),
-          ...(rest as any),
+          ...(options_ as any),
         },
         context.queryClient,
       )
@@ -183,8 +210,7 @@ export function createProcedureHooks<
         context.queryClient,
       )
     },
-    useSuspenseInfiniteQuery(options_) {
-      const { input, ...rest } = options_
+    useSuspenseInfiniteQuery(input, options_) {
       const context = useORPCContext(options.context)
       const client = get(context.client, options.path) as any
       return useSuspenseInfiniteQuery(
@@ -194,10 +220,32 @@ export function createProcedureHooks<
             type: 'infinite',
           }),
           queryFn: ({ pageParam }) => client({ ...input, cursor: pageParam }),
-          ...(rest as any),
+          ...(options_ as any),
         },
         context.queryClient,
       )
+    },
+
+    usePrefetchQuery(input, options_) {
+      const context = useORPCContext(options.context)
+      const client = get(context.client, options.path) as any
+      return usePrefetchQuery({
+        queryKey: getQueryKeyFromPath(options.path, { input, type: 'query' }),
+        queryFn: () => client(input),
+        ...options_,
+      })
+    },
+    usePrefetchInfiniteQuery(input, options_) {
+      const context = useORPCContext(options.context)
+      const client = get(context.client, options.path) as any
+      return usePrefetchInfiniteQuery({
+        queryKey: getQueryKeyFromPath(options.path, {
+          input,
+          type: 'infinite',
+        }),
+        queryFn: ({ pageParam }) => client({ ...input, cursor: pageParam }),
+        ...options_,
+      })
     },
 
     useMutation(options_) {
