@@ -1,18 +1,15 @@
-import type {} from '@orpc/contract'
 import type {
   InfiniteData,
   InvalidateQueryFilters,
   QueryFilters,
 } from '@tanstack/react-query'
+import type { SetOptional } from 'type-fest'
 import type { QueryKey, QueryType } from './key'
 
-export interface ORPCQueryFilters<TQueryType extends QueryType, TFilterInput>
-  extends QueryFilters {
-  /**
-   * Custom queries matching this query key
-   */
-  queryKey?: ReadonlyArray<unknown>
-
+export interface ORPCAdditionalQueryFilters<
+  TQueryType extends QueryType,
+  TFilterInput,
+> {
   /**
    * The type of the query. useQuery=query, useInfiniteQuery=infinite
    * If not specified, it will match all types.
@@ -24,27 +21,16 @@ export interface ORPCQueryFilters<TQueryType extends QueryType, TFilterInput>
    */
   input?: TFilterInput
 }
+
+export interface ORPCQueryFilters<TQueryType extends QueryType, TFilterInput>
+  extends SetOptional<QueryFilters, 'queryKey'>,
+    ORPCAdditionalQueryFilters<TQueryType, TFilterInput> {}
 
 export interface ORPCInvalidateQueryFilters<
   TQueryType extends QueryType,
   TFilterInput,
-> extends InvalidateQueryFilters {
-  /**
-   * Custom queries matching this query key
-   */
-  queryKey?: ReadonlyArray<unknown>
-
-  /**
-   * The type of the query. useQuery=query, useInfiniteQuery=infinite
-   * If not specified, it will match all types.
-   */
-  queryType?: TQueryType
-
-  /**
-   * The input of the query. If not specified, it will match all inputs.
-   */
-  input?: TFilterInput
-}
+> extends SetOptional<InvalidateQueryFilters, 'queryKey'>,
+    ORPCAdditionalQueryFilters<TQueryType, TFilterInput> {}
 
 export type ORPCQueryData<
   TQueryType extends QueryType,

@@ -6,7 +6,6 @@ import type {
 } from '@orpc/contract'
 import {
   type InfiniteData,
-  type OmitKeyof,
   type UseInfiniteQueryOptions,
   type UseInfiniteQueryResult,
   type UseMutationOptions,
@@ -23,6 +22,7 @@ import {
   useSuspenseInfiniteQuery,
   useSuspenseQuery,
 } from '@tanstack/react-query'
+import type { SetOptional } from 'type-fest'
 import {
   type QueryKey,
   getMutationKeyFromPath,
@@ -38,25 +38,25 @@ export interface ProcedureHooks<
 > {
   useQuery: (
     input: SchemaInput<TInputSchema>,
-    options?: OmitKeyof<
+    options?: SetOptional<
       UseQueryOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         unknown,
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey<undefined, SchemaInput<TInputSchema>>
+        QueryKey<'query', SchemaInput<TInputSchema>>
       >,
       'queryFn' | 'queryKey'
     >,
   ) => UseQueryResult<SchemaOutput<TOutputSchema, THandlerOutput>, unknown>
   useInfiniteQuery: (
     options: OptionalUndefined<
-      OmitKeyof<
+      SetOptional<
         UseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
           unknown,
           InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<undefined, SchemaInput<TInputSchema>>,
+          QueryKey<'infinite', SchemaInput<TInputSchema>>,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'
@@ -71,12 +71,12 @@ export interface ProcedureHooks<
 
   useSuspenseQuery: (
     input: SchemaInput<TInputSchema>,
-    options?: OmitKeyof<
+    options?: SetOptional<
       UseSuspenseQueryOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         unknown,
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey<undefined, SchemaInput<TInputSchema>>
+        QueryKey<'query', SchemaInput<TInputSchema>>
       >,
       'queryFn' | 'queryKey'
     >,
@@ -86,13 +86,13 @@ export interface ProcedureHooks<
   >
   useSuspenseInfiniteQuery: (
     options: OptionalUndefined<
-      OmitKeyof<
+      SetOptional<
         UseSuspenseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
           unknown,
           InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<undefined, unknown>,
+          QueryKey<'infinite', SchemaInput<TInputSchema>>,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'
@@ -106,7 +106,7 @@ export interface ProcedureHooks<
   >
 
   useMutation: (
-    options?: OmitKeyof<
+    options?: SetOptional<
       UseMutationOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         unknown,
@@ -147,7 +147,7 @@ export function createProcedureHooks<
       const client = get(context.client, options.path) as any
       return useQuery(
         {
-          queryKey: getQueryKeyFromPath(options.path, { input }),
+          queryKey: getQueryKeyFromPath(options.path, { input, type: 'query' }),
           queryFn: () => client(input),
           ...options_,
         },
@@ -176,7 +176,7 @@ export function createProcedureHooks<
       const client = get(context.client, options.path) as any
       return useSuspenseQuery(
         {
-          queryKey: getQueryKeyFromPath(options.path, { input }),
+          queryKey: getQueryKeyFromPath(options.path, { input, type: 'query' }),
           queryFn: () => client(input),
           ...options_,
         },
