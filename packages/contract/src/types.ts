@@ -29,3 +29,13 @@ export type IsEqual<A, B> = (<G>() => G extends A ? 1 : 2) extends <
 >() => G extends B ? 1 : 2
   ? true
   : false
+
+export type KeysOfType<T, SelectedType> = {
+  [key in keyof T]: SelectedType extends T[key] ? key : never
+}[keyof T]
+
+export type Optional<T> = Partial<Pick<T, KeysOfType<T, undefined>>>
+
+export type Required<T> = Omit<T, KeysOfType<T, undefined>>
+
+export type OptionalUndefined<T> = Optional<T> & Required<T>
