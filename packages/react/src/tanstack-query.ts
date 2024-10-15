@@ -35,23 +35,28 @@ export interface ORPCInvalidateQueryFilters<
 export type ORPCQueryData<
   TQueryType extends QueryType,
   TOutput,
+  TCursor,
 > = TQueryType extends 'infinite'
-  ? InfiniteData<TOutput>
+  ? InfiniteData<TOutput, TCursor>
   : TQueryType extends 'query'
     ? TOutput
-    : InfiniteData<TOutput> | TOutput
+    : InfiniteData<TOutput, TCursor> | TOutput
 
 export type ORPCQueriesData<
   TQueryType extends QueryType,
   TFilterInput,
   TOutput,
+  TCursor,
 > = TQueryType extends 'infinite'
-  ? [QueryKey<TQueryType, TFilterInput>, InfiniteData<TOutput> | undefined]
+  ? [
+      QueryKey<TQueryType, TFilterInput>,
+      InfiniteData<TOutput, TCursor> | undefined,
+    ]
   : TQueryType extends 'query'
     ? [QueryKey<TQueryType, TFilterInput>, TOutput | undefined]
     :
         | [
             QueryKey<TQueryType, TFilterInput>,
-            InfiniteData<TOutput> | undefined,
+            InfiniteData<TOutput, TCursor> | undefined,
           ]
         | [QueryKey<TQueryType, TFilterInput>, TOutput | undefined]

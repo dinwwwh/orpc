@@ -36,7 +36,8 @@ export interface GeneralUtils<
   ) => ORPCQueriesData<
     TQueryType,
     TFilterInput,
-    SchemaOutput<TOutputSchema, THandlerOutput>
+    SchemaOutput<TOutputSchema, THandlerOutput>,
+    SchemaInput<TInputSchema>['cursor']
   >
   setQueriesData: <
     TQueryType extends QueryType = undefined,
@@ -46,16 +47,25 @@ export interface GeneralUtils<
   >(
     filters: ORPCQueryFilters<TQueryType, TFilterInput>,
     updater: Updater<
-      | ORPCQueryData<TQueryType, SchemaOutput<TOutputSchema, THandlerOutput>>
+      | ORPCQueryData<
+          TQueryType,
+          SchemaOutput<TOutputSchema, THandlerOutput>,
+          SchemaInput<TInputSchema>['cursor']
+        >
       | undefined,
-      | ORPCQueryData<TQueryType, SchemaOutput<TOutputSchema, THandlerOutput>>
+      | ORPCQueryData<
+          TQueryType,
+          SchemaOutput<TOutputSchema, THandlerOutput>,
+          SchemaInput<TInputSchema>['cursor']
+        >
       | undefined
     >,
     options?: SetDataOptions,
   ) => ORPCQueriesData<
     TQueryType,
     TFilterInput,
-    SchemaOutput<TOutputSchema, THandlerOutput>
+    SchemaOutput<TOutputSchema, THandlerOutput>,
+    SchemaInput<TInputSchema>['cursor']
   >
 
   invalidateQueries: <

@@ -54,13 +54,16 @@ export interface ProcedureHooks<
   ) => UseQueryResult<SchemaOutput<TOutputSchema, THandlerOutput>, unknown>
   useInfiniteQuery: (
     input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number | symbol, any>,
+      Record<string | number, any>,
     options: OptionalUndefined<
       SetOptional<
         UseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
           unknown,
-          InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
+          InfiniteData<
+            SchemaOutput<TOutputSchema, THandlerOutput>,
+            SchemaInput<TInputSchema>['cursor']
+          >,
           SchemaOutput<TOutputSchema, THandlerOutput>,
           QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
           SchemaInput<TInputSchema>['cursor']
@@ -69,7 +72,10 @@ export interface ProcedureHooks<
       >
     >,
   ) => UseInfiniteQueryResult<
-    InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
+    InfiniteData<
+      SchemaOutput<TOutputSchema, THandlerOutput>,
+      SchemaInput<TInputSchema>['cursor']
+    >,
     unknown
   >
 
@@ -90,13 +96,16 @@ export interface ProcedureHooks<
   >
   useSuspenseInfiniteQuery: (
     input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number | symbol, any>,
+      Record<string | number, any>,
     options: OptionalUndefined<
       SetOptional<
         UseSuspenseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
           unknown,
-          InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
+          InfiniteData<
+            SchemaOutput<TOutputSchema, THandlerOutput>,
+            SchemaInput<TInputSchema>['cursor']
+          >,
           SchemaOutput<TOutputSchema, THandlerOutput>,
           QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
           SchemaInput<TInputSchema>['cursor']
@@ -105,7 +114,10 @@ export interface ProcedureHooks<
       >
     >,
   ) => UseSuspenseInfiniteQueryResult<
-    InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
+    InfiniteData<
+      SchemaOutput<TOutputSchema, THandlerOutput>,
+      SchemaInput<TInputSchema>['cursor']
+    >,
     unknown
   >
 
@@ -120,7 +132,7 @@ export interface ProcedureHooks<
   ) => void
   usePrefetchInfiniteQuery: (
     input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number | symbol, any>,
+      Record<string | number, any>,
     options: SetOptional<
       FetchInfiniteQueryOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,

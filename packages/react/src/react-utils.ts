@@ -70,6 +70,7 @@ export function createORPCUtils<TRouter extends ContractRouter | Router<any>>(
     ? createProcedureUtils({
         client,
         queryClient: options.contextValue.queryClient,
+        path,
       })
     : {}
 
