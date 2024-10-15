@@ -171,6 +171,9 @@ importers:
       '@orpc/server':
         specifier: workspace:*
         version: link:../server
+      type-fest:
+        specifier: ^4.26.1
+        version: 4.26.1
     devDependencies:
       '@tanstack/react-query':
         specifier: ^5.59.9
@@ -3146,6 +3149,10 @@ packages:
         optional: true
       typescript:
         optional: true
+
+  type-fest@4.26.1:
+    resolution: {integrity: sha512-yOGpmOAL7CkKe/91I5O3gPICmJNLJ1G4zFYVAsRHg7M64biSnPtRj0WNQt++bRkjYOqjWXrhnUw1utzmVErAdg==}
+    engines: {node: '>=16'}
 
   typescript@5.4.2:
     resolution: {integrity: sha512-+2/g0Fds1ERlP6JsakQQDXjZdZMM+rqpamFZJEKh4kwTIn3iDkgKtby0CeNd5ATNZ4Ry1ax15TMx0W2V+miizQ==}
@@ -6620,6 +6627,8 @@ snapshots:
       - supports-color
       - tsx
       - yaml
+
+  type-fest@4.26.1: {}
 
   typescript@5.4.2:
     optional: true

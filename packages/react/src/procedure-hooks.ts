@@ -43,7 +43,7 @@ export interface ProcedureHooks<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         unknown,
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey
+        QueryKey<undefined, SchemaInput<TInputSchema>>
       >,
       'queryFn' | 'queryKey'
     >,
@@ -56,7 +56,7 @@ export interface ProcedureHooks<
           unknown,
           InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey,
+          QueryKey<undefined, SchemaInput<TInputSchema>>,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'
@@ -76,7 +76,7 @@ export interface ProcedureHooks<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         unknown,
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey
+        QueryKey<undefined, SchemaInput<TInputSchema>>
       >,
       'queryFn' | 'queryKey'
     >,
@@ -92,7 +92,7 @@ export interface ProcedureHooks<
           unknown,
           InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey,
+          QueryKey<undefined, unknown>,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'

@@ -1,18 +1,26 @@
 import type { SchemaInput } from '@orpc/contract'
+import type { PartialDeep } from 'type-fest'
 import type { ProcedureHooks } from './procedure-hooks'
 import type {
   ORPCHooksWithContractRouter,
   ORPCHooksWithRouter,
 } from './react-hooks'
 
-export type QueryKey = [string[], { input?: unknown; type?: 'infinite' }]
+export type QueryType = 'query' | 'infinite' | undefined
+export type QueryKey<TQueryType extends QueryType, TInput> = [
+  string[],
+  TQueryType extends undefined
+    ? { type?: QueryType }
+    : { type: TQueryType } & TInput extends undefined
+      ? { input?: unknown }
+      : { input: TInput },
+]
+
 export type MutationKey = [string[]]
 
-export type QueryType = 'any' | 'infinite'
-
-export interface GetQueryKeyOptions<TInput> {
+export interface GetQueryKeyOptions<TQueryType extends QueryType, TInput> {
   input?: TInput
-  type?: QueryType
+  type?: TQueryType
 }
 
 export function getQueryKey<
@@ -20,35 +28,37 @@ export function getQueryKey<
     | ORPCHooksWithContractRouter<any>
     | ORPCHooksWithRouter<any>
     | ProcedureHooks<any, any, any>,
+  TQueryType extends QueryType = undefined,
+  TInput extends
+    | (T extends ProcedureHooks<infer UInputSchema, any, any>
+        ? PartialDeep<SchemaInput<UInputSchema>>
+        : unknown)
+    | undefined = undefined,
 >(
   orpc: T,
-  options?: GetQueryKeyOptions<
-    T extends ProcedureHooks<infer UInputSchema, any, any>
-      ? SchemaInput<UInputSchema>
-      : unknown
-  >,
-): QueryKey {
+  options?: GetQueryKeyOptions<TQueryType, TInput>,
+): QueryKey<TQueryType, TInput> {
   const path = ['todo']
   return getQueryKeyFromPath(path, options)
 }
 
-export function getQueryKeyFromPath(
+export function getQueryKeyFromPath<
+  TQueryType extends QueryType = undefined,
+  TInput = unknown,
+>(
   path: string[],
-  options?: GetQueryKeyOptions<unknown>,
-): QueryKey {
+  options?: GetQueryKeyOptions<TQueryType, TInput>,
+): QueryKey<TQueryType, TInput> {
   const withInput =
     options?.input !== undefined ? { input: options?.input } : {}
-  const withType =
-    options?.type !== undefined && options?.type !== 'any'
-      ? { type: options?.type }
-      : {}
+  const withType = options?.type !== undefined ? { type: options?.type } : {}
 
   return [
     path,
     {
       ...withInput,
       ...withType,
-    },
+    } as any,
   ]
 }
 

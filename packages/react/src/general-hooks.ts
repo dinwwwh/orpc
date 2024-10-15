@@ -22,8 +22,10 @@ export interface GeneralHooks<
   THandlerOutput extends SchemaOutput<TOutputSchema>,
 > {
   useIsFetching: (
-    input?: SchemaInput<TInputSchema>,
-    filers?: OmitKeyof<QueryFilters, 'queryKey'> & { type?: QueryType },
+    filers?: OmitKeyof<QueryFilters, 'queryKey'> & {
+      queryType?: QueryType
+      input?: SchemaInput<TInputSchema>
+    },
   ) => number
   useIsMutating: (filters?: OmitKeyof<MutationFilters, 'mutationKey'>) => number
 
@@ -66,12 +68,15 @@ export function createGeneralHooks<
   options: CreateGeneralHooksOptions,
 ): GeneralHooks<TInputSchema, TOutputSchema, THandlerOutput> {
   return {
-    useIsFetching(input, filters) {
-      const { type, ...rest } = filters ?? {}
+    useIsFetching(filters) {
+      const { queryType, input, ...rest } = filters ?? {}
       const context = useORPCContext(options.context)
       return useIsFetching(
         {
-          queryKey: getQueryKeyFromPath(options.path, { input, type }),
+          queryKey: getQueryKeyFromPath(options.path, {
+            input,
+            type: queryType,
+          }),
           ...rest,
         },
         context.queryClient,
