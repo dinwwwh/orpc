@@ -16,12 +16,18 @@ import {
   type ORPCUtilsWithRouter,
   createORPCUtils,
 } from './react-utils'
+import {
+  type UseQueriesWithContractRouter,
+  type UseQueriesWithRouter,
+  useQueriesFactory,
+} from './use-queries/hook'
 
 export type ORPCReactWithContractRouter<TRouter extends ContractRouter> =
   ORPCHooksWithContractRouter<TRouter> & {
     Provider: ORPCContext<TRouter>['Provider']
     useContext: () => ORPCContextValue<TRouter>
     useUtils: () => ORPCUtilsWithContractRouter<TRouter>
+    useQueries: () => UseQueriesWithContractRouter<TRouter>
   }
 
 export type ORPCReactWithRouter<TRouter extends Router<any>> =
@@ -29,6 +35,7 @@ export type ORPCReactWithRouter<TRouter extends Router<any>> =
     Provider: ORPCContext<TRouter>['Provider']
     useContext: () => ORPCContextValue<TRouter>
     useUtils: () => ORPCUtilsWithRouter<TRouter>
+    useQueries: () => UseQueriesWithRouter<TRouter>
   }
 
 export function createORPCReact<
@@ -41,6 +48,7 @@ export function createORPCReact<
   const context = createORPCContext<TRouter>()
   const useContext = () => useORPCContext(context)
   const useUtils = () => createORPCUtils({ contextValue: useContext() })
+  const useQueries = useQueriesFactory({ context })
   const hooks = createORPCHooks({ context })
 
   return new Proxy(
@@ -48,6 +56,7 @@ export function createORPCReact<
       Provider: context.Provider,
       useContext,
       useUtils,
+      useQueries,
     },
     {
       get(target, key) {

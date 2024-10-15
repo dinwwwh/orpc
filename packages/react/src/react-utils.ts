@@ -8,7 +8,6 @@ import type { Procedure, Router } from '@orpc/server'
 import { type GeneralUtils, createGeneralUtils } from './general-utils'
 import { type ProcedureUtils, createProcedureUtils } from './procedure-utils'
 import type { ORPCContextValue } from './react-context'
-import { get } from './utils'
 
 export type ORPCUtilsWithContractRouter<TRouter extends ContractRouter> = {
   [K in keyof TRouter]: TRouter[K] extends ContractProcedure<
@@ -58,7 +57,7 @@ export function createORPCUtils<TRouter extends ContractRouter | Router<any>>(
     ? ORPCUtilsWithContractRouter<TRouter>
     : never {
   const path = options.path ?? []
-  const client = get(options.contextValue.client, path) as any
+  const client = options.contextValue.client as any
 
   const generalUtils = createGeneralUtils({
     client,
@@ -90,6 +89,10 @@ export function createORPCUtils<TRouter extends ContractRouter | Router<any>>(
 
         const nextUtils = createORPCUtils({
           ...options,
+          contextValue: {
+            ...options.contextValue,
+            client: client[key],
+          },
           path: [...path, key],
         })
 
