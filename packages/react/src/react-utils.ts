@@ -63,6 +63,7 @@ export function createORPCUtils<TRouter extends ContractRouter | Router<any>>(
   const generalUtils = createGeneralUtils({
     client,
     queryClient: options.contextValue.queryClient,
+    path,
   })
 
   // for sure root is not procedure, so do not it procedure utils on root
