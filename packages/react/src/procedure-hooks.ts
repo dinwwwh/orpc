@@ -27,12 +27,13 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query'
 import type { SetOptional } from 'type-fest'
+import { orpcPathSymbol } from './orpc-path'
+import { type ORPCContext, useORPCContext } from './react-context'
 import {
   type QueryKey,
   getMutationKeyFromPath,
   getQueryKeyFromPath,
-} from './key'
-import { type ORPCContext, useORPCContext } from './react-context'
+} from './tanstack-key'
 import { get } from './utils'
 
 export interface ProcedureHooks<
@@ -182,6 +183,8 @@ export function createProcedureHooks<
   options: CreateProcedureHooksOptions,
 ): ProcedureHooks<TInputSchema, TOutputSchema, THandlerOutput> {
   return {
+    [orpcPathSymbol as any]: options.path,
+
     useQuery(input, options_) {
       const context = useORPCContext(options.context)
       const client = get(context.client, options.path) as any

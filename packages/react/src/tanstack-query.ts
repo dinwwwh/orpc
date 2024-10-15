@@ -4,7 +4,7 @@ import type {
   QueryFilters,
 } from '@tanstack/react-query'
 import type { SetOptional } from 'type-fest'
-import type { QueryKey, QueryType } from './key'
+import type { QueryKey, QueryType } from './tanstack-key'
 
 export interface ORPCAdditionalQueryFilters<
   TQueryType extends QueryType,

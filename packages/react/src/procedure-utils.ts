@@ -17,7 +17,7 @@ import type {
   Updater,
 } from '@tanstack/react-query'
 import type { SetOptional } from 'type-fest'
-import { type QueryKey, getQueryKeyFromPath } from './key'
+import { type QueryKey, getQueryKeyFromPath } from './tanstack-key'
 import { get } from './utils'
 
 export interface ProcedureUtils<

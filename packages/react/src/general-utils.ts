@@ -18,7 +18,7 @@ import {
   type QueryType,
   getMutationKeyFromPath,
   getQueryKeyFromPath,
-} from './key'
+} from './tanstack-key'
 import type {
   ORPCInvalidateQueryFilters,
   ORPCQueryFilters,

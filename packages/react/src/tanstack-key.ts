@@ -1,5 +1,6 @@
 import type { SchemaInput } from '@orpc/contract'
 import type { PartialDeep } from 'type-fest'
+import { getORPCPath } from './orpc-path'
 import type { ProcedureHooks } from './procedure-hooks'
 import type {
   ORPCHooksWithContractRouter,
@@ -38,7 +39,7 @@ export function getQueryKey<
   orpc: T,
   options?: GetQueryKeyOptions<TQueryType, TInput>,
 ): QueryKey<TQueryType, TInput> {
-  const path = ['todo']
+  const path = getORPCPath(orpc)
   return getQueryKeyFromPath(path, options)
 }
 
@@ -68,7 +69,7 @@ export function getMutationKey<
     | ORPCHooksWithRouter<any>
     | ProcedureHooks<any, any, any>,
 >(orpc: T): MutationKey {
-  const path = ['todo']
+  const path = getORPCPath(orpc)
   return getMutationKeyFromPath(path)
 }
 

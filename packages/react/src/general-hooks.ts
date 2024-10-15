@@ -9,12 +9,12 @@ import {
   useIsMutating,
   useMutationState,
 } from '@tanstack/react-query'
+import { type ORPCContext, useORPCContext } from './react-context'
 import {
   type QueryType,
   getMutationKeyFromPath,
   getQueryKeyFromPath,
-} from './key'
-import { type ORPCContext, useORPCContext } from './react-context'
+} from './tanstack-key'
 
 export interface GeneralHooks<
   TInputSchema extends Schema,

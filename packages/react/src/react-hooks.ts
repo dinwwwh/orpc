@@ -5,6 +5,7 @@ import type {
 } from '@orpc/contract'
 import type { Procedure, Router } from '@orpc/server'
 import { type GeneralHooks, createGeneralHooks } from './general-hooks'
+import { orpcPathSymbol } from './orpc-path'
 import { type ProcedureHooks, createProcedureHooks } from './procedure-hooks'
 import type { ORPCContext } from './react-context'
 
@@ -68,6 +69,8 @@ export function createORPCHooks<TRouter extends ContractRouter | Router<any>>(
 
   return new Proxy(
     {
+      [orpcPathSymbol]: path,
+
       ...generalHooks,
       ...procedureHooks,
     },
