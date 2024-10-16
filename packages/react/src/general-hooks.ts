@@ -59,9 +59,10 @@ export interface CreateGeneralHooksOptions {
 }
 
 export function createGeneralHooks<
-  TInputSchema extends Schema,
-  TOutputSchema extends Schema,
-  THandlerOutput extends SchemaOutput<TOutputSchema>,
+  TInputSchema extends Schema = undefined,
+  TOutputSchema extends Schema = undefined,
+  THandlerOutput extends
+    SchemaOutput<TOutputSchema> = SchemaOutput<TOutputSchema>,
 >(
   options: CreateGeneralHooksOptions,
 ): GeneralHooks<TInputSchema, TOutputSchema, THandlerOutput> {

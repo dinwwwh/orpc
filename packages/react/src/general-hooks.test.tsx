@@ -6,9 +6,14 @@ import {
   type UserCreateInputSchema,
   type UserFindInputSchema,
   type UserSchema,
+  queryClient,
   wrapper,
 } from '../tests/orpc'
 import { createGeneralHooks } from './general-hooks'
+
+beforeEach(() => {
+  queryClient.clear()
+})
 
 describe('useIsFetching', () => {
   const user_hooks = createGeneralHooks<undefined, undefined, unknown>({

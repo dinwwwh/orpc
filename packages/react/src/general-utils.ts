@@ -1,4 +1,3 @@
-import type { ProcedureClient } from '@orpc/client'
 import type { Schema, SchemaInput, SchemaOutput } from '@orpc/contract'
 import type {
   CancelOptions,
@@ -41,7 +40,7 @@ export interface GeneralUtils<
   ) => [
     QueryKey<'query', TFilterInput>,
     SchemaOutput<TOutputSchema, THandlerOutput> | undefined,
-  ]
+  ][]
   getInfiniteQueriesData: <
     TFilterInput extends
       | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
@@ -57,7 +56,7 @@ export interface GeneralUtils<
         >
       | undefined
     ),
-  ]
+  ][]
 
   setQueriesData: <
     TFilterInput extends
@@ -73,7 +72,7 @@ export interface GeneralUtils<
   ) => [
     QueryKey<'query', TFilterInput>,
     SchemaOutput<TOutputSchema, THandlerOutput> | undefined,
-  ]
+  ][]
   setInfiniteQueriesData: <
     TFilterInput extends
       | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
@@ -81,8 +80,16 @@ export interface GeneralUtils<
   >(
     filters: OmitKeyof<ORPCQueryFilters<undefined, TFilterInput>, 'queryType'>,
     updater: Updater<
-      InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>> | undefined,
-      InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>> | undefined
+      | InfiniteData<
+          SchemaOutput<TOutputSchema, THandlerOutput>,
+          SchemaInput<TInputSchema>['cursor']
+        >
+      | undefined,
+      | InfiniteData<
+          SchemaOutput<TOutputSchema, THandlerOutput>,
+          SchemaInput<TInputSchema>['cursor']
+        >
+      | undefined
     >,
     options?: SetDataOptions,
   ) => [
@@ -94,7 +101,7 @@ export interface GeneralUtils<
         >
       | undefined
     ),
-  ]
+  ][]
 
   invalidate: <
     TQueryType extends QueryType = undefined,
@@ -141,7 +148,9 @@ export interface GeneralUtils<
     options?: ResetOptions,
   ) => Promise<void>
 
-  isFetching: (filters?: ORPCQueryFilters<any, any>) => number
+  isFetching: (
+    filters?: ORPCQueryFilters<any, PartialDeep<SchemaInput<TInputSchema>>>,
+  ) => number
   isMutating: (filters?: SetOptional<MutationFilters, 'mutationKey'>) => number
 
   getQueryDefaults: <
@@ -252,12 +261,7 @@ export interface GeneralUtils<
   ) => void
 }
 
-export interface CreateGeneralUtilsOptions<
-  TInputSchema extends Schema,
-  TOutputSchema extends Schema,
-  THandlerOutput extends SchemaOutput<TOutputSchema>,
-> {
-  client: ProcedureClient<TInputSchema, TOutputSchema, THandlerOutput>
+export interface CreateGeneralUtilsOptions {
   queryClient: QueryClient
 
   /**
@@ -269,15 +273,12 @@ export interface CreateGeneralUtilsOptions<
 }
 
 export function createGeneralUtils<
-  TInputSchema extends Schema,
-  TOutputSchema extends Schema,
-  THandlerOutput extends SchemaOutput<TOutputSchema>,
+  TInputSchema extends Schema = undefined,
+  TOutputSchema extends Schema = undefined,
+  THandlerOutput extends
+    SchemaOutput<TOutputSchema> = SchemaOutput<TOutputSchema>,
 >(
-  options: CreateGeneralUtilsOptions<
-    TInputSchema,
-    TOutputSchema,
-    THandlerOutput
-  >,
+  options: CreateGeneralUtilsOptions,
 ): GeneralUtils<TInputSchema, TOutputSchema, THandlerOutput> {
   return {
     getQueriesData(filters) {

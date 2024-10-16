@@ -175,9 +175,10 @@ export interface ProcedureUtils<
 }
 
 export interface CreateProcedureUtilsOptions<
-  TInputSchema extends Schema,
-  TOutputSchema extends Schema,
-  THandlerOutput extends SchemaOutput<TOutputSchema>,
+  TInputSchema extends Schema = undefined,
+  TOutputSchema extends Schema = undefined,
+  THandlerOutput extends
+    SchemaOutput<TOutputSchema> = SchemaOutput<TOutputSchema>,
 > {
   client: ProcedureClient<TInputSchema, TOutputSchema, THandlerOutput>
   queryClient: QueryClient
