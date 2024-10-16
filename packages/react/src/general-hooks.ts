@@ -3,18 +3,14 @@ import {
   type Mutation,
   type MutationFilters,
   type MutationState,
-  type OmitKeyof,
-  type QueryFilters,
   useIsFetching,
   useIsMutating,
   useMutationState,
 } from '@tanstack/react-query'
+import type { PartialDeep, SetOptional } from 'type-fest'
 import { type ORPCContext, useORPCContext } from './react-context'
-import {
-  type QueryType,
-  getMutationKeyFromPath,
-  getQueryKeyFromPath,
-} from './tanstack-key'
+import { getMutationKeyFromPath, getQueryKeyFromPath } from './tanstack-key'
+import type { ORPCQueryFilters } from './tanstack-query'
 
 export interface GeneralHooks<
   TInputSchema extends Schema,
@@ -22,12 +18,14 @@ export interface GeneralHooks<
   THandlerOutput extends SchemaOutput<TOutputSchema>,
 > {
   useIsFetching: (
-    filers?: OmitKeyof<QueryFilters, 'queryKey'> & {
-      queryType?: QueryType
-      input?: SchemaInput<TInputSchema>
-    },
+    filers?: ORPCQueryFilters<
+      undefined,
+      PartialDeep<SchemaInput<TInputSchema>>
+    >,
   ) => number
-  useIsMutating: (filters?: OmitKeyof<MutationFilters, 'mutationKey'>) => number
+  useIsMutating: (
+    filters?: SetOptional<MutationFilters, 'mutationKey'>,
+  ) => number
 
   useMutationState: <
     UResult = MutationState<
@@ -37,7 +35,7 @@ export interface GeneralHooks<
       unknown
     >,
   >(options?: {
-    filters?: OmitKeyof<MutationFilters, 'mutationKey'>
+    filters?: SetOptional<MutationFilters, 'mutationKey'>
     select?: (
       mutation: Mutation<
         SchemaOutput<TOutputSchema, THandlerOutput>,
