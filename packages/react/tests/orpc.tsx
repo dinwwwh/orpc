@@ -2,6 +2,7 @@ import { createORPCClient } from '@orpc/client'
 import { createRouterHandler, initORPC } from '@orpc/server'
 import { fetchHandler } from '@orpc/server/fetch'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import React, { Suspense } from 'react'
 import { z } from 'zod'
 import { createORPCReact } from '../src'
 
@@ -117,12 +118,41 @@ export const queryClient = new QueryClient({
   },
 })
 
+export class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError?: boolean; error: unknown }
+> {
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error }
+  }
+
+  override componentDidCatch(error: unknown, errorInfo: unknown) {
+    // You can use your own error logging service here
+    // console.log({ error, errorInfo })
+  }
+
+  override render() {
+    if (this.state?.hasError) {
+      return (
+        <div data-testid="error-boundary">
+          Error occurred
+          <pre>{JSON.stringify(this.state.error, null, 2)}</pre>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
 export const wrapper = (props: { children: React.ReactNode }) => {
   return (
     <ORPCContext.Provider value={{ client: orpcClient, queryClient }}>
-      <QueryClientProvider client={queryClient}>
-        {props.children}
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <Suspense fallback={<div>Loading...</div>}>{props.children}</Suspense>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </ORPCContext.Provider>
   )
 }
