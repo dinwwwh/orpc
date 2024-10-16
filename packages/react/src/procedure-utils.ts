@@ -18,6 +18,7 @@ import type {
 } from '@tanstack/react-query'
 import type { SetOptional } from 'type-fest'
 import { type QueryKey, getQueryKeyFromPath } from './tanstack-key'
+import type { SchemaInputForInfiniteQuery } from './types'
 import { get } from './utils'
 
 export interface ProcedureUtils<
@@ -38,8 +39,7 @@ export interface ProcedureUtils<
     >,
   ) => Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
   fetchInfiniteQuery: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: OptionalUndefined<
       SetOptional<
         FetchInfiniteQueryOptions<
@@ -72,8 +72,7 @@ export interface ProcedureUtils<
     >,
   ) => Promise<void>
   prefetchInfiniteQuery: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: OptionalUndefined<
       SetOptional<
         FetchInfiniteQueryOptions<
@@ -92,8 +91,7 @@ export interface ProcedureUtils<
     input: SchemaInput<TInputSchema>,
   ) => SchemaOutput<TOutputSchema, THandlerOutput> | undefined
   getInfiniteQueryData: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
   ) =>
     | InfiniteData<
         SchemaOutput<TOutputSchema, THandlerOutput>,
@@ -114,8 +112,7 @@ export interface ProcedureUtils<
     >,
   ) => Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
   ensureInfiniteQueryData: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: OptionalUndefined<
       SetOptional<
         EnsureInfiniteQueryDataOptions<
@@ -141,8 +138,7 @@ export interface ProcedureUtils<
     | QueryState<SchemaOutput<TOutputSchema, THandlerOutput>, unknown>
     | undefined
   getInfiniteQueryState: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
   ) =>
     | QueryState<
         InfiniteData<
@@ -162,8 +158,7 @@ export interface ProcedureUtils<
     options?: SetDataOptions,
   ) => SchemaOutput<TOutputSchema, THandlerOutput> | undefined
   setInfiniteQueryData: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
     updater: Updater<
       | InfiniteData<
           SchemaOutput<TOutputSchema, THandlerOutput>,

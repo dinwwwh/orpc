@@ -26,7 +26,7 @@ import {
   useSuspenseInfiniteQuery,
   useSuspenseQuery,
 } from '@tanstack/react-query'
-import type { SetOptional } from 'type-fest'
+import type { PartialOnUndefinedDeep, SetOptional } from 'type-fest'
 import { orpcPathSymbol } from './orpc-path'
 import { type ORPCContext, useORPCContext } from './react-context'
 import {
@@ -34,6 +34,7 @@ import {
   getMutationKeyFromPath,
   getQueryKeyFromPath,
 } from './tanstack-key'
+import type { SchemaInputForInfiniteQuery } from './types'
 import { get } from './utils'
 
 export interface ProcedureHooks<
@@ -41,30 +42,31 @@ export interface ProcedureHooks<
   TOutputSchema extends Schema,
   THandlerOutput extends SchemaOutput<TOutputSchema>,
 > {
-  useQuery: (
+  useQuery: <USelectData = SchemaOutput<TOutputSchema, THandlerOutput>>(
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
       UseQueryOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         unknown,
-        SchemaOutput<TOutputSchema, THandlerOutput>,
+        USelectData,
         QueryKey<'query', SchemaInput<TInputSchema>>
       >,
       'queryFn' | 'queryKey'
     >,
-  ) => UseQueryResult<SchemaOutput<TOutputSchema, THandlerOutput>, unknown>
-  useInfiniteQuery: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+  ) => UseQueryResult<USelectData, unknown>
+  useInfiniteQuery: <
+    USelectData = InfiniteData<
+      SchemaOutput<TOutputSchema, THandlerOutput>,
+      SchemaInput<TInputSchema>['cursor']
+    >,
+  >(
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: OptionalUndefined<
       SetOptional<
         UseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
           unknown,
-          InfiniteData<
-            SchemaOutput<TOutputSchema, THandlerOutput>,
-            SchemaInput<TInputSchema>['cursor']
-          >,
+          USelectData,
           SchemaOutput<TOutputSchema, THandlerOutput>,
           QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
           SchemaInput<TInputSchema>['cursor']
@@ -72,41 +74,33 @@ export interface ProcedureHooks<
         'queryFn' | 'queryKey'
       >
     >,
-  ) => UseInfiniteQueryResult<
-    InfiniteData<
-      SchemaOutput<TOutputSchema, THandlerOutput>,
-      SchemaInput<TInputSchema>['cursor']
-    >,
-    unknown
-  >
+  ) => UseInfiniteQueryResult<USelectData, unknown>
 
-  useSuspenseQuery: (
+  useSuspenseQuery: <USelectData = SchemaOutput<TOutputSchema, THandlerOutput>>(
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
       UseSuspenseQueryOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         unknown,
-        SchemaOutput<TOutputSchema, THandlerOutput>,
+        USelectData,
         QueryKey<'query', SchemaInput<TInputSchema>>
       >,
       'queryFn' | 'queryKey'
     >,
-  ) => UseSuspenseQueryResult<
-    SchemaOutput<TOutputSchema, THandlerOutput>,
-    unknown
-  >
-  useSuspenseInfiniteQuery: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
+  ) => UseSuspenseQueryResult<USelectData, unknown>
+  useSuspenseInfiniteQuery: <
+    USelectData = InfiniteData<
+      SchemaOutput<TOutputSchema, THandlerOutput>,
+      SchemaInput<TInputSchema>['cursor']
+    >,
+  >(
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: OptionalUndefined<
       SetOptional<
         UseSuspenseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
           unknown,
-          InfiniteData<
-            SchemaOutput<TOutputSchema, THandlerOutput>,
-            SchemaInput<TInputSchema>['cursor']
-          >,
+          USelectData,
           SchemaOutput<TOutputSchema, THandlerOutput>,
           QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
           SchemaInput<TInputSchema>['cursor']
@@ -114,13 +108,7 @@ export interface ProcedureHooks<
         'queryFn' | 'queryKey'
       >
     >,
-  ) => UseSuspenseInfiniteQueryResult<
-    InfiniteData<
-      SchemaOutput<TOutputSchema, THandlerOutput>,
-      SchemaInput<TInputSchema>['cursor']
-    >,
-    unknown
-  >
+  ) => UseSuspenseInfiniteQueryResult<USelectData, unknown>
 
   usePrefetchQuery: (
     input: SchemaInput<TInputSchema>,
@@ -132,17 +120,18 @@ export interface ProcedureHooks<
     >,
   ) => void
   usePrefetchInfiniteQuery: (
-    input: Omit<SchemaInput<TInputSchema>, 'cursor'> &
-      Record<string | number, any>,
-    options: SetOptional<
-      FetchInfiniteQueryOptions<
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
-        SchemaInput<TInputSchema>['cursor']
-      >,
-      'queryKey' | 'queryFn'
+    input: SchemaInputForInfiniteQuery<TInputSchema>,
+    options: PartialOnUndefinedDeep<
+      SetOptional<
+        FetchInfiniteQueryOptions<
+          SchemaOutput<TOutputSchema, THandlerOutput>,
+          unknown,
+          SchemaOutput<TOutputSchema, THandlerOutput>,
+          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+          SchemaInput<TInputSchema>['cursor']
+        >,
+        'queryKey' | 'queryFn'
+      >
     >,
   ) => void
 
@@ -259,7 +248,7 @@ export function createProcedureHooks<
           type: 'infinite',
         }),
         queryFn: ({ pageParam }) => client({ ...input, cursor: pageParam }),
-        ...options_,
+        ...(options_ as any),
       })
     },
 

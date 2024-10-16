@@ -4,6 +4,11 @@
     "quickfix.biome": "explicit",
     "source.organizeImports.biome": "explicit"
   },
+  "explorer.fileNesting.patterns": {
+    "package.json": "*",
+    "*.ts": "${capture}.*",
+    "*.tsx": "${capture}.*"
+  },
 
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,

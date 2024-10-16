@@ -24,7 +24,6 @@ import {
 
 export type ORPCReactWithContractRouter<TRouter extends ContractRouter> =
   ORPCHooksWithContractRouter<TRouter> & {
-    Provider: ORPCContext<TRouter>['Provider']
     useContext: () => ORPCContextValue<TRouter>
     useUtils: () => ORPCUtilsWithContractRouter<TRouter>
     useQueries: () => UseQueriesWithContractRouter<TRouter>
@@ -32,7 +31,6 @@ export type ORPCReactWithContractRouter<TRouter extends ContractRouter> =
 
 export type ORPCReactWithRouter<TRouter extends Router<any>> =
   ORPCHooksWithRouter<TRouter> & {
-    Provider: ORPCContext<TRouter>['Provider']
     useContext: () => ORPCContextValue<TRouter>
     useUtils: () => ORPCUtilsWithRouter<TRouter>
     useQueries: () => UseQueriesWithRouter<TRouter>
@@ -40,20 +38,22 @@ export type ORPCReactWithRouter<TRouter extends Router<any>> =
 
 export function createORPCReact<
   TRouter extends ContractRouter | Router<any>,
->(): TRouter extends Router<any>
-  ? ORPCReactWithRouter<TRouter>
-  : TRouter extends ContractRouter
-    ? ORPCReactWithContractRouter<TRouter>
-    : never {
-  const context = createORPCContext<TRouter>()
-  const useContext = () => useORPCContext(context)
+>(): {
+  orpc: TRouter extends Router<any>
+    ? ORPCReactWithRouter<TRouter>
+    : TRouter extends ContractRouter
+      ? ORPCReactWithContractRouter<TRouter>
+      : never
+  ORPCContext: ORPCContext<TRouter>
+} {
+  const Context = createORPCContext<TRouter>()
+  const useContext = () => useORPCContext(Context)
   const useUtils = () => createORPCUtils({ contextValue: useContext() })
-  const useQueries = useQueriesFactory({ context })
-  const hooks = createORPCHooks({ context })
+  const useQueries = useQueriesFactory({ context: Context })
+  const hooks = createORPCHooks({ context: Context })
 
-  return new Proxy(
+  const orpc = new Proxy(
     {
-      Provider: context.Provider,
       useContext,
       useUtils,
       useQueries,
@@ -74,5 +74,7 @@ export function createORPCReact<
         })
       },
     },
-  ) as any
+  )
+
+  return { orpc: orpc as any, ORPCContext: Context }
 }

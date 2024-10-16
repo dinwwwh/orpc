@@ -25,6 +25,7 @@ import type {
   ORPCInvalidateQueryFilters,
   ORPCQueryFilters,
 } from './tanstack-query'
+import type { SchemaInputForInfiniteQuery } from './types'
 
 export interface GeneralUtils<
   TInputSchema extends Schema,
@@ -43,8 +44,7 @@ export interface GeneralUtils<
   ]
   getInfiniteQueriesData: <
     TFilterInput extends
-      | (PartialDeep<Omit<SchemaInput<TInputSchema>, 'cursor'>> &
-          Record<string | number, any>)
+      | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
       | undefined = undefined,
   >(
     filters?: OmitKeyof<ORPCQueryFilters<undefined, TFilterInput>, 'queryType'>,
@@ -76,8 +76,7 @@ export interface GeneralUtils<
   ]
   setInfiniteQueriesData: <
     TFilterInput extends
-      | (PartialDeep<Omit<SchemaInput<TInputSchema>, 'cursor'>> &
-          Record<string | number, any>)
+      | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
       | undefined = undefined,
   >(
     filters: OmitKeyof<ORPCQueryFilters<undefined, TFilterInput>, 'queryType'>,
@@ -166,8 +165,7 @@ export interface GeneralUtils<
   >
   getInfiniteQueryDefaults: <
     TFilterInput extends
-      | (PartialDeep<Omit<SchemaInput<TInputSchema>, 'cursor'>> &
-          Record<string | number, any>)
+      | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
       | undefined = undefined,
   >(
     filters?: Pick<

@@ -34,8 +34,17 @@ export type KeysOfType<T, SelectedType> = {
   [key in keyof T]: SelectedType extends T[key] ? key : never
 }[keyof T]
 
+/**
+ * @deprecated use type-fest lib instead
+ */
 export type Optional<T> = Partial<Pick<T, KeysOfType<T, undefined>>>
 
+/**
+ * @deprecated use type-fest lib instead
+ */
 export type Required<T> = Omit<T, KeysOfType<T, undefined>>
 
+/**
+ * @deprecated use type-fest lib instead
+ */
 export type OptionalUndefined<T> = Optional<T> & Required<T>
