@@ -1,10 +1,5 @@
 import type { ProcedureClient } from '@orpc/client'
-import type {
-  OptionalUndefined,
-  Schema,
-  SchemaInput,
-  SchemaOutput,
-} from '@orpc/contract'
+import type { Schema, SchemaInput, SchemaOutput } from '@orpc/contract'
 import type {
   EnsureInfiniteQueryDataOptions,
   EnsureQueryDataOptions,
@@ -16,7 +11,7 @@ import type {
   SetDataOptions,
   Updater,
 } from '@tanstack/react-query'
-import type { SetOptional } from 'type-fest'
+import type { PartialOnUndefinedDeep, SetOptional } from 'type-fest'
 import { type QueryKey, getQueryKeyFromPath } from './tanstack-key'
 import type { SchemaInputForInfiniteQuery } from './types'
 import { get } from './utils'
@@ -40,7 +35,7 @@ export interface ProcedureUtils<
   ) => Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
   fetchInfiniteQuery: (
     input: SchemaInputForInfiniteQuery<TInputSchema>,
-    options: OptionalUndefined<
+    options: PartialOnUndefinedDeep<
       SetOptional<
         FetchInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
@@ -73,7 +68,7 @@ export interface ProcedureUtils<
   ) => Promise<void>
   prefetchInfiniteQuery: (
     input: SchemaInputForInfiniteQuery<TInputSchema>,
-    options: OptionalUndefined<
+    options: PartialOnUndefinedDeep<
       SetOptional<
         FetchInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
@@ -113,7 +108,7 @@ export interface ProcedureUtils<
   ) => Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
   ensureInfiniteQueryData: (
     input: SchemaInputForInfiniteQuery<TInputSchema>,
-    options: OptionalUndefined<
+    options: PartialOnUndefinedDeep<
       SetOptional<
         EnsureInfiniteQueryDataOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
