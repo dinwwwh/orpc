@@ -14,7 +14,6 @@ import type {
 import type { PartialOnUndefinedDeep, SetOptional } from 'type-fest'
 import { type QueryKey, getQueryKeyFromPath } from './tanstack-key'
 import type { SchemaInputForInfiniteQuery } from './types'
-import { get } from './utils'
 
 export interface ProcedureUtils<
   TInputSchema extends Schema,
@@ -202,44 +201,44 @@ export function createProcedureUtils<
 ): ProcedureUtils<TInputSchema, TOutputSchema, THandlerOutput> {
   return {
     fetchQuery(input, options_) {
-      const client = get(options.client, options.path) as any
       return options.queryClient.fetchQuery({
         queryKey: getQueryKeyFromPath(options.path, { input, type: 'query' }),
-        queryFn: () => client(input),
+        queryFn: () => options.client(input),
         ...options_,
       })
     },
     fetchInfiniteQuery(input, options_) {
-      const client = get(options.client, options.path) as any
       return options.queryClient.fetchInfiniteQuery({
         queryKey: getQueryKeyFromPath(options.path, {
           input,
           type: 'infinite',
         }),
-        queryFn: ({ pageParam }) => client({ ...input, pageParam }),
+        queryFn: ({ pageParam }) => {
+          return options.client({ ...input, pageParam } as any)
+        },
         ...(options_ as any),
       })
     },
 
     prefetchQuery(input, options_) {
-      const client = get(options.client, options.path) as any
       return options.queryClient.prefetchQuery({
         queryKey: getQueryKeyFromPath(options.path, {
           input,
           type: 'query',
         }),
-        queryFn: () => client(input),
+        queryFn: () => options.client(input),
         ...options_,
       })
     },
     prefetchInfiniteQuery(input, options_) {
-      const client = get(options.client, options.path) as any
       return options.queryClient.prefetchInfiniteQuery({
         queryKey: getQueryKeyFromPath(options.path, {
           input,
           type: 'infinite',
         }),
-        queryFn: () => client(input),
+        queryFn: ({ pageParam }) => {
+          return options.client({ ...input, cursor: pageParam } as any)
+        },
         ...(options_ as any),
       })
     },
@@ -262,24 +261,24 @@ export function createProcedureUtils<
     },
 
     ensureQueryData(input, options_) {
-      const client = get(options.client, options.path) as any
       return options.queryClient.ensureQueryData({
         queryKey: getQueryKeyFromPath(options.path, {
           input,
           type: 'query',
         }),
-        queryFn: () => client(input),
+        queryFn: () => options.client(input),
         ...options_,
       })
     },
     ensureInfiniteQueryData(input, options_) {
-      const client = get(options.client, options.path) as any
       return options.queryClient.ensureInfiniteQueryData({
         queryKey: getQueryKeyFromPath(options.path, {
           input,
           type: 'infinite',
         }),
-        queryFn: ({ pageParam }) => client({ ...input, pageParam }),
+        queryFn: ({ pageParam }) => {
+          return options.client({ ...input, pageParam } as any)
+        },
         ...(options_ as any),
       })
     },
