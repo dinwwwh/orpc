@@ -234,23 +234,29 @@ export function createProcedureHooks<
     usePrefetchQuery(input, options_) {
       const context = useORPCContext(options.context)
       const client = get(context.client, options.path) as any
-      return usePrefetchQuery({
-        queryKey: getQueryKeyFromPath(options.path, { input, type: 'query' }),
-        queryFn: () => client(input),
-        ...options_,
-      })
+      return usePrefetchQuery(
+        {
+          queryKey: getQueryKeyFromPath(options.path, { input, type: 'query' }),
+          queryFn: () => client(input),
+          ...options_,
+        },
+        context.queryClient,
+      )
     },
     usePrefetchInfiniteQuery(input, options_) {
       const context = useORPCContext(options.context)
       const client = get(context.client, options.path) as any
-      return usePrefetchInfiniteQuery({
-        queryKey: getQueryKeyFromPath(options.path, {
-          input,
-          type: 'infinite',
-        }),
-        queryFn: ({ pageParam }) => client({ ...input, cursor: pageParam }),
-        ...(options_ as any),
-      })
+      return usePrefetchInfiniteQuery(
+        {
+          queryKey: getQueryKeyFromPath(options.path, {
+            input,
+            type: 'infinite',
+          }),
+          queryFn: ({ pageParam }) => client({ ...input, cursor: pageParam }),
+          ...(options_ as any),
+        },
+        context.queryClient,
+      )
     },
 
     useMutation(options_) {

@@ -64,9 +64,9 @@ describe('useIsFetching', () => {
     expect(result4.current).toBe(0)
     expect(result5.current).toBe(0)
 
-    renderHook(
-      () =>
-        useQuery({
+    renderHook(() =>
+      useQuery(
+        {
           queryKey: [
             ['user', 'find'],
             { input: { id: '12333' }, type: 'query' },
@@ -74,12 +74,13 @@ describe('useIsFetching', () => {
           queryFn: async () => {
             await new Promise((resolve) => setTimeout(resolve, 100))
           },
-        }),
-      { wrapper },
+        },
+        queryClient,
+      ),
     )
-    renderHook(
-      () =>
-        useQuery({
+    renderHook(() =>
+      useQuery(
+        {
           queryKey: [
             ['user', 'find'],
             { input: { id: '12333' }, type: 'infinite' },
@@ -87,8 +88,9 @@ describe('useIsFetching', () => {
           queryFn: async () => {
             await new Promise((resolve) => setTimeout(resolve, 100))
           },
-        }),
-      { wrapper },
+        },
+        queryClient,
+      ),
     )
 
     await new Promise((resolve) => setTimeout(resolve, 50)) // < 100 make sure the query is not finished
@@ -140,15 +142,16 @@ describe('useIsMutating', () => {
     expect(result2.current).toBe(0)
     expect(result3.current).toBe(0)
 
-    const { result: mutation } = renderHook(
-      () =>
-        useMutation({
+    const { result: mutation } = renderHook(() =>
+      useMutation(
+        {
           mutationKey: [['user', 'create']],
           mutationFn: async () => {
             await new Promise((resolve) => setTimeout(resolve, 100))
           },
-        }),
-      { wrapper },
+        },
+        queryClient,
+      ),
     )
 
     mutation.current.mutate()
@@ -202,15 +205,16 @@ describe('useMutationState', () => {
     expect(result2.current.length).toBe(0)
     expect(result3.current.length).toBe(0)
 
-    const { result: mutation } = renderHook(
-      () =>
-        useMutation({
+    const { result: mutation } = renderHook(() =>
+      useMutation(
+        {
           mutationKey: [['user', 'create']],
           mutationFn: async () => {
             await new Promise((resolve) => setTimeout(resolve, 100))
           },
-        }),
-      { wrapper },
+        },
+        queryClient,
+      ),
     )
 
     mutation.current.mutate({ name: 'dinwwwh' } as any)

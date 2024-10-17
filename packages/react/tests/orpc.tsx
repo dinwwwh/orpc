@@ -149,11 +149,16 @@ export class ErrorBoundary extends React.Component<
 export const wrapper = (props: { children: React.ReactNode }) => {
   return (
     <ORPCContext.Provider value={{ client: orpcClient, queryClient }}>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <Suspense fallback={<div>Loading...</div>}>{props.children}</Suspense>
+      <QueryClientProvider client={queryClient}>
+        {/* make sure orpc provide correct queryClient on each hook call */}
+        <QueryClientProvider client={new QueryClient()}>
+          <ErrorBoundary>
+            <Suspense fallback={<div>Loading...</div>}>
+              {props.children}
+            </Suspense>
+          </ErrorBoundary>
         </QueryClientProvider>
-      </ErrorBoundary>
+      </QueryClientProvider>
     </ORPCContext.Provider>
   )
 }

@@ -35,7 +35,7 @@ export function useORPCContext<TRouter extends ContractRouter | Router<any>>(
 
   if (!value) {
     throw new Error(
-      'useORPCContext must be used within a <orpc.Provider>, please see the docs',
+      'useORPCContext must be used within a <ORPCContext.Provider>, please see the docs',
     )
   }
 
