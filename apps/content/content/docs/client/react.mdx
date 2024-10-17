@@ -12,26 +12,27 @@ npm i @orpc/client @orpc/react @tanstack/react-query
 ## Setup
 
 ```tsx
-import { createORPCReact, ORPCContextProvider } from '@orpc/react'
+import { createORPCReact } from '@orpc/react'
 import { createORPCClient } from '@orpc/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { router } from './app-router-or-contract-router'
 
-export const orpc = createORPCReact<typeof router>()
+export const { orpc, ORPCContext } = createORPCReact<typeof router>()
 
 export function ORPCProvider({ children }: { children: React.ReactNode }) {
-    const [client] = useState(() => createORPCClient({
+    const [client] = useState(() => createORPCClient<typeof router>({
         baseURL: 'http://localhost:2026',
     }))
     const [queryClient] = useState(() => new QueryClient())
 
     return (
-        <ORPCContextProvider value={{ client, queryClient }}>
-            <QueryClientProvider client={queryClient}>
+        <QueryClientProvider client={queryClient}>
+            <ORPCContext.Provider value={{ client, queryClient }}>
+                {/* If you has own QueryClientProvider please put it here*/}
                 {children}
-            </QueryClientProvider>
-        </ORPCContextProvider>
+            </ORPCContext.Provider>
+        </QueryClientProvider>
     )
 }
 ```
@@ -101,3 +102,35 @@ Again, oRPC `useInfiniteQuery` just wraps [TanStack Query](https://tanstack.com/
 However, oRPC will manage the `query key` and `function` for you, providing the best developer experience.
 
 > **Note:** The React client is still in progress. We will add more features in the future.
+
+## Utils
+
+```ts
+const utils = orpc.useUtils()
+
+utils.user.invalidate()
+// ...
+```
+
+## Use Queries
+
+```ts
+const queries = orpc.useQueries((o) => {
+    return [
+        o.user.find({ id: '123' }),
+        o.user.list({}),
+    ]
+})
+```
+
+## Use Context
+
+```ts
+const {client, queryClient} = orpc.useContext()
+
+const user = await client.user.find({ id: '123' })
+```
+
+## Others
+
+oRPC React is well tested, it provides up to 30+ wrapper TanStack Query APIs. Please install and tinker with it.
