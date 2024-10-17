@@ -300,7 +300,7 @@ export function createGeneralUtils<
     },
 
     setQueriesData(filters, updater, options_) {
-      const { input, ...rest } = filters ?? {}
+      const { input, ...rest } = filters
       return options.queryClient.setQueriesData(
         {
           queryKey: getQueryKeyFromPath(options.path, {
@@ -314,7 +314,7 @@ export function createGeneralUtils<
       ) as any
     },
     setInfiniteQueriesData(filters, updater, options_) {
-      const { input, ...rest } = filters ?? {}
+      const { input, ...rest } = filters
       return options.queryClient.setQueriesData(
         {
           queryKey: getQueryKeyFromPath(options.path, {

@@ -11,10 +11,6 @@ import {
 } from '../tests/orpc'
 import { createGeneralUtils } from './general-utils'
 
-beforeEach(() => {
-  queryClient.clear()
-})
-
 const user_utils = createGeneralUtils({
   queryClient: queryClient,
   path: ['user'],
