@@ -1,4 +1,5 @@
 import type { SchemaInput } from '@orpc/contract'
+import type { MutationKey, QueryKey } from '@tanstack/react-query'
 import type { PartialDeep } from 'type-fest'
 import { getORPCPath } from './orpc-path'
 import type { ProcedureHooks } from './procedure-hooks'
@@ -8,20 +9,10 @@ import type {
 } from './react-hooks'
 
 export type QueryType = 'query' | 'infinite' | undefined
-export type QueryKey<TQueryType extends QueryType, TInput> = [
-  string[],
-  TQueryType extends undefined
-    ? { type?: QueryType }
-    : { type: TQueryType } & TInput extends undefined
-      ? { input?: unknown }
-      : { input: TInput },
-]
 
-export type MutationKey = [string[]]
-
-export interface GetQueryKeyOptions<TQueryType extends QueryType, TInput> {
+export interface GetQueryKeyOptions<TInput> {
   input?: TInput
-  type?: TQueryType
+  type?: QueryType
 }
 
 export function getQueryKey<
@@ -29,27 +20,22 @@ export function getQueryKey<
     | ORPCHooksWithContractRouter<any>
     | ORPCHooksWithRouter<any>
     | ProcedureHooks<any, any, any>,
-  TQueryType extends QueryType = undefined,
-  TInput extends
-    | (T extends ProcedureHooks<infer UInputSchema, any, any>
-        ? PartialDeep<SchemaInput<UInputSchema>>
-        : unknown)
-    | undefined = undefined,
 >(
   orpc: T,
-  options?: GetQueryKeyOptions<TQueryType, TInput>,
-): QueryKey<TQueryType, TInput> {
+  options?: GetQueryKeyOptions<
+    T extends ProcedureHooks<infer UInputSchema, any, any>
+      ? PartialDeep<SchemaInput<UInputSchema>>
+      : unknown
+  >,
+): QueryKey {
   const path = getORPCPath(orpc)
   return getQueryKeyFromPath(path, options)
 }
 
-export function getQueryKeyFromPath<
-  TQueryType extends QueryType = undefined,
-  TInput = unknown,
->(
+export function getQueryKeyFromPath(
   path: string[],
-  options?: GetQueryKeyOptions<TQueryType, TInput>,
-): QueryKey<TQueryType, TInput> {
+  options?: GetQueryKeyOptions<unknown>,
+): QueryKey {
   const withInput =
     options?.input !== undefined ? { input: options?.input } : {}
   const withType = options?.type !== undefined ? { type: options?.type } : {}
@@ -59,7 +45,7 @@ export function getQueryKeyFromPath<
     {
       ...withInput,
       ...withType,
-    } as any,
+    },
   ]
 }
 

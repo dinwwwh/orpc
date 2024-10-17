@@ -368,7 +368,7 @@ describe('getQueryState', () => {
     const data = utils.getQueryState({ id: '1' })
 
     expectTypeOf(data).toEqualTypeOf<
-      undefined | QueryState<SchemaOutput<typeof UserSchema>, unknown>
+      undefined | QueryState<SchemaOutput<typeof UserSchema>>
     >()
   })
 })
@@ -396,8 +396,7 @@ describe('getInfiniteQueryState', () => {
           InfiniteData<
             SchemaOutput<typeof UserListOutputSchema>,
             number | undefined
-          >,
-          unknown
+          >
         >
     >()
   })

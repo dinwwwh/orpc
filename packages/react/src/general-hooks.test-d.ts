@@ -1,5 +1,9 @@
 import type { SchemaInput, SchemaOutput } from '@orpc/contract'
-import type { Mutation, MutationState } from '@tanstack/react-query'
+import type {
+  DefaultError,
+  Mutation,
+  MutationState,
+} from '@tanstack/react-query'
 import {
   ORPCContext,
   type UserCreateInputSchema,
@@ -96,16 +100,15 @@ describe('useMutationState', () => {
   it('simple', () => {
     const result = hooks.useMutationState()
     expectTypeOf(result).toEqualTypeOf<
-      MutationState<unknown, unknown, unknown, unknown>[]
+      MutationState<unknown, DefaultError, unknown>[]
     >()
 
     const result2 = procedureHooks.useMutationState()
     expectTypeOf(result2).toEqualTypeOf<
       MutationState<
         SchemaOutput<typeof UserSchema>,
-        unknown,
-        SchemaInput<typeof UserCreateInputSchema>,
-        unknown
+        DefaultError,
+        SchemaInput<typeof UserCreateInputSchema>
       >[]
     >()
   })
@@ -123,7 +126,7 @@ describe('useMutationState', () => {
     const r1 = hooks.useMutationState({
       select: (data) => {
         expectTypeOf(data).toEqualTypeOf<
-          Mutation<unknown, unknown, unknown, unknown>
+          Mutation<unknown, DefaultError, unknown>
         >()
         return 1
       },
@@ -135,9 +138,8 @@ describe('useMutationState', () => {
         expectTypeOf(data).toEqualTypeOf<
           Mutation<
             SchemaOutput<typeof UserSchema>,
-            unknown,
-            SchemaInput<typeof UserCreateInputSchema>,
-            unknown
+            DefaultError,
+            SchemaInput<typeof UserCreateInputSchema>
           >
         >()
 

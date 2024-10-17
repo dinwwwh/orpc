@@ -1,5 +1,6 @@
 import type { Schema, SchemaInput, SchemaOutput } from '@orpc/contract'
 import {
+  type DefaultError,
   type Mutation,
   type MutationFilters,
   type MutationState,
@@ -17,34 +18,27 @@ export interface GeneralHooks<
   TOutputSchema extends Schema,
   THandlerOutput extends SchemaOutput<TOutputSchema>,
 > {
-  useIsFetching: (
-    filers?: ORPCQueryFilters<
-      undefined,
-      PartialDeep<SchemaInput<TInputSchema>>
-    >,
-  ) => number
-  useIsMutating: (
-    filters?: SetOptional<MutationFilters, 'mutationKey'>,
-  ) => number
+  useIsFetching(
+    filers?: ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
+  ): number
+  useIsMutating(filters?: SetOptional<MutationFilters, 'mutationKey'>): number
 
-  useMutationState: <
+  useMutationState<
     UResult = MutationState<
       SchemaOutput<TOutputSchema, THandlerOutput>,
-      unknown,
-      SchemaInput<TInputSchema>,
-      unknown
+      DefaultError,
+      SchemaInput<TInputSchema>
     >,
   >(options?: {
     filters?: SetOptional<MutationFilters, 'mutationKey'>
     select?: (
       mutation: Mutation<
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaInput<TInputSchema>,
-        unknown
+        DefaultError,
+        SchemaInput<TInputSchema>
       >,
     ) => UResult
-  }) => UResult[]
+  }): UResult[]
 }
 
 export interface CreateGeneralHooksOptions {

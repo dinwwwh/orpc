@@ -1,12 +1,14 @@
 import type { Schema, SchemaInput, SchemaOutput } from '@orpc/contract'
 import type {
   CancelOptions,
+  DefaultError,
   InfiniteData,
   InvalidateOptions,
   MutationFilters,
   MutationObserverOptions,
   OmitKeyof,
   QueryClient,
+  QueryKey,
   QueryObserverOptions,
   RefetchOptions,
   ResetOptions,
@@ -14,12 +16,7 @@ import type {
   Updater,
 } from '@tanstack/react-query'
 import type { PartialDeep, SetOptional } from 'type-fest'
-import {
-  type QueryKey,
-  type QueryType,
-  getMutationKeyFromPath,
-  getQueryKeyFromPath,
-} from './tanstack-key'
+import { getMutationKeyFromPath, getQueryKeyFromPath } from './tanstack-key'
 import type {
   ORPCInvalidateQueryFilters,
   ORPCQueryFilters,
@@ -31,24 +28,19 @@ export interface GeneralUtils<
   TOutputSchema extends Schema,
   THandlerOutput extends SchemaOutput<TOutputSchema>,
 > {
-  getQueriesData: <
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters?: OmitKeyof<ORPCQueryFilters<undefined, TFilterInput>, 'queryType'>,
-  ) => [
-    QueryKey<'query', TFilterInput>,
-    SchemaOutput<TOutputSchema, THandlerOutput> | undefined,
-  ][]
-  getInfiniteQueriesData: <
-    TFilterInput extends
-      | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters?: OmitKeyof<ORPCQueryFilters<undefined, TFilterInput>, 'queryType'>,
-  ) => [
-    QueryKey<'infinite', TFilterInput>,
+  getQueriesData(
+    filters?: OmitKeyof<
+      ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
+      'queryType'
+    >,
+  ): [QueryKey, SchemaOutput<TOutputSchema, THandlerOutput> | undefined][]
+  getInfiniteQueriesData(
+    filters?: OmitKeyof<
+      ORPCQueryFilters<PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>>,
+      'queryType'
+    >,
+  ): [
+    QueryKey,
     (
       | InfiniteData<
           SchemaOutput<TOutputSchema, THandlerOutput>,
@@ -58,27 +50,22 @@ export interface GeneralUtils<
     ),
   ][]
 
-  setQueriesData: <
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters: OmitKeyof<ORPCQueryFilters<undefined, TFilterInput>, 'queryType'>,
+  setQueriesData(
+    filters: OmitKeyof<
+      ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
+      'queryType'
+    >,
     updater: Updater<
       SchemaOutput<TOutputSchema, THandlerOutput> | undefined,
       SchemaOutput<TOutputSchema, THandlerOutput> | undefined
     >,
     options?: SetDataOptions,
-  ) => [
-    QueryKey<'query', TFilterInput>,
-    SchemaOutput<TOutputSchema, THandlerOutput> | undefined,
-  ][]
-  setInfiniteQueriesData: <
-    TFilterInput extends
-      | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters: OmitKeyof<ORPCQueryFilters<undefined, TFilterInput>, 'queryType'>,
+  ): [QueryKey, SchemaOutput<TOutputSchema, THandlerOutput> | undefined][]
+  setInfiniteQueriesData(
+    filters: OmitKeyof<
+      ORPCQueryFilters<PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>>,
+      'queryType'
+    >,
     updater: Updater<
       | InfiniteData<
           SchemaOutput<TOutputSchema, THandlerOutput>,
@@ -92,8 +79,8 @@ export interface GeneralUtils<
       | undefined
     >,
     options?: SetDataOptions,
-  ) => [
-    QueryKey<'infinite', TFilterInput>,
+  ): [
+    QueryKey,
     (
       | InfiniteData<
           SchemaOutput<TOutputSchema, THandlerOutput>,
@@ -103,157 +90,104 @@ export interface GeneralUtils<
     ),
   ][]
 
-  invalidate: <
-    TQueryType extends QueryType = undefined,
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters?: ORPCInvalidateQueryFilters<TQueryType, TFilterInput>,
+  invalidate(
+    filters?: ORPCInvalidateQueryFilters<
+      PartialDeep<SchemaInput<TInputSchema>>
+    >,
     options?: InvalidateOptions,
-  ) => Promise<void>
-  refetch: <
-    TQueryType extends QueryType = undefined,
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters?: ORPCQueryFilters<TQueryType, TFilterInput>,
+  ): Promise<void>
+  refetch(
+    filters?: ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
     options?: RefetchOptions,
-  ) => Promise<void>
-  cancel: <
-    TQueryType extends QueryType = undefined,
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters?: ORPCQueryFilters<TQueryType, TFilterInput>,
+  ): Promise<void>
+  cancel(
+    filters?: ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
     options?: CancelOptions,
-  ) => Promise<void>
-  remove: <
-    TQueryType extends QueryType = undefined,
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters?: ORPCQueryFilters<TQueryType, TFilterInput>,
-  ) => void
-  reset: <
-    TQueryType extends QueryType = undefined,
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
-    filters?: ORPCQueryFilters<TQueryType, TFilterInput>,
+  ): Promise<void>
+  remove(
+    filters?: ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
+  ): void
+  reset(
+    filters?: ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
     options?: ResetOptions,
-  ) => Promise<void>
+  ): Promise<void>
 
-  isFetching: (
-    filters?: ORPCQueryFilters<any, PartialDeep<SchemaInput<TInputSchema>>>,
-  ) => number
-  isMutating: (filters?: SetOptional<MutationFilters, 'mutationKey'>) => number
+  isFetching(
+    filters?: ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
+  ): number
+  isMutating(filters?: SetOptional<MutationFilters, 'mutationKey'>): number
 
-  getQueryDefaults: <
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
+  getQueryDefaults(
     filters?: Pick<
-      ORPCQueryFilters<undefined, TFilterInput>,
+      ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
       'input' | 'queryKey'
     >,
-  ) => OmitKeyof<
-    QueryObserverOptions<
-      SchemaOutput<TOutputSchema, THandlerOutput>,
-      unknown,
-      SchemaOutput<TOutputSchema, THandlerOutput>,
-      SchemaOutput<TOutputSchema, THandlerOutput>,
-      QueryKey<'query', TFilterInput>
-    >,
+  ): OmitKeyof<
+    QueryObserverOptions<SchemaOutput<TOutputSchema, THandlerOutput>>,
     'queryKey'
   >
-  getInfiniteQueryDefaults: <
-    TFilterInput extends
-      | PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>
-      | undefined = undefined,
-  >(
+  getInfiniteQueryDefaults(
     filters?: Pick<
-      ORPCQueryFilters<undefined, TFilterInput>,
+      ORPCQueryFilters<PartialDeep<SchemaInputForInfiniteQuery<TInputSchema>>>,
       'input' | 'queryKey'
     >,
-  ) => OmitKeyof<
+  ): OmitKeyof<
     QueryObserverOptions<
       SchemaOutput<TOutputSchema, THandlerOutput>,
-      unknown,
+      DefaultError,
       SchemaOutput<TOutputSchema, THandlerOutput>,
       InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
-      QueryKey<'infinite', TFilterInput>,
+      QueryKey,
       SchemaInput<TInputSchema>['cursor']
     >,
     'queryKey'
   >
 
-  setQueryDefaults: <
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
+  setQueryDefaults(
     options: Partial<
       OmitKeyof<
-        QueryObserverOptions<
-          SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
-          SchemaOutput<TOutputSchema, THandlerOutput>,
-          SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'query', TFilterInput>
-        >,
+        QueryObserverOptions<SchemaOutput<TOutputSchema, THandlerOutput>>,
         'queryKey'
       >
     >,
     filters?: Pick<
-      ORPCQueryFilters<undefined, TFilterInput>,
+      ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
       'input' | 'queryKey'
     >,
-  ) => void
-  setInfiniteQueryDefaults: <
-    TFilterInput extends
-      | PartialDeep<SchemaInput<TInputSchema>>
-      | undefined = undefined,
-  >(
+  ): void
+  setInfiniteQueryDefaults(
     options: Partial<
       OmitKeyof<
         QueryObserverOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
+          DefaultError,
           SchemaOutput<TOutputSchema, THandlerOutput>,
           InfiniteData<SchemaOutput<TOutputSchema, THandlerOutput>>,
-          QueryKey<'infinite', TFilterInput>,
+          QueryKey,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryKey'
       >
     >,
     filters?: Pick<
-      ORPCQueryFilters<undefined, TFilterInput>,
+      ORPCQueryFilters<PartialDeep<SchemaInput<TInputSchema>>>,
       'input' | 'queryKey'
     >,
-  ) => void
+  ): void
 
   getMutationDefaults: (
     filters?: Pick<MutationFilters, 'mutationKey'>,
   ) => MutationObserverOptions<
     SchemaOutput<TOutputSchema, THandlerOutput>,
-    unknown,
-    SchemaInput<TInputSchema>,
-    unknown
+    DefaultError,
+    SchemaInput<TInputSchema>
   >
   setMutationDefaults: (
     options: OmitKeyof<
       MutationObserverOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaInput<TInputSchema>,
-        unknown
+        DefaultError,
+        SchemaInput<TInputSchema>
       >,
       'mutationKey'
     >,

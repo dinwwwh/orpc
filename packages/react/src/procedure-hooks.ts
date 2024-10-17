@@ -1,13 +1,10 @@
-import type {
-  OptionalUndefined,
-  Schema,
-  SchemaInput,
-  SchemaOutput,
-} from '@orpc/contract'
+import type { Schema, SchemaInput, SchemaOutput } from '@orpc/contract'
 import {
+  type DefaultError,
   type FetchInfiniteQueryOptions,
   type FetchQueryOptions,
   type InfiniteData,
+  type QueryKey,
   type UseInfiniteQueryOptions,
   type UseInfiniteQueryResult,
   type UseMutationOptions,
@@ -29,11 +26,7 @@ import {
 import type { PartialOnUndefinedDeep, SetOptional } from 'type-fest'
 import { orpcPathSymbol } from './orpc-path'
 import { type ORPCContext, useORPCContext } from './react-context'
-import {
-  type QueryKey,
-  getMutationKeyFromPath,
-  getQueryKeyFromPath,
-} from './tanstack-key'
+import { getMutationKeyFromPath, getQueryKeyFromPath } from './tanstack-key'
 import type { SchemaInputForInfiniteQuery } from './types'
 import { get } from './utils'
 
@@ -42,114 +35,105 @@ export interface ProcedureHooks<
   TOutputSchema extends Schema,
   THandlerOutput extends SchemaOutput<TOutputSchema>,
 > {
-  useQuery: <USelectData = SchemaOutput<TOutputSchema, THandlerOutput>>(
+  useQuery<USelectData = SchemaOutput<TOutputSchema, THandlerOutput>>(
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
       UseQueryOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        USelectData,
-        QueryKey<'query', SchemaInput<TInputSchema>>
+        DefaultError,
+        USelectData
       >,
       'queryFn' | 'queryKey'
     >,
-  ) => UseQueryResult<USelectData, unknown>
-  useInfiniteQuery: <
+  ): UseQueryResult<USelectData>
+  useInfiniteQuery<
     USelectData = InfiniteData<
       SchemaOutput<TOutputSchema, THandlerOutput>,
       SchemaInput<TInputSchema>['cursor']
     >,
   >(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
-    options: OptionalUndefined<
+    options: PartialOnUndefinedDeep<
       SetOptional<
         UseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
+          DefaultError,
           USelectData,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+          QueryKey,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'
       >
     >,
-  ) => UseInfiniteQueryResult<USelectData, unknown>
+  ): UseInfiniteQueryResult<USelectData>
 
-  useSuspenseQuery: <USelectData = SchemaOutput<TOutputSchema, THandlerOutput>>(
+  useSuspenseQuery<USelectData = SchemaOutput<TOutputSchema, THandlerOutput>>(
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
       UseSuspenseQueryOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        USelectData,
-        QueryKey<'query', SchemaInput<TInputSchema>>
+        DefaultError,
+        USelectData
       >,
       'queryFn' | 'queryKey'
     >,
-  ) => UseSuspenseQueryResult<USelectData, unknown>
-  useSuspenseInfiniteQuery: <
+  ): UseSuspenseQueryResult<USelectData>
+  useSuspenseInfiniteQuery<
     USelectData = InfiniteData<
       SchemaOutput<TOutputSchema, THandlerOutput>,
       SchemaInput<TInputSchema>['cursor']
     >,
   >(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
-    options: OptionalUndefined<
+    options: PartialOnUndefinedDeep<
       SetOptional<
         UseSuspenseInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
+          DefaultError,
           USelectData,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+          QueryKey,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryFn' | 'queryKey'
       >
     >,
-  ) => UseSuspenseInfiniteQueryResult<USelectData, unknown>
+  ): UseSuspenseInfiniteQueryResult<USelectData>
 
-  usePrefetchQuery: (
+  usePrefetchQuery(
     input: SchemaInput<TInputSchema>,
-    options?: FetchQueryOptions<
-      SchemaOutput<TOutputSchema, THandlerOutput>,
-      unknown,
-      SchemaOutput<TOutputSchema, THandlerOutput>,
-      QueryKey<'query', SchemaInput<TInputSchema>>
-    >,
-  ) => void
-  usePrefetchInfiniteQuery: (
+    options?: FetchQueryOptions<SchemaOutput<TOutputSchema, THandlerOutput>>,
+  ): void
+  usePrefetchInfiniteQuery(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: PartialOnUndefinedDeep<
       SetOptional<
         FetchInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
+          DefaultError,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+          QueryKey,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryKey' | 'queryFn'
       >
     >,
-  ) => void
+  ): void
 
-  useMutation: (
+  useMutation(
     options?: SetOptional<
       UseMutationOptions<
         SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaInput<TInputSchema>,
-        unknown
+        DefaultError,
+        SchemaInput<TInputSchema>
       >,
       'mutationFn' | 'mutationKey'
     >,
-  ) => UseMutationResult<
+  ): UseMutationResult<
     SchemaOutput<TOutputSchema, THandlerOutput>,
-    unknown,
-    SchemaInput<TInputSchema>,
-    unknown
+    DefaultError,
+    SchemaInput<TInputSchema>
   >
 }
 

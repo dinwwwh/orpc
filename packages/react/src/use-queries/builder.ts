@@ -2,22 +2,20 @@ import type { ProcedureClient } from '@orpc/client'
 import type { Schema, SchemaInput, SchemaOutput } from '@orpc/contract'
 import type {} from '@orpc/server'
 import type {
+  DefaultError,
   OmitKeyof,
   QueriesPlaceholderDataFunction,
   QueryKey,
   UseQueryOptions,
 } from '@tanstack/react-query'
 import type { SetOptional } from 'type-fest'
-import {
-  type QueryKey as ORPCQueryKey,
-  getQueryKeyFromPath,
-} from '../tanstack-key'
+import { getQueryKeyFromPath } from '../tanstack-key'
 
 type UseQueryOptionsForUseQueries<
   TQueryFnData,
-  TError,
-  TData,
-  TQueryKey extends QueryKey,
+  TError = DefaultError,
+  TData = TQueryFnData,
+  TQueryKey extends QueryKey = QueryKey,
 > = OmitKeyof<
   UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
   'placeholderData'
@@ -33,20 +31,10 @@ export interface UseQueriesBuilder<
   (
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
-      UseQueryOptionsForUseQueries<
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        ORPCQueryKey<'query', SchemaInput<TInputSchema>>
-      >,
+      UseQueryOptionsForUseQueries<SchemaOutput<TOutputSchema, THandlerOutput>>,
       'queryFn' | 'queryKey'
     >,
-  ): UseQueryOptionsForUseQueries<
-    SchemaOutput<TOutputSchema, THandlerOutput>,
-    any, // FIX: this should be unknown
-    SchemaOutput<TOutputSchema, THandlerOutput>,
-    ORPCQueryKey<'query', SchemaInput<TInputSchema>>
-  >
+  ): UseQueryOptionsForUseQueries<SchemaOutput<TOutputSchema, THandlerOutput>>
 }
 
 export interface CreateUseQueriesBuilderOptions<

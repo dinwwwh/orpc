@@ -1,18 +1,20 @@
 import type { ProcedureClient } from '@orpc/client'
 import type { Schema, SchemaInput, SchemaOutput } from '@orpc/contract'
 import type {
+  DefaultError,
   EnsureInfiniteQueryDataOptions,
   EnsureQueryDataOptions,
   FetchInfiniteQueryOptions,
   FetchQueryOptions,
   InfiniteData,
   QueryClient,
+  QueryKey,
   QueryState,
   SetDataOptions,
   Updater,
 } from '@tanstack/react-query'
 import type { PartialOnUndefinedDeep, SetOptional } from 'type-fest'
-import { type QueryKey, getQueryKeyFromPath } from './tanstack-key'
+import { getQueryKeyFromPath } from './tanstack-key'
 import type { SchemaInputForInfiniteQuery } from './types'
 
 export interface ProcedureUtils<
@@ -20,138 +22,120 @@ export interface ProcedureUtils<
   TOutputSchema extends Schema,
   THandlerOutput extends SchemaOutput<TOutputSchema>,
 > {
-  fetchQuery: (
+  fetchQuery(
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
-      FetchQueryOptions<
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey<'query', SchemaInput<TInputSchema>>
-      >,
+      FetchQueryOptions<SchemaOutput<TOutputSchema, THandlerOutput>>,
       'queryKey' | 'queryFn'
     >,
-  ) => Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
-  fetchInfiniteQuery: (
+  ): Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
+  fetchInfiniteQuery(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: PartialOnUndefinedDeep<
       SetOptional<
         FetchInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
+          DefaultError,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+          QueryKey,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryKey' | 'queryFn'
       >
     >,
-  ) => Promise<
+  ): Promise<
     InfiniteData<
       SchemaOutput<TOutputSchema, THandlerOutput>,
       SchemaInput<TInputSchema>['cursor']
     >
   >
 
-  prefetchQuery: (
+  prefetchQuery(
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
-      FetchQueryOptions<
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey<'query', SchemaInput<TInputSchema>>
-      >,
+      FetchQueryOptions<SchemaOutput<TOutputSchema, THandlerOutput>>,
       'queryKey' | 'queryFn'
     >,
-  ) => Promise<void>
-  prefetchInfiniteQuery: (
+  ): Promise<void>
+  prefetchInfiniteQuery(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: PartialOnUndefinedDeep<
       SetOptional<
         FetchInfiniteQueryOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
+          DefaultError,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+          QueryKey,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryKey' | 'queryFn'
       >
     >,
-  ) => Promise<void>
+  ): Promise<void>
 
-  getQueryData: (
+  getQueryData(
     input: SchemaInput<TInputSchema>,
-  ) => SchemaOutput<TOutputSchema, THandlerOutput> | undefined
-  getInfiniteQueryData: (
+  ): SchemaOutput<TOutputSchema, THandlerOutput> | undefined
+  getInfiniteQueryData(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
-  ) =>
+  ):
     | InfiniteData<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         SchemaInput<TInputSchema>['cursor']
       >
     | undefined
 
-  ensureQueryData: (
+  ensureQueryData(
     input: SchemaInput<TInputSchema>,
     options?: SetOptional<
-      EnsureQueryDataOptions<
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        unknown,
-        SchemaOutput<TOutputSchema, THandlerOutput>,
-        QueryKey<'query', SchemaInput<TInputSchema>>
-      >,
+      EnsureQueryDataOptions<SchemaOutput<TOutputSchema, THandlerOutput>>,
       'queryFn' | 'queryKey'
     >,
-  ) => Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
-  ensureInfiniteQueryData: (
+  ): Promise<SchemaOutput<TOutputSchema, THandlerOutput>>
+  ensureInfiniteQueryData(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
     options: PartialOnUndefinedDeep<
       SetOptional<
         EnsureInfiniteQueryDataOptions<
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          unknown,
+          DefaultError,
           SchemaOutput<TOutputSchema, THandlerOutput>,
-          QueryKey<'infinite', Omit<SchemaInput<TInputSchema>, 'cursor'>>,
+          QueryKey,
           SchemaInput<TInputSchema>['cursor']
         >,
         'queryKey' | 'queryFn'
       >
     >,
-  ) => Promise<
+  ): Promise<
     InfiniteData<
       SchemaOutput<TOutputSchema, THandlerOutput>,
       SchemaInput<TInputSchema>['cursor']
     >
   >
 
-  getQueryState: (
+  getQueryState(
     input: SchemaInput<TInputSchema>,
-  ) =>
-    | QueryState<SchemaOutput<TOutputSchema, THandlerOutput>, unknown>
-    | undefined
-  getInfiniteQueryState: (
+  ): QueryState<SchemaOutput<TOutputSchema, THandlerOutput>> | undefined
+  getInfiniteQueryState(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
-  ) =>
+  ):
     | QueryState<
         InfiniteData<
           SchemaOutput<TOutputSchema, THandlerOutput>,
           SchemaInput<TInputSchema>['cursor']
-        >,
-        unknown
+        >
       >
     | undefined
 
-  setQueryData: (
+  setQueryData(
     input: SchemaInput<TInputSchema>,
     updater: Updater<
       SchemaOutput<TOutputSchema, THandlerOutput> | undefined,
       SchemaOutput<TOutputSchema, THandlerOutput> | undefined
     >,
     options?: SetDataOptions,
-  ) => SchemaOutput<TOutputSchema, THandlerOutput> | undefined
-  setInfiniteQueryData: (
+  ): SchemaOutput<TOutputSchema, THandlerOutput> | undefined
+  setInfiniteQueryData(
     input: SchemaInputForInfiniteQuery<TInputSchema>,
     updater: Updater<
       | InfiniteData<
@@ -166,7 +150,7 @@ export interface ProcedureUtils<
       | undefined
     >,
     options?: SetDataOptions,
-  ) =>
+  ):
     | InfiniteData<
         SchemaOutput<TOutputSchema, THandlerOutput>,
         SchemaInput<TInputSchema>['cursor']

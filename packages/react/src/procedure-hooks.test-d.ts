@@ -1,5 +1,5 @@
 import type { SchemaInput, SchemaOutput } from '@orpc/contract'
-import type { InfiniteData } from '@tanstack/react-query'
+import type { DefaultError, InfiniteData } from '@tanstack/react-query'
 import {} from '@testing-library/react'
 import {
   ORPCContext,
@@ -322,7 +322,7 @@ describe('useMutation', () => {
         expectTypeOf(data).toEqualTypeOf<SchemaOutput<typeof UserSchema>>()
       },
       onError(error) {
-        expectTypeOf(error).toEqualTypeOf<unknown>()
+        expectTypeOf(error).toEqualTypeOf<DefaultError>()
       },
     })
   })
