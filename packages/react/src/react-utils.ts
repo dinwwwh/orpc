@@ -60,7 +60,6 @@ export function createORPCUtils<TRouter extends ContractRouter | Router<any>>(
   const client = options.contextValue.client as any
 
   const generalUtils = createGeneralUtils({
-    client,
     queryClient: options.contextValue.queryClient,
     path,
   })

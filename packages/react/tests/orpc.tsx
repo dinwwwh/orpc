@@ -97,7 +97,8 @@ export const appRouterHandler = createRouterHandler({ router: appRouter })
 export const orpcClient = createORPCClient<typeof appRouter>({
   baseURL: 'http://localhost:3000',
 
-  fetch(...args) {
+  async fetch(...args) {
+    await new Promise((resolve) => setTimeout(resolve, 100))
     const request = new Request(...args)
 
     return fetchHandler({
