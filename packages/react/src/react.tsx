@@ -33,7 +33,7 @@ export type ORPCReactWithRouter<TRouter extends Router<any>> =
   ORPCHooksWithRouter<TRouter> & {
     useContext: () => ORPCContextValue<TRouter>
     useUtils: () => ORPCUtilsWithRouter<TRouter>
-    useQueries: () => UseQueriesWithRouter<TRouter>
+    useQueries: UseQueriesWithRouter<TRouter>
   }
 
 export function createORPCReact<

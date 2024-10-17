@@ -53,13 +53,13 @@ export const userList = orpcServer
         users: [
           {
             data: {
-              id: crypto.randomUUID(),
+              id: `id-${input.data.cursor}`,
               name: `number-${input.data.cursor}`,
             },
           },
           {
             data: {
-              id: crypto.randomUUID(),
+              id: `id-${input.data.cursor + 1}`,
               name: `number-${input.data.cursor + 1}`,
             },
           },

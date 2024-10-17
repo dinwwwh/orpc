@@ -13,7 +13,7 @@ import {
 } from './builders'
 
 export interface UseQueriesWithContractRouter<TRouter extends ContractRouter> {
-  <T extends Array<any>, TCombinedResult = QueriesResults<T>>(
+  <T extends Array<any> = [], TCombinedResult = QueriesResults<T>>(
     build: (
       builders: UseQueriesBuildersWithContractRouter<TRouter>,
     ) => [...QueriesOptions<T>],
@@ -22,7 +22,7 @@ export interface UseQueriesWithContractRouter<TRouter extends ContractRouter> {
 }
 
 export interface UseQueriesWithRouter<TRouter extends Router<any>> {
-  <T extends Array<any>, TCombinedResult = QueriesResults<T>>(
+  <T extends Array<any> = [], TCombinedResult = QueriesResults<T>>(
     build: (
       builders: UseQueriesBuildersWithRouter<TRouter>,
     ) => [...QueriesOptions<T>],

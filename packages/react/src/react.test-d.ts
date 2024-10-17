@@ -1,6 +1,7 @@
 import type { SchemaOutput } from '@orpc/contract'
 import type { QueryClient } from '@tanstack/react-query'
 import {
+  ORPCContext,
   type UserFindInputSchema,
   type UserSchema,
   orpc,
@@ -10,6 +11,7 @@ import type { GeneralHooks } from './general-hooks'
 import type { GeneralUtils } from './general-utils'
 import type { ProcedureHooks } from './procedure-hooks'
 import type { ProcedureUtils } from './procedure-utils'
+import { useQueriesFactory } from './use-queries/hook'
 
 describe('useUtils', () => {
   const utils = orpc.useUtils()
@@ -50,7 +52,11 @@ it('useContext', () => {
   expectTypeOf(context.queryClient).toEqualTypeOf<QueryClient>()
 })
 
-it('useQueries', { todo: true }, () => {})
+it('useQueries', () => {
+  expectTypeOf(orpc.useQueries).toEqualTypeOf(
+    useQueriesFactory({ context: ORPCContext }),
+  )
+})
 
 describe('hooks', () => {
   it('router level', () => {

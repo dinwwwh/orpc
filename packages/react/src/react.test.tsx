@@ -36,7 +36,19 @@ it('useContext', async () => {
   )
 })
 
-it('useQueries', { todo: true }, async () => {})
+it('useQueries', async () => {
+  const queries = renderHook(
+    () => orpc.useQueries((o) => [o.user.find({ id: '123' })]),
+    { wrapper: wrapper },
+  )
+
+  await waitFor(() =>
+    expect(queries.result.current[0].data).toEqual({
+      id: '123',
+      name: 'name-123',
+    }),
+  )
+})
 
 it('hooks', async () => {
   const isFetching = renderHook(() => orpc.user.useIsFetching(), {

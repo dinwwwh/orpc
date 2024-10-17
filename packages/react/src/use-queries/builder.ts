@@ -43,7 +43,7 @@ export interface UseQueriesBuilder<
     >,
   ): UseQueryOptionsForUseQueries<
     SchemaOutput<TOutputSchema, THandlerOutput>,
-    unknown,
+    any, // FIX: this should be unknown
     SchemaOutput<TOutputSchema, THandlerOutput>,
     ORPCQueryKey<'query', SchemaInput<TInputSchema>>
   >
@@ -63,9 +63,10 @@ export interface CreateUseQueriesBuilderOptions<
 }
 
 export function createUseQueriesBuilder<
-  TInputSchema extends Schema,
-  TOutputSchema extends Schema,
-  THandlerOutput extends SchemaOutput<TOutputSchema>,
+  TInputSchema extends Schema = undefined,
+  TOutputSchema extends Schema = undefined,
+  THandlerOutput extends
+    SchemaOutput<TOutputSchema> = SchemaOutput<TOutputSchema>,
 >(
   options: CreateUseQueriesBuilderOptions<
     TInputSchema,
