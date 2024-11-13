@@ -1,9 +1,16 @@
 import { type ContractRouter, eachContractRouterLeaf } from '@orpc/contract'
 import { type Router, toContractRouter } from '@orpc/server'
-import { findDeepMatches, omit } from '@orpc/shared'
+import {
+  findDeepMatches,
+  isEqual,
+  mapValues,
+  omit,
+  replaceDeepMatches,
+} from '@orpc/shared'
 import { preSerialize } from '@orpc/transformer'
 import type { JSONSchema } from 'json-schema-typed/draft-2020-12'
 import {
+  type ComponentsObject,
   type MediaTypeObject,
   type OpenAPIObject,
   OpenApiBuilder,
@@ -12,6 +19,7 @@ import {
   type RequestBodyObject,
   type ResponseObject,
 } from 'openapi3-ts/oas31'
+import { Schema, type ZodTypeAny } from 'zod'
 import { extractJSONSchema, zodToJsonSchema } from './zod-to-json-schema'
 
 // Reference: https://spec.openapis.org/oas/v3.1.0.html#style-values
@@ -38,7 +46,11 @@ export interface GenerateOpenAPIOptions {
 export function generateOpenAPI(
   opts: {
     router: ContractRouter | Router<any>
-  } & Omit<OpenAPIObject, 'openapi'>,
+  } & Omit<OpenAPIObject, 'openapi' | 'components'> & {
+      components?: Omit<ComponentsObject, 'schemas'> & {
+        schemas?: ComponentsObject['schemas'] | Record<string, ZodTypeAny>
+      }
+    },
   options?: GenerateOpenAPIOptions,
 ): OpenAPIObject {
   const throwOnMissingTagDefinition =
@@ -47,12 +59,41 @@ export function generateOpenAPI(
     options?.ignoreUndefinedPathProcedures ?? false
 
   const builder = new OpenApiBuilder({
-    ...omit(opts, ['router']),
+    ...omit(opts, ['router', 'components']),
+    components: {
+      ...(opts.components ? omit(opts.components, ['schemas']) : undefined),
+      schemas: opts.components?.schemas
+        ? (mapValues(opts.components.schemas as any, (value) => {
+            if (value instanceof Schema) {
+              return zodToJsonSchema(value, { mode: 'output' })
+            }
+
+            return value
+          }) as ComponentsObject['schemas'])
+        : undefined,
+    },
     openapi: '3.1.0',
   })
 
   const rootTags = opts.tags?.map((tag) => tag.name) ?? []
   const router = toContractRouter(opts.router)
+  const reusableSchemas = opts.components?.schemas
+    ? (
+        Object.entries(opts.components.schemas).filter(
+          ([_, value]) => value instanceof Schema,
+        ) as [string, ZodTypeAny][]
+      ).map(([key, value]) => {
+        const inputSchema = zodToJsonSchema(value, { mode: 'input' })
+        const outputSchema = zodToJsonSchema(value, { mode: 'output' })
+
+        return {
+          zodSchema: value,
+          isOnlyOutput: !isEqual(inputSchema, outputSchema),
+          jsonSchema: outputSchema,
+          name: key,
+        }
+      })
+    : []
 
   eachContractRouterLeaf(router, (procedure, path_) => {
     const internal = procedure.zz$cp
@@ -65,10 +106,16 @@ export function generateOpenAPI(
     const method = internal.method ?? 'POST'
 
     const inputSchema = internal.InputSchema
-      ? zodToJsonSchema(internal.InputSchema, { mode: 'input' })
+      ? zodToJsonSchema(internal.InputSchema, {
+          mode: 'input',
+          reusableSchemas,
+        })
       : {}
     const outputSchema = internal.OutputSchema
-      ? zodToJsonSchema(internal.OutputSchema, { mode: 'output' })
+      ? zodToJsonSchema(internal.OutputSchema, {
+          mode: 'output',
+          reusableSchemas,
+        })
       : {}
 
     const params: ParameterObject[] | undefined = (() => {
@@ -253,7 +300,25 @@ export function generateOpenAPI(
     })
   })
 
-  return preSerialize(builder.getSpec()) as OpenAPIObject
+  return replaceDeepMatches(
+    preSerialize(builder.getSpec()),
+    (value) => {
+      console.log(
+        value,
+        reusableSchemas.some(({ jsonSchema }) => value === jsonSchema),
+      )
+      return reusableSchemas.some(({ jsonSchema }) => value === jsonSchema)
+    },
+    (value) => {
+      const name = reusableSchemas.find(
+        ({ jsonSchema }) => value === jsonSchema,
+      )!.name
+
+      return {
+        $ref: `#/components/schemas/${name}`, // TODO: escape
+      }
+    },
+  ) as OpenAPIObject
 }
 
 function isFileSchema(schema: unknown) {

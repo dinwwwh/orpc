@@ -4,4 +4,4 @@ export * from './json'
 export * from './object'
 
 export { isPlainObject } from 'is-what'
-export { guard, trim, mapEntries, omit } from 'radash'
+export { guard, trim, mapEntries, omit, isEqual, mapValues } from 'radash'

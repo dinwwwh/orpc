@@ -7,6 +7,8 @@ import { generateOpenAPI } from './generator'
 it('works', () => {
   const o = ioc
 
+  const schema = z.object({ name: z.string() })
+
   const router = o.router({
     ping: o.output(z.string()),
 
@@ -14,7 +16,7 @@ it('works', () => {
       find: o
         .route({ method: 'GET', path: '/users/{id}', tags: ['user'] })
         .input(z.object({ id: z.string() }))
-        .output(z.object({ name: z.string() })),
+        .output(schema),
     },
   })
 
@@ -24,7 +26,14 @@ it('works', () => {
       title: 'test',
       version: '1.0.0',
     },
+    components: {
+      schemas: {
+        User: schema,
+      },
+    },
   })
+
+  // console.dir(spec, { depth: Number.POSITIVE_INFINITY })
 
   expect(spec).toMatchObject({
     openapi: '3.1.0',

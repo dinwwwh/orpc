@@ -110,12 +110,33 @@ export interface ZodToJsonSchemaOptions {
    * @internal
    */
   isHandledCustomJSONSchema?: boolean
+
+  /**
+   *
+   *
+   */
+  reusableSchemas?: {
+    zodSchema: ZodTypeAny
+    isOnlyOutput: boolean
+    jsonSchema: Exclude<JSONSchema, boolean>
+  }[]
 }
 
 export function zodToJsonSchema(
   schema: ZodTypeAny,
   options?: ZodToJsonSchemaOptions,
 ): Exclude<JSONSchema, boolean> {
+  const mode = options?.mode ?? 'input'
+  const matchReusableSchema = options?.reusableSchemas?.find(
+    ({ zodSchema }) => schema === zodSchema,
+  )
+  if (
+    matchReusableSchema &&
+    (!matchReusableSchema.isOnlyOutput || mode === 'output')
+  ) {
+    return matchReusableSchema.jsonSchema
+  }
+
   if (!options?.isHandledCustomJSONSchema) {
     const customJSONSchema = getCustomJSONSchema(schema._def, options)
 
@@ -550,10 +571,7 @@ export function zodToJsonSchema(
     case ZodFirstPartyTypeKind.ZodEffects: {
       const schema_ = schema as ZodEffects<ZodTypeAny>
 
-      if (
-        schema_._def.effect.type === 'transform' &&
-        childOptions?.mode === 'output'
-      ) {
+      if (schema_._def.effect.type === 'transform' && mode === 'output') {
         return {}
       }
 
@@ -573,7 +591,7 @@ export function zodToJsonSchema(
     case ZodFirstPartyTypeKind.ZodPipeline: {
       const schema_ = schema as ZodPipeline<ZodTypeAny, ZodTypeAny>
       return zodToJsonSchema(
-        childOptions?.mode === 'output' ? schema_._def.out : schema_._def.in,
+        mode === 'output' ? schema_._def.out : schema_._def.in,
         childOptions,
       )
     }
@@ -612,8 +630,6 @@ export function extractJSONSchema(
     return { schema, matches }
   }
 
-  // TODO: $ref
-
   if (
     schema.anyOf &&
     Object.keys(schema).every(
@@ -623,6 +639,10 @@ export function extractJSONSchema(
     const anyOf = schema.anyOf
       .map((s) => extractJSONSchema(s, check, matches).schema)
       .filter((v) => !!v)
+
+    if (anyOf.length === schema.anyOf.length) {
+      return { schema, matches }
+    }
 
     if (anyOf.length === 1 && typeof anyOf[0] === 'object') {
       return { schema: { ...schema, anyOf: undefined, ...anyOf[0] }, matches }
@@ -637,8 +657,6 @@ export function extractJSONSchema(
     }
   }
 
-  // TODO: $ref
-
   if (
     schema.oneOf &&
     Object.keys(schema).every(
@@ -648,6 +666,10 @@ export function extractJSONSchema(
     const oneOf = schema.oneOf
       .map((s) => extractJSONSchema(s, check, matches).schema)
       .filter((v) => !!v)
+
+    if (oneOf.length === schema.oneOf.length) {
+      return { schema, matches }
+    }
 
     if (oneOf.length === 1 && typeof oneOf[0] === 'object') {
       return { schema: { ...schema, oneOf: undefined, ...oneOf[0] }, matches }

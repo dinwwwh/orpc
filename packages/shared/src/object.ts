@@ -61,3 +61,29 @@ export function findDeepMatches(
 
   return { maps, values }
 }
+
+export function replaceDeepMatches(
+  payload: unknown,
+  check: (value: unknown) => boolean,
+  replacer: (value: unknown) => unknown,
+): unknown {
+  if (check(payload)) {
+    return replacer(payload)
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.map((v, i) => {
+      return replaceDeepMatches(v, check, replacer)
+    })
+  }
+
+  if (isPlainObject(payload)) {
+    const newPayload: Record<string, unknown> = {}
+    for (const key in payload) {
+      newPayload[key] = replaceDeepMatches(payload[key], check, replacer)
+    }
+    return newPayload
+  }
+
+  return payload
+}
