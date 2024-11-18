@@ -1,7 +1,7 @@
 {
   "name": "@orpc/server",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "author": {
     "name": "unnoq",
     "email": "contact@unnoq.com",
@@ -14,7 +14,9 @@
     "url": "https://github.com/unnoq/unnoq.git",
     "directory": "examples/typescript-vite-package"
   },
-  "keywords": ["unnoq"],
+  "keywords": [
+    "unnoq"
+  ],
   "publishConfig": {
     "access": "public",
     "exports": {
@@ -40,7 +42,10 @@
       "types": "./src/*.ts"
     }
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "tsup --entry.index=src/index.ts --entry.fetch=src/adapters/fetch.ts --clean --sourcemap --splitting --format=esm --onSuccess='tsc -b --noCheck'",
     "type:check": "tsc -b"
