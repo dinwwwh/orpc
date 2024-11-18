@@ -78,19 +78,40 @@ jobs:
             [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           edit-mode: replace
 
-      - name: Get @dinui/react version
+      - name: Get @orpc/server version
         if: steps.publish.outcome == 'success'
         uses: martinbeentjes/npm-get-version-action@v1.3.1
-        id: dinui-react-version
+        id: orpc-server-version
         with:
-          path: packages/react-ui
+          path: packages/server
 
-      - name: Get @dinui/cli version
+      - name: Get @orpc/contract version
         if: steps.publish.outcome == 'success'
         uses: martinbeentjes/npm-get-version-action@v1.3.1
-        id: dinui-cli-version
+        id: orpc-contract-version
         with:
-          path: packages/cli
+          path: packages/contract
+
+      - name: Get @orpc/client version
+        if: steps.publish.outcome == 'success'
+        uses: martinbeentjes/npm-get-version-action@v1.3.1
+        id: orpc-client-version
+        with:
+          path: packages/client
+
+      - name: Get @orpc/react version
+        if: steps.publish.outcome == 'success'
+        uses: martinbeentjes/npm-get-version-action@v1.3.1
+        id: orpc-react-version
+        with:
+          path: packages/react
+
+      - name: Get @orpc/openapi version
+        if: steps.publish.outcome == 'success'
+        uses: martinbeentjes/npm-get-version-action@v1.3.1
+        id: orpc-openapi-version
+        with:
+          path: packages/openapi
 
       - name: Update pr-release comment with published status
         if: steps.publish.outcome == 'success'
@@ -106,11 +127,11 @@ jobs:
             Status: ✅ Published
 
             ```bash
-            npm install @orpc/server@${{ steps.dinui-react-version.outputs.current-version}}
-            npm install @orpc/contract@${{ steps.dinui-react-version.outputs.current-version}}
-            npm install @orpc/client@${{ steps.dinui-react-version.outputs.current-version}}
-            npm install @orpc/react@${{ steps.dinui-react-version.outputs.current-version}}
-            npm install @orpc/openapi@${{ steps.dinui-react-version.outputs.current-version}}
+            npm install @orpc/server@${{ steps.orpc-server-version.outputs.current-version}}
+            npm install @orpc/contract@${{ steps.orpc-contract-version.outputs.current-version}}
+            npm install @orpc/client@${{ steps.orpc-client-version.outputs.current-version}}
+            npm install @orpc/react@${{ steps.orpc-react-version.outputs.current-version}}
+            npm install @orpc/openapi@${{ steps.orpc-openapi-version.outputs.current-version}}
             ```
 
             [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ github.job }})
