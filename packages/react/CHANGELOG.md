@@ -1,5 +1,11 @@
 # @orpc/react
 
+## 0.0.4
+
+### Patch Changes
+
+- [`a3ef9f3`](https://github.com/unnoq/orpc/commit/a3ef9f32c2a61cd9bfa2b4e14b94e2440629d1aa) Thanks [@unnoq](https://github.com/unnoq)! - fix: wrong useQueries type when create from contract
+
 ## 0.0.3
 
 ### Patch Changes
