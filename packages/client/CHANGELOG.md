@@ -1,5 +1,15 @@
 # @orpc/client
 
+## 0.0.3
+
+### Patch Changes
+
+- Updated dependencies [[`7e5011f`](https://github.com/unnoq/orpc/commit/7e5011ff86cbc5426ec5624370a52d75d43dc190), [`7e5011f`](https://github.com/unnoq/orpc/commit/7e5011ff86cbc5426ec5624370a52d75d43dc190), [`90282e4`](https://github.com/unnoq/orpc/commit/90282e4482c1def9378307175046854039454708)]:
+  - @orpc/shared@0.0.4
+  - @orpc/server@0.0.3
+  - @orpc/contract@0.0.3
+  - @orpc/transformer@0.0.3
+
 ## 0.0.2
 
 ### Patch Changes

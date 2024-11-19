@@ -1,5 +1,11 @@
 # @orpc/shared
 
+## 0.0.4
+
+### Patch Changes
+
+- [`7e5011f`](https://github.com/unnoq/orpc/commit/7e5011ff86cbc5426ec5624370a52d75d43dc190) Thanks [@unnoq](https://github.com/unnoq)! - fix: get utils not work on function
+
 ## 0.0.3
 
 ### Patch Changes
