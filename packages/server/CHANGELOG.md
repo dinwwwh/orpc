@@ -1,5 +1,21 @@
 # @orpc/server
 
+## 0.1.0
+
+### Minor Changes
+
+- [`8e9a954`](https://github.com/unnoq/orpc/commit/8e9a954ab8a13a4d968caaf4aa67b70c2d38c914) Thanks [@unnoq](https://github.com/unnoq)! - feat: control method on POST request with ?method=METHOD
+
+### Patch Changes
+
+- [`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238) Thanks [@unnoq](https://github.com/unnoq)! - build: optimize
+
+- Updated dependencies [[`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238), [`8e9a954`](https://github.com/unnoq/orpc/commit/8e9a954ab8a13a4d968caaf4aa67b70c2d38c914)]:
+  - @orpc/transformer@0.0.4
+  - @orpc/contract@0.0.4
+  - @orpc/shared@0.0.5
+  - @orpc/zod@0.0.1
+
 ## 0.0.3
 
 ### Patch Changes

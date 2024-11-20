@@ -1,5 +1,22 @@
 # @orpc/openapi
 
+## 0.0.4
+
+### Patch Changes
+
+- [`1c9f9ab`](https://github.com/unnoq/orpc/commit/1c9f9ab83c4b96b831ac654adc688788ba894ed5) Thanks [@unnoq](https://github.com/unnoq)! - fix: body schema not remove params fields
+
+- [`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238) Thanks [@unnoq](https://github.com/unnoq)! - build: optimize
+
+- [`1c9f9ab`](https://github.com/unnoq/orpc/commit/1c9f9ab83c4b96b831ac654adc688788ba894ed5) Thanks [@unnoq](https://github.com/unnoq)! - fix: required and schema examples not work on query
+
+- Updated dependencies [[`8e9a954`](https://github.com/unnoq/orpc/commit/8e9a954ab8a13a4d968caaf4aa67b70c2d38c914), [`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238), [`8e9a954`](https://github.com/unnoq/orpc/commit/8e9a954ab8a13a4d968caaf4aa67b70c2d38c914)]:
+  - @orpc/server@0.1.0
+  - @orpc/transformer@0.0.4
+  - @orpc/contract@0.0.4
+  - @orpc/shared@0.0.5
+  - @orpc/zod@0.0.1
+
 ## 0.0.3
 
 ### Patch Changes

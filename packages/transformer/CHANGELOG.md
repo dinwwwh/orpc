@@ -1,5 +1,17 @@
 # @orpc/transformer
 
+## 0.0.4
+
+### Patch Changes
+
+- [`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238) Thanks [@unnoq](https://github.com/unnoq)! - build: optimize
+
+- [`8e9a954`](https://github.com/unnoq/orpc/commit/8e9a954ab8a13a4d968caaf4aa67b70c2d38c914) Thanks [@unnoq](https://github.com/unnoq)! - fix: zod-coerce create properties when it not exists
+
+- Updated dependencies [[`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238)]:
+  - @orpc/shared@0.0.5
+  - @orpc/zod@0.0.1
+
 ## 0.0.3
 
 ### Patch Changes
