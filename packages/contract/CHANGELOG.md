@@ -1,5 +1,14 @@
 # @orpc/contract
 
+## 0.0.4
+
+### Patch Changes
+
+- [`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238) Thanks [@unnoq](https://github.com/unnoq)! - build: optimize
+
+- Updated dependencies [[`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238)]:
+  - @orpc/shared@0.0.5
+
 ## 0.0.3
 
 ### Patch Changes

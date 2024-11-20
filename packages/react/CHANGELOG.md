@@ -1,5 +1,17 @@
 # @orpc/react
 
+## 1.0.0
+
+### Patch Changes
+
+- [`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238) Thanks [@unnoq](https://github.com/unnoq)! - build: optimize
+
+- Updated dependencies [[`8e9a954`](https://github.com/unnoq/orpc/commit/8e9a954ab8a13a4d968caaf4aa67b70c2d38c914), [`ab80aa6`](https://github.com/unnoq/orpc/commit/ab80aa614bcd4c5bff641ed693e2f86178235238)]:
+  - @orpc/server@0.1.0
+  - @orpc/contract@0.0.4
+  - @orpc/client@1.0.0
+  - @orpc/shared@0.0.5
+
 ## 0.0.4
 
 ### Patch Changes
