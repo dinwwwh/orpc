@@ -8,11 +8,11 @@
     "url": "https://unnoq.com"
   },
   "license": "MIT",
-  "homepage": "https://github.com/unnoq/unnoq",
+  "homepage": "https://github.com/unnoq/orpc",
   "repository": {
     "type": "git",
-    "url": "https://github.com/unnoq/unnoq.git",
-    "directory": "examples/typescript-vite-package"
+    "url": "https://github.com/unnoq/orpc.git",
+    "directory": "packages/transformer"
   },
   "keywords": ["unnoq"],
   "publishConfig": {
