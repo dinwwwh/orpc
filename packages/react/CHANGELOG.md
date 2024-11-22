@@ -1,5 +1,15 @@
 # @orpc/react
 
+## 1.0.2
+
+### Patch Changes
+
+- [`b16f327`](https://github.com/unnoq/orpc/commit/b16f327fc4587cebc6eb1a600896f5a5a30d66a4) Thanks [@unnoq](https://github.com/unnoq)! - chore: bump version
+
+- Updated dependencies [[`b16f327`](https://github.com/unnoq/orpc/commit/b16f327fc4587cebc6eb1a600896f5a5a30d66a4)]:
+  - @orpc/server@0.1.2
+  - @orpc/client@1.0.2
+
 ## 1.0.1
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @orpc/server
 
+## 0.1.2
+
+### Patch Changes
+
+- [`b16f327`](https://github.com/unnoq/orpc/commit/b16f327fc4587cebc6eb1a600896f5a5a30d66a4) Thanks [@unnoq](https://github.com/unnoq)! - chore: bump version
+
 ## 0.1.1
 
 ### Patch Changes
