@@ -1,5 +1,13 @@
 # @orpc/server
 
+## 0.1.1
+
+### Patch Changes
+
+- [`865646b`](https://github.com/unnoq/orpc/commit/865646b73f72bc293b7a9965a41e95c1886dbace) Thanks [@unnoq](https://github.com/unnoq)! - feat!: middleware can output directly with new apis
+
+- [`865646b`](https://github.com/unnoq/orpc/commit/865646b73f72bc293b7a9965a41e95c1886dbace) Thanks [@unnoq](https://github.com/unnoq)! - chore: dedupe code
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,15 @@
 # @orpc/react
 
+## 1.0.1
+
+### Patch Changes
+
+- [`865646b`](https://github.com/unnoq/orpc/commit/865646b73f72bc293b7a9965a41e95c1886dbace) Thanks [@unnoq](https://github.com/unnoq)! - chore: dedupe code
+
+- Updated dependencies [[`865646b`](https://github.com/unnoq/orpc/commit/865646b73f72bc293b7a9965a41e95c1886dbace), [`865646b`](https://github.com/unnoq/orpc/commit/865646b73f72bc293b7a9965a41e95c1886dbace)]:
+  - @orpc/server@0.1.1
+  - @orpc/client@1.0.1
+
 ## 1.0.0
 
 ### Patch Changes
