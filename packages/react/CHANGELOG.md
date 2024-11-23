@@ -1,5 +1,14 @@
 # @orpc/react
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`d6f69ef`](https://github.com/unnoq/orpc/commit/d6f69ef1ee5f29a1419fe293cd1b9528be2e59fb)]:
+  - @orpc/contract@0.1.0
+  - @orpc/server@0.2.0
+  - @orpc/client@2.0.0
+
 ## 1.0.2
 
 ### Patch Changes
