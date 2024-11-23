@@ -1,5 +1,11 @@
 # @orpc/client
 
+## 1.0.3
+
+### Patch Changes
+
+- [`e45f716`](https://github.com/unnoq/orpc/commit/e45f7166dcebc66ba139e9ec159411aa2ab355c9) Thanks [@unnoq](https://github.com/unnoq)! - test
+
 ## 1.0.2
 
 ### Patch Changes
