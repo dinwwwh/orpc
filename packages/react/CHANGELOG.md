@@ -1,5 +1,12 @@
 # @orpc/react
 
+## 1.0.3
+
+### Patch Changes
+
+- Updated dependencies [[`083f8df`](https://github.com/unnoq/orpc/commit/083f8df3a51a1acb96811d38c15e7a5914672540)]:
+  - @orpc/client@1.0.3
+
 ## 1.0.2
 
 ### Patch Changes
