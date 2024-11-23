@@ -26,7 +26,6 @@ export const refresh = oc
     path: '/refresh',
     summary: 'Refresh a token',
   })
-  .input(TokenSchema)
   .output(TokenSchema)
 
 export const revoke = oc

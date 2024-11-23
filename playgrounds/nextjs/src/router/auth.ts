@@ -38,7 +38,6 @@ export const refresh = authed
     path: '/refresh',
     summary: 'Refresh a token',
   })
-  .input(TokenSchema)
   .output(TokenSchema)
   .handler(async (input, context, meta) => {
     return {
