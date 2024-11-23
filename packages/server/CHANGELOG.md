@@ -1,5 +1,14 @@
 # @orpc/server
 
+## 0.2.1
+
+### Patch Changes
+
+- [#25](https://github.com/unnoq/orpc/pull/25) [`2759965`](https://github.com/unnoq/orpc/commit/27599650d434049b4861bf4f9df8efb621fd60aa) Thanks [@unnoq](https://github.com/unnoq)! - chore: bump version
+
+- Updated dependencies [[`2759965`](https://github.com/unnoq/orpc/commit/27599650d434049b4861bf4f9df8efb621fd60aa)]:
+  - @orpc/contract@0.1.1
+
 ## 0.2.0
 
 ### Minor Changes
