@@ -1,0 +1,5 @@
+---
+"@orpc/client": patch
+---
+
+test
