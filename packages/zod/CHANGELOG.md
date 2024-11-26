@@ -1,5 +1,11 @@
 # @orpc/zod
 
+## 0.0.2
+
+### Patch Changes
+
+- [`ea94dfe`](https://github.com/unnoq/orpc/commit/ea94dfedb57a04aa173f29b00e198af3015fa633) Thanks [@unnoq](https://github.com/unnoq)! - fix: bundle unexpected deps
+
 ## 0.0.1
 
 ### Patch Changes

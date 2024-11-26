@@ -1,5 +1,16 @@
 # @orpc/server
 
+## 0.3.1
+
+### Patch Changes
+
+- [`ea94dfe`](https://github.com/unnoq/orpc/commit/ea94dfedb57a04aa173f29b00e198af3015fa633) Thanks [@unnoq](https://github.com/unnoq)! - fix: bundle unexpected deps
+
+- Updated dependencies [[`68f9a38`](https://github.com/unnoq/orpc/commit/68f9a38f77146ac0b9e61b4a18156753bf62a903), [`ea94dfe`](https://github.com/unnoq/orpc/commit/ea94dfedb57a04aa173f29b00e198af3015fa633)]:
+  - @orpc/shared@0.1.1
+  - @orpc/contract@0.1.3
+  - @orpc/transformer@0.0.6
+
 ## 0.3.0
 
 ### Minor Changes

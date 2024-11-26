@@ -1,5 +1,13 @@
 # @orpc/shared
 
+## 0.1.1
+
+### Patch Changes
+
+- [`68f9a38`](https://github.com/unnoq/orpc/commit/68f9a38f77146ac0b9e61b4a18156753bf62a903) Thanks [@unnoq](https://github.com/unnoq)! - chore: improve `value` util
+
+- [`ea94dfe`](https://github.com/unnoq/orpc/commit/ea94dfedb57a04aa173f29b00e198af3015fa633) Thanks [@unnoq](https://github.com/unnoq)! - fix: bundle unexpected deps
+
 ## 0.1.0
 
 ### Minor Changes
