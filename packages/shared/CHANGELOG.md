@@ -1,5 +1,11 @@
 # @orpc/shared
 
+## 0.1.0
+
+### Minor Changes
+
+- [#30](https://github.com/unnoq/orpc/pull/30) [`3bc7898`](https://github.com/unnoq/orpc/commit/3bc789835a4c95551779c0c136fbf6ba40b79590) Thanks [@unnoq](https://github.com/unnoq)! - feat!: `.handler` become `.func`, caller accept FormData
+
 ## 0.0.5
 
 ### Patch Changes

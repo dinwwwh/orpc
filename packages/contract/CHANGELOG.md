@@ -1,5 +1,12 @@
 # @orpc/contract
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`3bc7898`](https://github.com/unnoq/orpc/commit/3bc789835a4c95551779c0c136fbf6ba40b79590)]:
+  - @orpc/shared@0.1.0
+
 ## 0.1.1
 
 ### Patch Changes

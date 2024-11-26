@@ -1,5 +1,18 @@
 # @orpc/server
 
+## 0.3.0
+
+### Minor Changes
+
+- [#30](https://github.com/unnoq/orpc/pull/30) [`3bc7898`](https://github.com/unnoq/orpc/commit/3bc789835a4c95551779c0c136fbf6ba40b79590) Thanks [@unnoq](https://github.com/unnoq)! - feat!: `.handler` become `.func`, caller accept FormData
+
+### Patch Changes
+
+- Updated dependencies [[`3bc7898`](https://github.com/unnoq/orpc/commit/3bc789835a4c95551779c0c136fbf6ba40b79590)]:
+  - @orpc/shared@0.1.0
+  - @orpc/contract@0.1.2
+  - @orpc/transformer@0.0.5
+
 ## 0.2.1
 
 ### Patch Changes
