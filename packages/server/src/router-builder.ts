@@ -1,4 +1,5 @@
 import type { HandledRouter, Router } from './router'
+import type { LazyRouter } from './router-lazy'
 import type { Context, MergeContext } from './types'
 import { DecoratedContractProcedure, type HTTPPath } from '@orpc/contract'
 import {
@@ -7,6 +8,7 @@ import {
   type Middleware,
 } from './middleware'
 import { decorateProcedure, isProcedure } from './procedure'
+import { createLazyProcedureOrLazyRouter } from './router-lazy'
 
 export class RouterBuilder<
   TContext extends Context,
@@ -118,5 +120,14 @@ export class RouterBuilder<
     }
 
     return handled as HandledRouter<URouter>
+  }
+
+  lazy<U extends Router<TContext>>(
+    load: () => Promise<{ default: U }>,
+  ): LazyRouter<U> {
+    return createLazyProcedureOrLazyRouter({
+      load: async () => (await load()).default,
+      middlewares: this.zz$rb.middlewares,
+    }) as any
   }
 }

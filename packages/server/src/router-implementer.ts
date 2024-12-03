@@ -1,5 +1,6 @@
 import type { Middleware } from './middleware'
 import type { RouterWithContract } from './router'
+import type { LazyRouter } from './router-lazy'
 import type { Context } from './types'
 import {
   type ContractProcedure,
@@ -8,6 +9,7 @@ import {
 } from '@orpc/contract'
 import { isProcedure } from './procedure'
 import { ProcedureImplementer } from './procedure-implementer'
+import { createLazyProcedureOrLazyRouter } from './router-lazy'
 
 export class RouterImplementer<
   TContext extends Context,
@@ -25,6 +27,14 @@ export class RouterImplementer<
     assertRouterImplementation(this.zz$ri.contract, router)
 
     return router
+  }
+
+  lazy(
+    load: () => Promise<{ default: RouterWithContract<TContext, TContract> }>,
+  ): LazyRouter<RouterWithContract<TContext, TContract>> {
+    return createLazyProcedureOrLazyRouter({
+      load: async () => (await load()).default,
+    }) as any
   }
 }
 

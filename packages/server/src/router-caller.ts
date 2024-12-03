@@ -2,6 +2,7 @@ import type { Value } from '@orpc/shared'
 import type { Router } from './router'
 import { isProcedure, type Procedure } from './procedure'
 import { createProcedureCaller, type ProcedureCaller } from './procedure-caller'
+import { isLazyProcedure, type LazyProcedure } from './procedure-lazy'
 
 export interface CreateRouterCallerOptions<
   TRouter extends Router<any>,
@@ -20,13 +21,13 @@ export interface CreateRouterCallerOptions<
    *
    * @internal
    */
-  basePath?: string[]
+  path?: string[]
 }
 
 export type RouterCaller<
   TRouter extends Router<any>,
 > = {
-  [K in keyof TRouter]: TRouter[K] extends Procedure<any, any, any, any, any>
+  [K in keyof TRouter]: TRouter[K] extends Procedure<any, any, any, any, any> | LazyProcedure<any, any, any, any, any>
     ? ProcedureCaller<TRouter[K]>
     : TRouter[K] extends Router<any>
       ? RouterCaller<TRouter[K]>
@@ -38,27 +39,47 @@ export function createRouterCaller<
 >(
   options: CreateRouterCallerOptions<TRouter>,
 ): RouterCaller<TRouter> {
-  const caller: Record<string, unknown> = {}
+  return createRouterCallerInternal({
+    current: options.router,
+    context: options.context,
+    path: options.path ?? [],
+  }) as any
+}
 
-  for (const key in options.router) {
-    const path = [...(options.basePath ?? []), key]
-    const item = options.router[key]
+function createRouterCallerInternal(
+  options: {
+    current: Procedure<any, any, any, any, any> | LazyProcedure<any, any, any, any, any> | Router<any>
+    context: Value<any>
+    path: string[]
+  },
+) {
+  const procedureCaller = isLazyProcedure(options.current) || isProcedure(options.current)
+    ? createProcedureCaller({
+      procedure: options.current,
+      context: options.context as any,
+      path: options.path,
+    })
+    : {}
 
-    if (isProcedure(item)) {
-      caller[key] = createProcedureCaller({
-        procedure: item,
-        context: options.context as any,
-        path,
-      })
-    }
-    else {
-      caller[key] = createRouterCaller({
-        router: item as any,
+  const recursive = new Proxy(procedureCaller, {
+    get(target, key) {
+      if (typeof key !== 'string') {
+        return Reflect.get(target, key)
+      }
+
+      const next = Reflect.get(options.current, key)
+
+      if ((typeof next !== 'object' && typeof next !== 'function') || next === null) {
+        throw new Error('The loader reached the end of the chain')
+      }
+
+      return createRouterCallerInternal({
+        current: next,
         context: options.context,
-        basePath: path,
+        path: [...(options.path ?? []), key],
       })
-    }
-  }
+    },
+  })
 
-  return caller as RouterCaller<TRouter>
+  return recursive
 }

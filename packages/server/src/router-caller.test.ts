@@ -29,6 +29,12 @@ describe('createRouterCaller', () => {
       ping,
       pong,
     },
+    lazy: osw.lazy(() => Promise.resolve({
+      default: {
+        ping,
+        pong: osw.lazy(() => Promise.resolve({ default: pong })),
+      },
+    })),
   })
 
   it('infer context', () => {
@@ -82,6 +88,10 @@ describe('createRouterCaller', () => {
     })
     expect(caller.nested.pong({ value: '123' })).resolves.toEqual({
       value: true,
+    })
+
+    expect(caller.lazy.ping({ value: '123' })).resolves.toEqual({
+      value: '123',
     })
 
     // @ts-expect-error - invalid input

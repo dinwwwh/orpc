@@ -219,7 +219,7 @@ export type WELL_DEFINED_PROCEDURE = Procedure<
   unknown
 >
 
-export function isProcedure(item: unknown): item is WELL_DEFINED_PROCEDURE {
+export function isProcedure(item: unknown): item is Procedure<any, any, any, any, any> {
   if (item instanceof Procedure)
     return true
 

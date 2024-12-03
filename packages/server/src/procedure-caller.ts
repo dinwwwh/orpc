@@ -1,14 +1,15 @@
 import type { SchemaInput, SchemaOutput } from '@orpc/contract'
 import type { MiddlewareMeta } from './middleware'
-import type { Procedure } from './procedure'
 import type { Context } from './types'
 import { type Value, value } from '@orpc/shared'
 import { ORPCError } from '@orpc/shared/error'
 import { OpenAPIDeserializer } from '@orpc/transformer'
+import { isProcedure, type Procedure } from './procedure'
+import { LAZY_PROCEDURE_SYMBOL, type LazyProcedure } from './procedure-lazy'
 import { mergeContext } from './utils'
 
 export interface CreateProcedureCallerOptions<
-  TProcedure extends Procedure<any, any, any, any, any>,
+  TProcedure extends Procedure<any, any, any, any, any> | LazyProcedure<any, any, any, any, any>,
 > {
   procedure: TProcedure
 
@@ -18,7 +19,9 @@ export interface CreateProcedureCallerOptions<
   context: Value<
     TProcedure extends Procedure<infer UContext, any, any, any, any>
       ? UContext
-      : never
+      : TProcedure extends LazyProcedure<infer UContext, any, any, any, any>
+        ? UContext
+        : never
   >
 
   /**
@@ -30,7 +33,7 @@ export interface CreateProcedureCallerOptions<
 }
 
 export type ProcedureCaller<
-  TProcedure extends Procedure<any, any, any, any, any>,
+  TProcedure extends Procedure<any, any, any, any, any> | LazyProcedure<any, any, any, any, any>,
 > = TProcedure extends Procedure<
   any,
   any,
@@ -43,17 +46,33 @@ export type ProcedureCaller<
     ) => Promise<
       SchemaOutput<UOutputSchema, UFuncOutput>
     >
-  : never
+  : TProcedure extends LazyProcedure<
+    infer UContext,
+    infer UExtraContext,
+    infer UInputSchema,
+    infer UOutputSchema,
+    infer UFuncOutput
+  >
+    ? ProcedureCaller<Procedure<UContext, UExtraContext, UInputSchema, UOutputSchema, UFuncOutput>>
+    : never
 
 export function createProcedureCaller<
-  TProcedure extends Procedure<any, any, any, any, any>,
+  TProcedure extends Procedure<any, any, any, any, any> | LazyProcedure<any, any, any, any, any>,
 >(
   options: CreateProcedureCallerOptions<TProcedure>,
 ): ProcedureCaller<TProcedure> {
-  const path = options.path ?? []
-  const procedure = options.procedure
+  const loadProcedure: () => Promise<Procedure<any, any, any, any, any>> = async () => {
+    if (isProcedure(options.procedure)) {
+      return options.procedure
+    }
+
+    return options.procedure[LAZY_PROCEDURE_SYMBOL].load()
+  }
 
   const caller = async (input: unknown): Promise<unknown> => {
+    const path = options.path ?? []
+    const procedure = await loadProcedure()
+
     const input_ = (() => {
       if (!(input instanceof FormData)) {
         return input
