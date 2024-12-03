@@ -5,8 +5,8 @@ import { isProcedure, type Procedure } from './procedure'
 import { decorateLazyProcedure, isLazyProcedure, LAZY_PROCEDURE_SYMBOL } from './procedure-lazy'
 
 export type LazyRouter<TRouter extends Router<any>> = {
-  [K in keyof TRouter]: TRouter[K] extends DecoratedLazyProcedure<any, any, any, any, any>
-    ? TRouter[K]
+  [K in keyof TRouter]: TRouter[K] extends LazyProcedure<infer UContext, infer UExtraContext, infer UInputSchema, infer UOutputSchema, infer UFuncOutput>
+    ? DecoratedLazyProcedure<UContext, UExtraContext, UInputSchema, UOutputSchema, UFuncOutput>
     : TRouter[K] extends Procedure<infer UContext, infer UExtraContext, infer UInputSchema, infer UOutputSchema, infer UFuncOutput>
       ? DecoratedLazyProcedure<UContext, UExtraContext, UInputSchema, UOutputSchema, UFuncOutput>
       : TRouter[K] extends Router<any>
@@ -25,10 +25,12 @@ export function createLazyProcedureOrLazyRouter<
     : T extends Router<any>
       ? LazyRouter<T>
       : never {
-  return createLazyProcedureOrLazyRouterInternal({
+  const result = createLazyProcedureOrLazyRouterInternal({
     load: options.load,
     middlewares: options.middlewares,
   }) as any
+
+  return result
 }
 
 function createLazyProcedureOrLazyRouterInternal(
@@ -41,7 +43,7 @@ function createLazyProcedureOrLazyRouterInternal(
     const procedure = await options.load()
 
     if (isLazyProcedure(procedure)) {
-      return await procedure[LAZY_PROCEDURE_SYMBOL].load()
+      return procedure[LAZY_PROCEDURE_SYMBOL].load()
     }
 
     if (isProcedure(procedure)) {
@@ -64,15 +66,16 @@ function createLazyProcedureOrLazyRouterInternal(
 
       const loadNext: () => Promise<Router<any> | Procedure<any, any, any, any, any>> = async () => {
         const current = await options.load()
+        const next = Reflect.get(current, key)
 
-        if ((typeof current !== 'object' && typeof current !== 'function') || current === null) {
+        if ((typeof next !== 'object' && typeof next !== 'function') || next === null) {
           throw new Error('The loader reached the end of the chain')
         }
 
-        return Reflect.get(current, key) as any
+        return next
       }
 
-      return createLazyProcedureOrLazyRouter({
+      return createLazyProcedureOrLazyRouterInternal({
         load: loadNext,
         middlewares: options.middlewares,
       })

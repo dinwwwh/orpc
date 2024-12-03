@@ -244,7 +244,7 @@ export class Builder<TContext extends Context, TExtraContext extends Context> {
         ? LazyRouter<U>
         : never {
     return createLazyProcedureOrLazyRouter({
-      load: async () => (await load()).default,
+      load: () => load().then(m => m.default),
       middlewares: this.zz$b.middlewares,
     })
   }

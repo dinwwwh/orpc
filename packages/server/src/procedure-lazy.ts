@@ -56,7 +56,7 @@ export function decorateLazyProcedure<
   TFuncOutput extends SchemaOutput<TOutputSchema>,
 >(
   options: DecorateLazyProcedureOptions<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput>,
-) {
+): DecoratedLazyProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput> {
   const lazyProcedure: LazyProcedure<TContext, TExtraContext, TInputSchema, TOutputSchema, TFuncOutput> = {
     [LAZY_PROCEDURE_SYMBOL]: {
       load: async () => {

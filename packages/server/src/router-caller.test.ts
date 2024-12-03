@@ -29,12 +29,23 @@ describe('createRouterCaller', () => {
       ping,
       pong,
     },
-    lazy: osw.lazy(() => Promise.resolve({
+    lazy: osw.lazy(async () => ({
       default: {
         ping,
-        pong: osw.lazy(() => Promise.resolve({ default: pong })),
+        pong: osw.lazy(async () => ({ default: pong })),
       },
     })),
+  })
+
+  it('test', async () => {
+    const caller = osw.lazy(() => Promise.resolve({
+      default: {
+        pong: osw.lazy(() => Promise.resolve({ default: pong })),
+      },
+    }))
+
+    // console.log(await caller.lazy.ping({ value: '123' }))
+    console.log(caller.pong())
   })
 
   it('infer context', () => {
@@ -94,6 +105,10 @@ describe('createRouterCaller', () => {
       value: '123',
     })
 
+    expect(caller.lazy.pong({ value: '123' })).resolves.toEqual({
+      value: true,
+    })
+
     // @ts-expect-error - invalid input
     expect(caller.ping({ value: new Date('2023-01-01') })).rejects.toThrowError(
       'Validation input failed',
@@ -118,6 +133,14 @@ describe('createRouterCaller', () => {
           ping,
         },
       },
+      lazy: osw.lazy(() => Promise.resolve({
+        default: {
+          ping,
+          nested: {
+            ping: osw.lazy(() => Promise.resolve({ default: ping })),
+          },
+        },
+      })),
     })
 
     const caller = createRouterCaller({
@@ -130,6 +153,14 @@ describe('createRouterCaller', () => {
     expect(caller.nested.child.ping('')).resolves.toEqual([
       'nested',
       'child',
+      'ping',
+    ])
+
+    expect(caller.lazy.ping('')).resolves.toEqual(['lazy', 'ping'])
+    expect(caller.lazy.nested.ping('')).resolves.toEqual(['lazy', 'nested', 'ping'])
+    expect(caller.lazy.nested.ping('')).resolves.toEqual([
+      'lazy',
+      'nested',
       'ping',
     ])
   })

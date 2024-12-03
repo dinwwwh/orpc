@@ -56,7 +56,7 @@ function createRouterCallerInternal(
   const procedureCaller = isLazyProcedure(options.current) || isProcedure(options.current)
     ? createProcedureCaller({
       procedure: options.current,
-      context: options.context as any,
+      context: options.context,
       path: options.path,
     })
     : {}
@@ -76,7 +76,7 @@ function createRouterCallerInternal(
       return createRouterCallerInternal({
         current: next,
         context: options.context,
-        path: [...(options.path ?? []), key],
+        path: [...options.path, key],
       })
     },
   })
