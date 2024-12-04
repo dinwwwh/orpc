@@ -3,6 +3,7 @@ import type { Router } from './router'
 import type { LazyRouter } from './router-lazy'
 import type { Context, MergeContext } from './types'
 import { DecoratedContractProcedure, type HTTPPath } from '@orpc/contract'
+import { ERROR_ROUTER_REACHED_END } from './error'
 import { decorateMiddleware, type MapInputMiddleware, type Middleware } from './middleware'
 import { decorateProcedure, isProcedure } from './procedure'
 import { createLazyProcedure, type DecoratedLazyProcedure, decorateLazyProcedure, isLazyProcedure, LAZY_PROCEDURE_LOADER_SYMBOL, type LazyProcedure } from './procedure-lazy'
@@ -147,7 +148,7 @@ function adaptRouter(options: {
       const child = Reflect.get(options.routerOrChild, key) as Router<any>[keyof Router<any>] | undefined
 
       if ((typeof child !== 'object' && typeof child !== 'function') || child === null) {
-        throw new Error('Reached the end of the router')
+        throw ERROR_ROUTER_REACHED_END
       }
 
       return adaptRouter({

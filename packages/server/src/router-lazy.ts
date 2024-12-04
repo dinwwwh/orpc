@@ -1,4 +1,5 @@
 import type { Router } from './router'
+import { ERROR_LAZY_LOADER_INVALID_PROCEDURE, ERROR_ROUTER_REACHED_END } from './error'
 import { type ANY_PROCEDURE, isProcedure } from './procedure'
 import { type ANY_LAZY_PROCEDURE, createLazyProcedure, type DecoratedLazyProcedure, decorateLazyProcedure, isLazyProcedure, LAZY_PROCEDURE_LOADER_SYMBOL, type LazyProcedure } from './procedure-lazy'
 
@@ -21,7 +22,7 @@ export function createLazyProcedureOrLazyRouter<T extends Router<any> | ANY_PROC
     const procedure = await loader()
 
     if (!isProcedure(procedure)) {
-      throw new Error('The loaded procedure is not a valid procedure')
+      throw ERROR_LAZY_LOADER_INVALID_PROCEDURE
     }
 
     return procedure
@@ -45,7 +46,7 @@ export function createLazyProcedureOrLazyRouter<T extends Router<any> | ANY_PROC
         const next = Reflect.get(current, key) as Router<any> | ANY_PROCEDURE | ANY_LAZY_PROCEDURE | undefined
 
         if ((typeof next !== 'object' && typeof next !== 'function') || next === null) {
-          throw new Error('The loader reached the end of the chain')
+          throw ERROR_ROUTER_REACHED_END
         }
 
         if (LAZY_ROUTER_LOADER_SYMBOL in next && typeof next[LAZY_ROUTER_LOADER_SYMBOL] === 'function') {

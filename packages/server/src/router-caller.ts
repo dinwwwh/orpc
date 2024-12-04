@@ -1,6 +1,7 @@
 import type { Value } from '@orpc/shared'
 import type { ANY_PROCEDURE } from './procedure'
 import type { Router } from './router'
+import { ERROR_ROUTER_REACHED_END } from './error'
 import { isProcedure } from './procedure'
 import { createProcedureCaller, type ProcedureCaller } from './procedure-caller'
 import { type ANY_LAZY_PROCEDURE, isLazyProcedure } from './procedure-lazy'
@@ -73,7 +74,7 @@ function createRouterCallerInternal(
       const next = Reflect.get(options.current, key)
 
       if ((typeof next !== 'object' && typeof next !== 'function') || next === null) {
-        throw new Error('The loader reached the end of the chain')
+        throw ERROR_ROUTER_REACHED_END
       }
 
       return createRouterCallerInternal({

@@ -1,4 +1,5 @@
-import type { Procedure } from '../procedure'
+import type { ANY_PROCEDURE } from '../procedure'
+import type { ANY_LAZY_PROCEDURE } from '../procedure-lazy'
 import type { Router } from '../router'
 import type { FetchHandler } from './types'
 import { ORPC_HEADER, ORPC_HEADER_VALUE } from '@orpc/contract'
@@ -7,6 +8,7 @@ import { ORPCError } from '@orpc/shared/error'
 import { ORPCDeserializer, ORPCSerializer } from '@orpc/transformer'
 import { isProcedure } from '../procedure'
 import { createProcedureCaller } from '../procedure-caller'
+import { isLazyProcedure } from '../procedure-lazy'
 
 const serializer = new ORPCSerializer()
 const deserializer = new ORPCDeserializer()
@@ -74,11 +76,11 @@ export function createORPCHandler(): FetchHandler {
 
 function resolveORPCRouter(router: Router<any>, pathname: string): {
   path: string[]
-  procedure: Procedure<any, any, any, any, any>
+  procedure: ANY_PROCEDURE | ANY_LAZY_PROCEDURE
 } | undefined {
   const path = trim(pathname, '/').split('/').map(decodeURIComponent)
 
-  let current: Router<any> | Procedure<any, any, any, any, any> | undefined = router
+  let current: Router<any> | ANY_PROCEDURE | ANY_LAZY_PROCEDURE | undefined = router
   for (const segment of path) {
     if ((typeof current !== 'object' || current === null) && typeof current !== 'function') {
       current = undefined
@@ -88,7 +90,7 @@ function resolveORPCRouter(router: Router<any>, pathname: string): {
     current = (current as any)[segment]
   }
 
-  return isProcedure(current)
+  return isProcedure(current) || isLazyProcedure(current)
     ? {
         procedure: current,
         path,
