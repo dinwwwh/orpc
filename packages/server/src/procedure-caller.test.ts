@@ -1,5 +1,7 @@
+import type { DecoratedLazyProcedure } from './procedure-lazy'
 import { z } from 'zod'
 import { createProcedureCaller, os } from '.'
+import { decorateLazyProcedure } from './procedure-lazy'
 
 describe('createProcedureCaller', () => {
   const path = ['ping']
@@ -167,5 +169,27 @@ describe('createProcedureCaller', () => {
     os.input(z.any()).func(() => { })()
     // @ts-expect-error input is required
     expect(os.input(z.boolean()).func(() => { })()).rejects.toThrow()
+  })
+
+  it('work with lazy procedure', () => {
+    const schema = z.string()
+    const procedure = os.input(schema).func(() => {
+      return { value: true }
+    })
+
+    const lazy = decorateLazyProcedure(() => Promise.resolve(procedure))
+
+    expectTypeOf(lazy).toEqualTypeOf<DecoratedLazyProcedure<typeof procedure>>()
+
+    const caller = createProcedureCaller({
+      procedure: lazy,
+      context: undefined,
+    })
+
+    expectTypeOf(caller).toMatchTypeOf<
+      (value: string) => Promise<{ value: boolean }>
+    >()
+
+    expect(caller('123')).resolves.toEqual({ value: true })
   })
 })
