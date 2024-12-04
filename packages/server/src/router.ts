@@ -1,21 +1,14 @@
-import type {
-  ContractProcedure,
-  ContractRouter,
-  SchemaInput,
-  SchemaOutput,
-} from '@orpc/contract'
+import type { ContractProcedure, ContractRouter, SchemaInput, SchemaOutput } from '@orpc/contract'
+import type { ANY_PROCEDURE, DecoratedProcedure, Procedure } from './procedure'
+import type { ANY_LAZY_PROCEDURE } from './procedure-lazy'
 import type { Context } from './types'
 import {
   isContractProcedure,
 } from '@orpc/contract'
-import {
-  type DecoratedProcedure,
-  isProcedure,
-  type Procedure,
-} from './procedure'
+import { isProcedure } from './procedure'
 
 export interface Router<TContext extends Context> {
-  [k: string]: Procedure<TContext, any, any, any, any> | Router<TContext>
+  [k: string]: ANY_PROCEDURE | ANY_LAZY_PROCEDURE | Router<TContext>
 }
 
 export type HandledRouter<TRouter extends Router<any>> = {
