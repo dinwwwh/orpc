@@ -1,7 +1,7 @@
 import type { DecoratedLazyProcedure } from './procedure-lazy'
 import { z } from 'zod'
 import { createProcedureCaller, os } from '.'
-import { decorateLazyProcedure } from './procedure-lazy'
+import { createLazyProcedure, decorateLazyProcedure } from './procedure-lazy'
 
 describe('createProcedureCaller', () => {
   const path = ['ping']
@@ -177,7 +177,7 @@ describe('createProcedureCaller', () => {
       return { value: true }
     })
 
-    const lazy = decorateLazyProcedure(() => Promise.resolve(procedure))
+    const lazy = decorateLazyProcedure(createLazyProcedure(() => Promise.resolve(procedure)))
 
     expectTypeOf(lazy).toEqualTypeOf<DecoratedLazyProcedure<typeof procedure>>()
 
