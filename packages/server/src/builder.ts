@@ -1,7 +1,8 @@
 import type { IsEqual } from '@orpc/shared'
 import type { DecoratedProcedure, Procedure, ProcedureFunc } from './procedure'
 import type { DecoratedLazyProcedure } from './procedure-lazy'
-import type { HandledRouter, Router } from './router'
+import type { Router } from './router'
+import type { AdaptedRouter } from './router-builder'
 import type { LazyRouter } from './router-lazy'
 import type { Context, MergeContext } from './types'
 import {
@@ -232,7 +233,7 @@ export class Builder<TContext extends Context, TExtraContext extends Context> {
    */
   router<URouter extends Router<TContext>>(
     router: URouter,
-  ): HandledRouter<URouter> {
+  ): AdaptedRouter<URouter> {
     return new RouterBuilder<TContext, TExtraContext>(this.zz$b).router(router)
   }
 

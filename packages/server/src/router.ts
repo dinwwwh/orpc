@@ -1,6 +1,6 @@
 import type { ContractProcedure, ContractRouter, SchemaInput, SchemaOutput } from '@orpc/contract'
-import type { DecoratedProcedure, Procedure } from './procedure'
-import type { DecoratedLazyProcedure, LazyProcedure } from './procedure-lazy'
+import type { Procedure } from './procedure'
+import type { LazyProcedure } from './procedure-lazy'
 import type { Context } from './types'
 import {
   isContractProcedure,
@@ -12,28 +12,6 @@ export interface Router<TContext extends Context> {
     | Procedure<TContext, any, any, any, any>
     | LazyProcedure<Procedure<TContext, any, any, any, any>>
     | Router<TContext>
-}
-
-export type HandledRouter<TRouter extends Router<any>> = {
-  [K in keyof TRouter]: TRouter[K] extends Procedure<
-    infer UContext,
-    infer UExtraContext,
-    infer UInputSchema,
-    infer UOutputSchema,
-    infer UFuncOutput
-  >
-    ? DecoratedProcedure<
-      UContext,
-      UExtraContext,
-      UInputSchema,
-      UOutputSchema,
-      UFuncOutput
-    >
-    : TRouter[K] extends LazyProcedure<infer UProcedure>
-      ? DecoratedLazyProcedure<UProcedure>
-      : TRouter[K] extends Router<any>
-        ? HandledRouter<TRouter[K]>
-        : never
 }
 
 export type RouterWithContract<
