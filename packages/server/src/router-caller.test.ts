@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { createRouterCaller, os } from '.'
+import { LAZY_PROCEDURE_SYMBOL } from './procedure-lazy'
 
 describe('createRouterCaller', () => {
   const internal = false
@@ -45,7 +46,7 @@ describe('createRouterCaller', () => {
     }))
 
     // console.log(await caller.lazy.ping({ value: '123' }))
-    console.log(caller.pong())
+    console.log(await caller.pong())
   })
 
   it('infer context', () => {

@@ -42,10 +42,6 @@ function createLazyProcedureOrLazyRouterInternal(
   const loadProcedure: () => Promise<Procedure<any, any, any, any, any>> = async () => {
     const procedure = await options.load()
 
-    if (isLazyProcedure(procedure)) {
-      return procedure[LAZY_PROCEDURE_SYMBOL].load()
-    }
-
     if (isProcedure(procedure)) {
       return procedure
     }
@@ -64,12 +60,16 @@ function createLazyProcedureOrLazyRouterInternal(
         return Reflect.get(target, key)
       }
 
-      const loadNext: () => Promise<Router<any> | Procedure<any, any, any, any, any>> = async () => {
+      const loadNext: () => Promise<Router<any> | Procedure<any, any, any, any, any> | LazyProcedure<any, any, any, any, any>> = async () => {
         const current = await options.load()
         const next = Reflect.get(current, key)
 
         if ((typeof next !== 'object' && typeof next !== 'function') || next === null) {
           throw new Error('The loader reached the end of the chain')
+        }
+
+        if (isLazyProcedure(next)) {
+          return next[LAZY_PROCEDURE_SYMBOL].load()
         }
 
         return next
