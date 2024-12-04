@@ -1,5 +1,8 @@
 import type { IsEqual } from '@orpc/shared'
+import type { DecoratedProcedure, Procedure, ProcedureFunc } from './procedure'
+import type { DecoratedLazyProcedure } from './procedure-lazy'
 import type { HandledRouter, Router } from './router'
+import type { LazyRouter } from './router-lazy'
 import type { Context, MergeContext } from './types'
 import {
   ContractProcedure,
@@ -17,11 +20,7 @@ import {
   type MapInputMiddleware,
   type Middleware,
 } from './middleware'
-import {
-  type DecoratedProcedure,
-  decorateProcedure,
-  type ProcedureFunc,
-} from './procedure'
+import { decorateProcedure } from './procedure'
 import { ProcedureBuilder } from './procedure-builder'
 import { ProcedureImplementer } from './procedure-implementer'
 import { RouterBuilder } from './router-builder'
@@ -29,6 +28,7 @@ import {
   type ChainedRouterImplementer,
   chainRouterImplementer,
 } from './router-implementer'
+import { createLazyProcedureOrLazyRouter } from './router-lazy'
 
 export class Builder<TContext extends Context, TExtraContext extends Context> {
   constructor(
@@ -234,5 +234,15 @@ export class Builder<TContext extends Context, TExtraContext extends Context> {
     router: URouter,
   ): HandledRouter<URouter> {
     return new RouterBuilder<TContext, TExtraContext>(this.zz$b).router(router)
+  }
+
+  lazy<U extends Router<TContext> | Procedure<TContext, any, any, any, any>>(
+    loader: () => Promise<{ default: U }>,
+  ): U extends Procedure<any, any, any, any, any>
+      ? DecoratedLazyProcedure<U>
+      : U extends Router<any>
+        ? LazyRouter<U>
+        : never {
+    return createLazyProcedureOrLazyRouter(() => loader().then(r => r.default))
   }
 }

@@ -1,6 +1,6 @@
 import type { ContractProcedure, ContractRouter, SchemaInput, SchemaOutput } from '@orpc/contract'
-import type { ANY_PROCEDURE, DecoratedProcedure, Procedure } from './procedure'
-import type { ANY_LAZY_PROCEDURE } from './procedure-lazy'
+import type { DecoratedProcedure, Procedure } from './procedure'
+import type { DecoratedLazyProcedure, LazyProcedure } from './procedure-lazy'
 import type { Context } from './types'
 import {
   isContractProcedure,
@@ -8,7 +8,10 @@ import {
 import { isProcedure } from './procedure'
 
 export interface Router<TContext extends Context> {
-  [k: string]: ANY_PROCEDURE | ANY_LAZY_PROCEDURE | Router<TContext>
+  [k: string]:
+    | Procedure<TContext, any, any, any, any>
+    | LazyProcedure<Procedure<TContext, any, any, any, any>>
+    | Router<TContext>
 }
 
 export type HandledRouter<TRouter extends Router<any>> = {
@@ -26,9 +29,11 @@ export type HandledRouter<TRouter extends Router<any>> = {
       UOutputSchema,
       UFuncOutput
     >
-    : TRouter[K] extends Router<any>
-      ? HandledRouter<TRouter[K]>
-      : never
+    : TRouter[K] extends LazyProcedure<infer UProcedure>
+      ? DecoratedLazyProcedure<UProcedure>
+      : TRouter[K] extends Router<any>
+        ? HandledRouter<TRouter[K]>
+        : never
 }
 
 export type RouterWithContract<
@@ -39,12 +44,15 @@ export type RouterWithContract<
     infer UInputSchema,
     infer UOutputSchema
   >
-    ? Procedure<TContext, any, UInputSchema, UOutputSchema, any>
+    ? Procedure<TContext, any, UInputSchema, UOutputSchema, any> | LazyProcedure<Procedure<TContext, any, UInputSchema, UOutputSchema, any>>
     : TContract[K] extends ContractRouter
       ? RouterWithContract<TContext, TContract[K]>
       : never
 }
 
+/**
+ * @deprecated not work with lazy router
+ */
 export function toContractRouter(
   router: ContractRouter | Router<any>,
 ): ContractRouter {
@@ -68,7 +76,9 @@ export function toContractRouter(
 }
 
 export type InferRouterInputs<T extends Router<any>> = {
-  [K in keyof T]: T[K] extends Procedure<any, any, infer UInputSchema, any, any>
+  [K in keyof T]: T[K] extends
+  | Procedure<any, any, infer UInputSchema, any, any>
+  | LazyProcedure<Procedure<any, any, infer UInputSchema, any, any>>
     ? SchemaInput<UInputSchema>
     : T[K] extends Router<any>
       ? InferRouterInputs<T[K]>
@@ -76,7 +86,9 @@ export type InferRouterInputs<T extends Router<any>> = {
 }
 
 export type InferRouterOutputs<T extends Router<any>> = {
-  [K in keyof T]: T[K] extends Procedure<any, any, any, infer UOutputSchema, infer UFuncOutput>
+  [K in keyof T]: T[K] extends
+  | Procedure<any, any, any, infer UOutputSchema, infer UFuncOutput>
+  | LazyProcedure<Procedure<any, any, any, infer UOutputSchema, infer UFuncOutput>>
     ? SchemaOutput<UOutputSchema, UFuncOutput>
     : T[K] extends Router<any>
       ? InferRouterOutputs<T[K]>
