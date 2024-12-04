@@ -11,22 +11,23 @@ describe('createLazyProcedureOrLazyRouter', () => {
   const decorated = decorateLazyProcedure(lazy)
   const decoratedWithContext = decorateLazyProcedure(lazyWithContext)
 
-  const router = {
+  const collection = {
     procedure,
     procedureWithContext,
     lazy,
     lazyWithContext,
     decorated,
     decoratedWithContext,
+  }
 
-    nested: {
-      procedure,
-      procedureWithContext,
-      lazy,
-      lazyWithContext,
-      decorated,
-      decoratedWithContext,
-    },
+  const router = {
+    ...collection,
+    nested: collection,
+
+    lazyRouter: createLazyProcedureOrLazyRouter(() => Promise.resolve({
+      ...collection,
+      nested: collection,
+    })),
   }
 
   it('should create a lazy procedure', () => {
@@ -53,6 +54,22 @@ describe('createLazyProcedureOrLazyRouter', () => {
 
     expect(_lazy.nested.lazyWithContext).toSatisfy(isLazyProcedure)
     expect(_lazy.nested.decoratedWithContext).toSatisfy(isLazyProcedure)
+
+    expect(_lazy.lazyRouter.lazy).toSatisfy(isLazyProcedure)
+    expect(_lazy.lazyRouter.lazy('test')).resolves.toBe('test')
+    expect(_lazy.lazyRouter.decorated).toSatisfy(isLazyProcedure)
+    expect(_lazy.lazyRouter.decorated('test')).resolves.toBe('test')
+
+    expect(_lazy.lazyRouter.lazyWithContext).toSatisfy(isLazyProcedure)
+    expect(_lazy.lazyRouter.decoratedWithContext).toSatisfy(isLazyProcedure)
+
+    expect(_lazy.lazyRouter.nested.lazy).toSatisfy(isLazyProcedure)
+    expect(_lazy.lazyRouter.nested.lazy('test')).resolves.toBe('test')
+    expect(_lazy.lazyRouter.nested.decorated).toSatisfy(isLazyProcedure)
+    expect(_lazy.lazyRouter.nested.decorated('test')).resolves.toBe('test')
+
+    expect(_lazy.lazyRouter.nested.lazyWithContext).toSatisfy(isLazyProcedure)
+    expect(_lazy.lazyRouter.nested.decoratedWithContext).toSatisfy(isLazyProcedure)
   })
 
   it('lazy router every level satisfy isLazyProcedure', () => {

@@ -2,6 +2,8 @@ import type { Router } from './router'
 import { type ANY_PROCEDURE, isProcedure } from './procedure'
 import { type ANY_LAZY_PROCEDURE, createLazyProcedure, type DecoratedLazyProcedure, decorateLazyProcedure, isLazyProcedure, LAZY_PROCEDURE_LOADER_SYMBOL, type LazyProcedure } from './procedure-lazy'
 
+export const LAZY_ROUTER_LOADER_SYMBOL = Symbol('ORPC_LAZY_ROUTER_LOADER')
+
 export type LazyRouter<T extends Router<any>> = {
   [K in keyof T]: T[K] extends ANY_PROCEDURE
     ? DecoratedLazyProcedure<T[K]>
@@ -25,7 +27,12 @@ export function createLazyProcedureOrLazyRouter<T extends Router<any> | ANY_PROC
     return procedure
   }
 
-  const lazyProcedure = decorateLazyProcedure(createLazyProcedure(procedureLoader))
+  const lazyProcedure = Object.assign(
+    decorateLazyProcedure(createLazyProcedure(procedureLoader)),
+    {
+      [LAZY_ROUTER_LOADER_SYMBOL]: loader,
+    },
+  )
 
   const recursive = new Proxy(lazyProcedure, {
     get(target, key) {
@@ -39,6 +46,10 @@ export function createLazyProcedureOrLazyRouter<T extends Router<any> | ANY_PROC
 
         if ((typeof next !== 'object' && typeof next !== 'function') || next === null) {
           throw new Error('The loader reached the end of the chain')
+        }
+
+        if (LAZY_ROUTER_LOADER_SYMBOL in next && typeof next[LAZY_ROUTER_LOADER_SYMBOL] === 'function') {
+          return next[LAZY_ROUTER_LOADER_SYMBOL]()
         }
 
         if (isLazyProcedure(next)) {

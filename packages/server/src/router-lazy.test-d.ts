@@ -11,22 +11,23 @@ describe('createLazyProcedureOrLazyRouter', () => {
   const decorated = decorateLazyProcedure(lazy)
   const decoratedWithContext = decorateLazyProcedure(lazyWithContext)
 
-  const router = {
+  const collection = {
     procedure,
     procedureWithContext,
     lazy,
     lazyWithContext,
     decorated,
     decoratedWithContext,
+  }
 
-    nested: {
-      procedure,
-      procedureWithContext,
-      lazy,
-      lazyWithContext,
-      decorated,
-      decoratedWithContext,
-    },
+  const router = {
+    ...collection,
+    nested: collection,
+
+    lazyRouter: createLazyProcedureOrLazyRouter(() => Promise.resolve({
+      ...collection,
+      nested: collection,
+    })),
   }
 
   it('should create a lazy procedure', () => {
@@ -51,5 +52,15 @@ describe('createLazyProcedureOrLazyRouter', () => {
     expectTypeOf(_lazy.nested.lazyWithContext).toMatchTypeOf<typeof lazyWithContext>()
     expectTypeOf(_lazy.nested.decorated).toEqualTypeOf<typeof decorated>()
     expectTypeOf(_lazy.nested.decoratedWithContext).toEqualTypeOf<typeof decoratedWithContext>()
+
+    expectTypeOf(_lazy.lazyRouter.lazy).toMatchTypeOf<typeof lazy>()
+    expectTypeOf(_lazy.lazyRouter.lazyWithContext).toMatchTypeOf<typeof lazyWithContext>()
+    expectTypeOf(_lazy.lazyRouter.decorated).toEqualTypeOf<typeof decorated>()
+    expectTypeOf(_lazy.lazyRouter.decoratedWithContext).toEqualTypeOf<typeof decoratedWithContext>()
+
+    expectTypeOf(_lazy.lazyRouter.nested.lazy).toMatchTypeOf<typeof lazy>()
+    expectTypeOf(_lazy.lazyRouter.nested.lazyWithContext).toMatchTypeOf<typeof lazyWithContext>()
+    expectTypeOf(_lazy.lazyRouter.nested.decorated).toEqualTypeOf<typeof decorated>()
+    expectTypeOf(_lazy.lazyRouter.nested.decoratedWithContext).toEqualTypeOf<typeof decoratedWithContext>()
   })
 })
