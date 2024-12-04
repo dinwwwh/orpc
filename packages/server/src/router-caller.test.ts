@@ -22,6 +22,14 @@ describe('createRouterCaller', () => {
     return { value: true }
   })
 
+  const lazyRouter = osw.lazy(() => Promise.resolve({
+    default: {
+      ping: osw.lazy(() => Promise.resolve({ default: ping })),
+      pong,
+      lazyRouter: osw.lazy(() => Promise.resolve({ default: { ping, pong } })),
+    },
+  }))
+
   const router = osw.router({
     ping,
     pong,
@@ -29,6 +37,7 @@ describe('createRouterCaller', () => {
       ping,
       pong,
     },
+    lazyRouter,
   })
 
   it('infer context', () => {
@@ -74,6 +83,30 @@ describe('createRouterCaller', () => {
       }>
     >()
 
+    expectTypeOf(caller.lazyRouter.ping).toMatchTypeOf<
+      (input: { value: string }) => Promise<{
+        value: string
+      }>
+    >()
+
+    expectTypeOf(caller.lazyRouter.pong).toMatchTypeOf<
+      (input: unknown) => Promise<{
+        value: boolean
+      }>
+    >()
+
+    expectTypeOf(caller.lazyRouter.lazyRouter.ping).toMatchTypeOf<
+      (input: { value: string }) => Promise<{
+        value: string
+      }>
+    >()
+
+    expectTypeOf(caller.lazyRouter.lazyRouter.pong).toMatchTypeOf<
+      (input: unknown) => Promise<{
+        value: boolean
+      }>
+    >()
+
     expect(caller.ping({ value: '123' })).resolves.toEqual({ value: '123' })
     expect(caller.pong({ value: '123' })).resolves.toEqual({ value: true })
 
@@ -81,6 +114,20 @@ describe('createRouterCaller', () => {
       value: '123',
     })
     expect(caller.nested.pong({ value: '123' })).resolves.toEqual({
+      value: true,
+    })
+
+    expect(caller.lazyRouter.ping({ value: '123' })).resolves.toEqual({
+      value: '123',
+    })
+    expect(caller.lazyRouter.pong({ value: '123' })).resolves.toEqual({
+      value: true,
+    })
+
+    expect(caller.lazyRouter.lazyRouter.ping({ value: '123' })).resolves.toEqual({
+      value: '123',
+    })
+    expect(caller.lazyRouter.lazyRouter.pong({ value: '123' })).resolves.toEqual({
       value: true,
     })
 
@@ -93,12 +140,29 @@ describe('createRouterCaller', () => {
     expect(caller.nested.ping({ value: true })).rejects.toThrowError(
       'Validation input failed',
     )
+
+    // @ts-expect-error - invalid input
+    expect(caller.lazyRouter.ping({ value: true })).rejects.toThrowError(
+      'Validation input failed',
+    )
+
+    // @ts-expect-error - invalid input
+    expect(caller.lazyRouter.lazyRouter.ping({ value: true })).rejects.toThrowError(
+      'Validation input failed',
+    )
   })
 
   it('path', () => {
     const ping = osw.func((_, __, { path }) => {
       return path
     })
+
+    const lazyRouter = osw.lazy(() => Promise.resolve({
+      default: {
+        ping: osw.lazy(() => Promise.resolve({ default: ping })),
+        lazyRouter: osw.lazy(() => Promise.resolve({ default: { ping } })),
+      },
+    }))
 
     const router = osw.router({
       ping,
@@ -108,6 +172,7 @@ describe('createRouterCaller', () => {
           ping,
         },
       },
+      lazyRouter,
     })
 
     const caller = createRouterCaller({
@@ -120,6 +185,12 @@ describe('createRouterCaller', () => {
     expect(caller.nested.child.ping('')).resolves.toEqual([
       'nested',
       'child',
+      'ping',
+    ])
+    expect(caller.lazyRouter.ping()).resolves.toEqual(['lazyRouter', 'ping'])
+    expect(caller.lazyRouter.lazyRouter.ping('')).resolves.toEqual([
+      'lazyRouter',
+      'lazyRouter',
       'ping',
     ])
   })
