@@ -145,6 +145,10 @@ function adaptRouter(options: {
         return Reflect.get(target, key)
       }
 
+      if (key === 'then') {
+        return undefined
+      }
+
       const child = Reflect.get(options.routerOrChild, key) as Router<any>[keyof Router<any>] | undefined
 
       if ((typeof child !== 'object' && typeof child !== 'function') || child === null) {

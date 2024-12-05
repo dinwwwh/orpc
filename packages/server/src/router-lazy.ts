@@ -41,6 +41,10 @@ export function createLazyProcedureOrLazyRouter<T extends Router<any> | ANY_PROC
         return Reflect.get(target, key)
       }
 
+      if (key === 'then') {
+        return undefined
+      }
+
       const nextLoader = async (): Promise<Router<any> | ANY_PROCEDURE> => {
         const current = await loader()
         const next = Reflect.get(current, key) as Router<any> | ANY_PROCEDURE | ANY_LAZY_PROCEDURE | undefined

@@ -5,6 +5,7 @@ import type { Context } from './types'
 import { type Value, value } from '@orpc/shared'
 import { ORPCError } from '@orpc/shared/error'
 import { OpenAPIDeserializer } from '@orpc/transformer'
+import { loadLazy } from './lazy'
 import { isProcedure } from './procedure'
 import { type ANY_LAZY_PROCEDURE, LAZY_PROCEDURE_LOADER_SYMBOL, type LazyProcedure } from './procedure-lazy'
 import { mergeContext } from './utils'
@@ -55,7 +56,7 @@ export function createProcedureCaller<
       return options.procedure
     }
 
-    return options.procedure[LAZY_PROCEDURE_LOADER_SYMBOL]()
+    return loadLazy(options.procedure)
   }
 
   const caller = async (input: unknown): Promise<unknown> => {

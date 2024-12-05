@@ -1,4 +1,5 @@
 import type { ContractProcedure, ContractRouter, SchemaInput, SchemaOutput } from '@orpc/contract'
+import type { Lazy } from './lazy'
 import type { Procedure } from './procedure'
 import type { LazyProcedure } from './procedure-lazy'
 import type { Context } from './types'
@@ -10,8 +11,9 @@ import { isProcedure } from './procedure'
 export interface Router<TContext extends Context> {
   [k: string]:
     | Procedure<TContext, any, any, any, any>
-    | LazyProcedure<Procedure<TContext, any, any, any, any>>
+    | Lazy<Procedure<TContext, any, any, any, any>>
     | Router<TContext>
+    | Lazy<Router<TContext>>
 }
 
 export type RouterWithContract<

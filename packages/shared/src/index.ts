@@ -1,6 +1,7 @@
 export * from './function'
 export * from './json'
 export * from './object'
+export * from './promise'
 export * from './value'
 
 export { isPlainObject } from 'is-what'
