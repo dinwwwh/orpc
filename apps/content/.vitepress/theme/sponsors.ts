@@ -436,7 +436,7 @@ export const sponsors: JSONSponsor[] = [
   {
     name: 'wang chenyu',
     login: 'hanayashiki',
-    avatar: 'https://avatars.githubusercontent.com/u/26056783?u=98c5ceda64b19874ed2a31515467332ea991e590&v=4',
+    avatar: 'https://avatars.githubusercontent.com/u/26056783?u=06c3b9205a16fd41a871e82da1cc2a09306d53f5&v=4',
     amount: 5,
     link: 'https://github.com/hanayashiki?ref=orpc',
     org: false,
@@ -444,7 +444,7 @@ export const sponsors: JSONSponsor[] = [
     tierTitle: 'Backers',
     tierLevel: 1,
     sidebarSize: 'none',
-    sidebarLogo: 'https://avatars.githubusercontent.com/u/26056783?u=98c5ceda64b19874ed2a31515467332ea991e590&v=4',
+    sidebarLogo: 'https://avatars.githubusercontent.com/u/26056783?u=06c3b9205a16fd41a871e82da1cc2a09306d53f5&v=4',
   },
   {
     name: 'Alex',
