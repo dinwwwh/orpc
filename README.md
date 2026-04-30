@@ -214,7 +214,6 @@ If you find oRPC valuable and would like to support its development, you can do 
 
 <table>
   <tr>
-   <td align="center"><a href="https://misskey.io/?ref=orpc" target="_blank" rel="noopener" title="村上さん"><img src="https://avatars.githubusercontent.com/u/37681609?u=0dd4c7e4ba937cbb52b068c55914b1d8164dc0c7&amp;v=4" width="209" alt="村上さん"/><br />村上さん</a></td>
    <td align="center"><a href="https://github.com/christ12938?ref=orpc" target="_blank" rel="noopener" title="christ12938"><img src="https://avatars.githubusercontent.com/u/25758598?v=4" width="209" alt="christ12938"/><br />christ12938</a></td>
   </tr>
 </table>
@@ -285,6 +284,7 @@ If you find oRPC valuable and would like to support its development, you can do 
   <a href="https://github.com/MrMaxie?ref=orpc" target="_blank" rel="noopener" title="Maxie"><img src="https://avatars.githubusercontent.com/u/3857836?u=5e6b57973d4385d655663ffdd836e487856f2984&amp;v=4" width="32" height="32" alt="Maxie" /></a>
   <a href="https://github.com/Stijn-Timmer?ref=orpc" target="_blank" rel="noopener" title="Stijn Timmer"><img src="https://avatars.githubusercontent.com/u/100147665?u=106b2c18e9c98a61861b4ee7fc100f5b9906a6c9&amp;v=4" width="32" height="32" alt="Stijn Timmer" /></a>
   <a href="https://github.com/u1-liquid?ref=orpc" target="_blank" rel="noopener" title="あわわわとーにゅ"><img src="https://avatars.githubusercontent.com/u/17376330?u=de3353804be889f009f7e0a1582daf04d0ab292d&amp;v=4" width="32" height="32" alt="あわわわとーにゅ" /></a>
+  <a href="https://github.com/SanMurakami?ref=orpc" target="_blank" rel="noopener" title="村上さん"><img src="https://avatars.githubusercontent.com/u/37681609?u=0dd4c7e4ba937cbb52b068c55914b1d8164dc0c7&amp;v=4" width="32" height="32" alt="村上さん" /></a>
   <a href="https://github.com/zuplo?ref=orpc" target="_blank" rel="noopener" title="Zuplo"><img src="https://avatars.githubusercontent.com/u/85497839?v=4" width="32" height="32" alt="Zuplo" /></a>
   <a href="https://github.com/motopods?ref=orpc" target="_blank" rel="noopener" title="motopods"><img src="https://avatars.githubusercontent.com/u/58200641?u=18833983d65b481ae90a4adec2373064ec58bcf3&amp;v=4" width="32" height="32" alt="motopods" /></a>
   <a href="https://github.com/franciscohermida?ref=orpc" target="_blank" rel="noopener" title="Francisco Hermida"><img src="https://avatars.githubusercontent.com/u/483242?u=bbcbc80eb9d8781ff401f7dafc3b59cd7bea0561&amp;v=4" width="32" height="32" alt="Francisco Hermida" /></a>
