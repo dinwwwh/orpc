@@ -696,7 +696,7 @@ export const sponsors: JSONSponsor[] = [
   {
     name: 'Bapusaheb Patil',
     login: 'bapspatil',
-    avatar: 'https://avatars.githubusercontent.com/u/16699418?v=4',
+    avatar: 'https://avatars.githubusercontent.com/u/16699418?u=6d9d8e0a64a6f91ca1c4d559c72d931172bdcbbd&v=4',
     amount: -1,
     link: 'https://github.com/bapspatil?ref=orpc',
     org: false,
@@ -704,7 +704,7 @@ export const sponsors: JSONSponsor[] = [
     tierTitle: 'Past Sponsors',
     tierLevel: 0,
     sidebarSize: 'none',
-    sidebarLogo: 'https://avatars.githubusercontent.com/u/16699418?v=4',
+    sidebarLogo: 'https://avatars.githubusercontent.com/u/16699418?u=6d9d8e0a64a6f91ca1c4d559c72d931172bdcbbd&v=4',
   },
   {
     name: 'grim',
