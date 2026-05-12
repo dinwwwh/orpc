@@ -183,7 +183,7 @@ describe('traverseContractProcedures', () => {
     })
 
     const callablePong = Object.assign(() => {}, {
-      '~orpc': ping['~orpc'],
+      '~orpc': pong['~orpc'],
     })
 
     const router = { ping: callablePing, nested: { pong: callablePong } }
