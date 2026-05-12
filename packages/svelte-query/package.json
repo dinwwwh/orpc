@@ -1,7 +1,7 @@
 {
   "name": "@orpc/svelte-query",
   "type": "module",
-  "version": "1.13.14",
+  "version": "1.14.2",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -15,6 +15,7 @@
     "tanstack query",
     "svelte"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

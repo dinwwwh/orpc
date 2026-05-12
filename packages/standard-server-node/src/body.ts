@@ -62,6 +62,10 @@ export function toNodeHttpBody(
   headers: StandardHeaders,
   options: ToNodeHttpBodyOptions = {},
 ): Readable | undefined | string {
+  if (body instanceof ReadableStream) {
+    return Readable.fromWeb(body)
+  }
+
   const currentContentDisposition = flattenHeader(headers['content-disposition'])
 
   delete headers['content-type']

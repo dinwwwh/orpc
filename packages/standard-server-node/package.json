@@ -1,7 +1,7 @@
 {
   "name": "@orpc/standard-server-node",
   "type": "module",
-  "version": "1.13.14",
+  "version": "1.14.2",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -12,6 +12,7 @@
   "keywords": [
     "orpc"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

@@ -1,7 +1,7 @@
 {
   "name": "@orpc/vue-colada",
   "type": "module",
-  "version": "1.13.14",
+  "version": "1.14.2",
   "license": "MIT",
   "homepage": "https://orpc.dev",
   "repository": {
@@ -16,6 +16,7 @@
     "pinia-colada",
     "tanstack"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

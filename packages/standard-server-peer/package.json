@@ -1,7 +1,7 @@
 {
   "name": "@orpc/standard-server-peer",
   "type": "module",
-  "version": "1.13.14",
+  "version": "1.14.2",
   "license": "MIT",
   "homepage": "https://orpc.com",
   "repository": {
@@ -12,6 +12,7 @@
   "keywords": [
     "orpc"
   ],
+  "sideEffects": false,
   "publishConfig": {
     "exports": {
       ".": {

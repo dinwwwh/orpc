@@ -7,7 +7,7 @@ import type { Request, Response } from 'express'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { ORPCGlobalContext, ORPCModuleConfig } from './module'
-import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
+import { applyDecorators, Delete, Get, Head, HttpCode, Inject, Injectable, Optional, Options, Patch, Post, Put, UseInterceptors } from '@nestjs/common'
 import { fallbackContractConfig, isContractProcedure } from '@orpc/contract'
 import { StandardBracketNotationSerializer, StandardOpenAPIJsonSerializer, StandardOpenAPISerializer } from '@orpc/openapi-client/standard'
 import { StandardOpenAPICodec } from '@orpc/openapi/standard'
@@ -15,10 +15,18 @@ import { getRouter, isProcedure, unlazy } from '@orpc/server'
 import { StandardHandler } from '@orpc/server/standard'
 import { get, intercept, toArray } from '@orpc/shared'
 import * as StandardServerFastify from '@orpc/standard-server-fastify'
+import * as StandardServerFetch from '@orpc/standard-server-fetch'
 import * as StandardServerNode from '@orpc/standard-server-node'
 import { mergeMap } from 'rxjs'
 import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
 import { toNestPattern } from './utils'
+
+interface HonoContext {
+  req: { raw: globalThis.Request, params?: NestParams }
+  res?: globalThis.Response
+  finalized: boolean
+  newResponse: (...args: any[]) => globalThis.Response
+}
 
 const MethodDecoratorMap = {
   HEAD: Head,
@@ -27,6 +35,7 @@ const MethodDecoratorMap = {
   PUT: Put,
   PATCH: Patch,
   DELETE: Delete,
+  OPTIONS: Options,
 }
 
 /**
@@ -122,16 +131,26 @@ export class ImplementInterceptor implements NestInterceptor {
           `)
         }
 
-        const req: Request | FastifyRequest = ctx.switchToHttp().getRequest()
-        const res: Response | FastifyReply = ctx.switchToHttp().getResponse()
+        const req: Request | FastifyRequest | HonoContext['req'] = ctx.switchToHttp().getRequest()
+        const res: Response | FastifyReply | HonoContext = ctx.switchToHttp().getResponse()
 
-        const standardRequest = 'raw' in req
-          ? StandardServerFastify.toStandardLazyRequest(req, res as FastifyReply)
-          : StandardServerNode.toStandardLazyRequest(req, res as Response)
+        // Detect a Hono adapter response context by its Fetch response factory.
+        const isHono = 'finalized' in res && typeof (res as HonoContext).newResponse === 'function'
+        const isFastify = 'raw' in req && !isHono
+
+        const standardRequest = (() => {
+          if (isHono) {
+            return StandardServerFetch.toStandardLazyRequest((req as HonoContext['req']).raw)
+          }
+          if (isFastify) {
+            return StandardServerFastify.toStandardLazyRequest(req as FastifyRequest, res as FastifyReply)
+          }
+          return StandardServerNode.toStandardLazyRequest(req as Request, res as Response)
+        })()
 
         const handler = new StandardHandler(procedure, {
           init: () => {},
-          match: () => Promise.resolve({ path: toArray(this.config.path), procedure, params: flattenParams(req.params as NestParams) }),
+          match: () => Promise.resolve({ path: toArray(this.config.path), procedure, params: flattenParams(req.params as NestParams | undefined) }),
         }, this.codec, {
           // Since plugins can modify options directly, so we need to clone to avoid affecting other handlers/requests
           // TODO: improve plugins system to avoid this cloning
@@ -148,11 +167,15 @@ export class ImplementInterceptor implements NestInterceptor {
             toArray(this.config.sendResponseInterceptors),
             { request: req, response: res, standardResponse: result.response },
             async ({ response, standardResponse }) => {
-              if ('raw' in response) {
-                await StandardServerFastify.sendStandardResponse(response, standardResponse, this.config)
+              if (isHono) {
+                const fetchResponse = StandardServerFetch.toFetchResponse(standardResponse, this.config)
+                return (response as HonoContext).newResponse(fetchResponse.body, fetchResponse)
+              }
+              else if (isFastify) {
+                await StandardServerFastify.sendStandardResponse(response as FastifyReply, standardResponse, this.config)
               }
               else {
-                await StandardServerNode.sendStandardResponse(response, standardResponse, this.config)
+                await StandardServerNode.sendStandardResponse(response as Response, standardResponse, this.config)
               }
             },
           )
@@ -162,10 +185,10 @@ export class ImplementInterceptor implements NestInterceptor {
   }
 }
 
-function flattenParams(params: NestParams): StandardParams {
+function flattenParams(params: NestParams | undefined): StandardParams {
   const flatten: StandardParams = {}
 
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(params ?? {})) {
     if (Array.isArray(value)) {
       flatten[key] = value.join('/')
     }
