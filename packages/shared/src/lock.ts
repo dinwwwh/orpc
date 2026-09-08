@@ -14,8 +14,7 @@ export class MemoryLock {
   async run<T>(key: string, fn: (waited: boolean) => Promise<T>): Promise<T> {
     const previous = this.pending.get(key)
     const run = () => fn(previous !== undefined)
-    // A failed predecessor still hands the turn on.
-    const current = previous === undefined ? run() : previous.then(run, run)
+    const current = previous?.then(run, run) ?? run()
 
     this.pending.set(key, current)
 

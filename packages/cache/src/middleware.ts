@@ -1,7 +1,7 @@
 import type { Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
 import type { CacheHandlerPluginContext } from './handler-plugin'
-import type { CacheContext, CacheEntry, CacheStore } from './types'
+import type { CacheContext } from './types'
 import { nowInSeconds, value } from '@orpc/shared'
 import { CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL } from './handler-plugin'
 
@@ -79,90 +79,23 @@ export function cache<
     const store = middlewareOptions.context['cache/store']
     const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]
 
-    const fill = async () => {
-      const result = await middlewareOptions.next()
-      await store.set(key, result.output, { tags, ttl, swr })
-      return result
-    }
-
-    const serve = (entry: CacheEntry) => {
-      const remainingTtl = remainingTtlOf(entry)
-
-      if (remainingTtl === 0) {
-        const refresh = lock(store, key, async (waited) => {
-          if (waited) {
-            // Whoever held the lock first may have refreshed the entry already.
-            const current = await store.get(key)
-
-            if (current !== undefined && remainingTtlOf(current) !== 0) {
-              return
-            }
-          }
-
-          await fill()
-        })
-
-        // Whatever owns background work owns the refresh from here, failures included.
-        middlewareOptions.context['cache/waitUntil']?.(refresh)
-      }
-
-      pluginContext?.caches.push({
-        procedure: middlewareOptions.procedure,
-        path: middlewareOptions.path,
-        tags: entry.tags,
-        // Reflected HTTP caching headers must never outlive the store entry.
-        ttl: remainingTtl,
-        swr,
-      })
-
-      return done({ output: entry.output })
-    }
-
-    const entry = await store.get(key)
-
-    if (entry) {
-      return serve(entry)
-    }
-
-    return lock(store, key, async (waited) => {
-      if (waited) {
-        // Whoever held the lock first may have filled the entry already.
-        const entry = await store.get(key)
-
-        if (entry) {
-          return serve(entry)
-        }
-      }
-
-      const result = await fill()
-
-      pluginContext?.caches.push({
-        procedure: middlewareOptions.procedure,
-        path: middlewareOptions.path,
-        tags,
-        ttl,
-        swr,
-      })
-
-      return result
+    const entry = await store.fetch(key, async () => (await middlewareOptions.next()).output, {
+      tags,
+      ttl,
+      swr,
+      waitUntil: middlewareOptions.context['cache/waitUntil'],
     })
+
+    pluginContext?.caches.push({
+      procedure: middlewareOptions.procedure,
+      path: middlewareOptions.path,
+      tags: entry.tags,
+      ttl: entry.expiresAt !== undefined ? Math.max(0, entry.expiresAt - nowInSeconds()) : undefined,
+      swr,
+    })
+
+    return done({ output: entry.output })
   }
-}
-
-/**
- * Runs `fn` under the store's per-key lock when it has one, so concurrent
- * callers fill an entry once; otherwise every caller fills.
- */
-function lock<T>(store: CacheStore, key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T> {
-  return store.lock !== undefined ? store.lock(key, fn) : fn(false)
-}
-
-/**
- * The entry's remaining freshness in seconds: `0` once it is stale and
- * `undefined` when it never expires.
- */
-function remainingTtlOf(entry: CacheEntry): number | undefined {
-  return entry.expiresAt !== undefined ? Math.max(0, entry.expiresAt - nowInSeconds()) : undefined
 }
 
 export interface RevalidateMiddlewareOptions<

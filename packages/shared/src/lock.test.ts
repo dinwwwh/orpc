@@ -23,7 +23,6 @@ describe('memoryLock', () => {
       return 'third'
     })
 
-    // Other keys are independent of the held one.
     await expect(lock.run('other', async waited => waited)).resolves.toBe(false)
     expect(order).toEqual(['first:false'])
 

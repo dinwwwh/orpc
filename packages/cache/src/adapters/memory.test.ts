@@ -17,22 +17,22 @@ describe('memoryCacheStore', () => {
   it('encodes structurally equal non-string keys to the same entry', async () => {
     const store = new MemoryCacheStore()
 
-    await store.set([['planet', 'find'], { b: 2, a: 1 }], 'v')
+    await store.fetch([['planet', 'find'], { b: 2, a: 1 }], async () => 'v')
 
-    await expect(store.get([['planet', 'find'], { a: 1, b: 2 }])).resolves.toMatchObject({ output: 'v' })
-    await expect(store.get([['planet', 'find'], { a: 1, b: 3 }])).resolves.toBeUndefined()
-    await expect(store.get([['planet', 'list'], { a: 1, b: 2 }])).resolves.toBeUndefined()
+    await expect(store.fetch([['planet', 'find'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.fetch([['planet', 'find'], { a: 1, b: 3 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
+    await expect(store.fetch([['planet', 'list'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
   })
 
   it('encodes complex key values, ignoring unsupported ones like blobs', async () => {
     const store = new MemoryCacheStore()
 
-    await store.set({ date: new Date(1), big: 1n }, 'v')
-    await expect(store.get({ big: 1n, date: new Date(1) })).resolves.toMatchObject({ output: 'v' })
-    await expect(store.get({ big: 2n, date: new Date(1) })).resolves.toBeUndefined()
+    await store.fetch({ date: new Date(1), big: 1n }, async () => 'v')
+    await expect(store.fetch({ big: 1n, date: new Date(1) }, async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.fetch({ big: 2n, date: new Date(1) }, async () => 'other')).resolves.toMatchObject({ output: 'other' })
 
-    await store.set({ file: new Blob(['a']), id: 1 }, 'blobbed')
-    await expect(store.get({ file: new Blob(['b']), id: 1 })).resolves.toMatchObject({ output: 'blobbed' })
+    await store.fetch({ file: new Blob(['a']), id: 1 }, async () => 'blobbed')
+    await expect(store.fetch({ file: new Blob(['b']), id: 1 }, async () => 'other')).resolves.toMatchObject({ output: 'blobbed' })
   })
 
   it('supports a custom key serializer', async () => {
@@ -40,83 +40,104 @@ describe('memoryCacheStore', () => {
     const serializeSpy = vi.spyOn(serializer, 'serialize')
     const store = new MemoryCacheStore({ serializer })
 
-    await store.set({ id: 1 }, 'v')
+    await store.fetch({ id: 1 }, async () => 'v')
 
-    await expect(store.get({ id: 1 })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.fetch({ id: 1 }, async () => 'other')).resolves.toMatchObject({ output: 'v' })
     expect(serializeSpy).toHaveBeenCalled()
   })
 
-  it('returns fresh entries with a future expiresAt, then evicts at ttl without swr', async () => {
+  it('returns fresh entries with a future expiresAt, then fills again at ttl without swr', async () => {
     const store = new MemoryCacheStore()
 
-    await store.set('k', 'v', { ttl: 1 })
-    await expect(store.get('k')).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+    await expect(store.fetch('k', async () => 'v', { ttl: 1 })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
 
     vi.setSystemTime(999)
-    await expect(store.get('k')).resolves.toBeDefined()
+    await expect(store.fetch('k', async () => 'other', { ttl: 1 })).resolves.toMatchObject({ output: 'v' })
 
     vi.setSystemTime(1000)
-    await expect(store.get('k')).resolves.toBeUndefined()
+    await expect(store.fetch('k', async () => 'other', { ttl: 1 })).resolves.toEqual({ output: 'other', tags: undefined, expiresAt: 2 })
   })
 
-  it('returns stale entries within the swr window, then evicts', async () => {
+  it('serves stale entries within swr while one caller refreshes them in the background', async () => {
     const store = new MemoryCacheStore()
-
-    await store.set('k', 'v', { ttl: 1, swr: 1 })
+    await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
 
     vi.setSystemTime(1200) // past ttl, within swr
-    await expect(store.get('k')).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+    let finish!: (output: string) => void
+    const fill = vi.fn(() => new Promise<string>((resolve) => {
+      finish = resolve
+    }))
+    const waitUntil = vi.fn()
+
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+    expect(waitUntil).toHaveBeenCalledTimes(2)
+
+    finish('fresh')
+    await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
+    expect(fill).toHaveBeenCalledTimes(1) // the second stale hit found the refreshed entry
+
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toEqual({ output: 'fresh', tags: undefined, expiresAt: 2 })
+  })
+
+  it('leaves a failed refresh to waitUntil and keeps serving the stale entry', async () => {
+    const store = new MemoryCacheStore()
+    await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+
+    vi.setSystemTime(1200)
+    const waitUntil = vi.fn()
+    const fill = vi.fn(async () => {
+      throw new Error('handler down')
+    })
+
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
+    await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
+
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toMatchObject({ output: 'v' })
+    await expect(waitUntil.mock.calls[1]![0]).rejects.toThrow('handler down')
+    expect(fill).toHaveBeenCalledTimes(2)
+  })
+
+  it('lets a waiting refresh fill when the first one failed', async () => {
+    const store = new MemoryCacheStore()
+    await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+
+    vi.setSystemTime(1200)
+    let fail!: (error: Error) => void
+    const fill = vi.fn()
+      .mockImplementationOnce(() => new Promise<never>((_, reject) => {
+        fail = reject
+      }))
+      .mockResolvedValue('fresh')
+    const waitUntil = vi.fn()
+
+    await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
+    await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
+    fail(new Error('handler down'))
+
+    await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
+    await waitUntil.mock.calls[1]![0]
+    expect(fill).toHaveBeenCalledTimes(2)
+
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
+  })
+
+  it('evicts past ttl + swr, and revalidation drops stale entries too', async () => {
+    const store = new MemoryCacheStore()
+
+    await store.fetch('evicted', async () => 'v', { ttl: 1, swr: 1 })
+    await store.fetch('stale', async () => 'v', { tags: ['a'], ttl: 1, swr: 1 })
+    await store.fetch('k', async () => 'old', { tags: ['old'], ttl: 1 })
+
+    vi.setSystemTime(1000) // 'k' expired without swr, so it is filled again with new tags
+    await expect(store.fetch('k', async () => 'new', { tags: ['new'] })).resolves.toEqual({ output: 'new', tags: ['new'], expiresAt: undefined })
+
+    vi.setSystemTime(1200) // 'stale' and 'evicted' are stale
+    await store.revalidate({ tags: ['a', 'old'] })
+    await expect(store.fetch('stale', async () => 'refilled', { tags: ['a'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.fetch('k', async () => 'refilled', { tags: ['new'] })).resolves.toMatchObject({ output: 'new' })
 
     vi.setSystemTime(2000) // past ttl + swr
-    await expect(store.get('k')).resolves.toBeUndefined()
-  })
-
-  it('invalidates stale entries too, and overwrites replace tags and expiry', async () => {
-    const store = new MemoryCacheStore()
-
-    await store.set('stale', 'v', { tags: ['a'], ttl: 1, swr: 1 })
-    await store.set('k', 'old', { tags: ['old'], ttl: 1 })
-    await store.set('k', 'new', { tags: ['new'] })
-
-    vi.setSystemTime(1200) // 'stale' is now stale
-    await store.revalidate({ tags: ['a', 'old'] })
-
-    await expect(store.get('stale')).resolves.toBeUndefined()
-    await expect(store.get('k')).resolves.toEqual({ output: 'new', tags: ['new'], expiresAt: undefined })
-  })
-})
-
-describe('memoryCacheStore concurrency', () => {
-  it('applies concurrent sets and revalidations in call order', async () => {
-    const store = new MemoryCacheStore()
-
-    await Promise.all([
-      store.set('before', 'v', { tags: ['t'] }),
-      store.revalidate({ tags: ['t'] }),
-      store.set('after', 'v', { tags: ['t'] }),
-    ])
-
-    await expect(store.get('before')).resolves.toBeUndefined()
-    await expect(store.get('after')).resolves.toMatchObject({ output: 'v' })
-  })
-
-  it('misses consistently across concurrent gets of an invalidated entry', async () => {
-    const store = new MemoryCacheStore()
-
-    await store.set('k', 'v', { tags: ['t'] })
-    await store.revalidate({ tags: ['t'] })
-
-    await expect(Promise.all([store.get('k'), store.get('k'), store.get('k')])).resolves.toEqual([undefined, undefined, undefined])
-  })
-
-  it('keeps the last of concurrent sets to the same key', async () => {
-    const store = new MemoryCacheStore()
-
-    await Promise.all([
-      store.set('k', 'first', { ttl: 1 }),
-      store.set('k', 'last', { tags: ['t'] }),
-    ])
-
-    await expect(store.get('k')).resolves.toEqual({ output: 'last', tags: ['t'], expiresAt: undefined })
+    await expect(store.fetch('evicted', async () => 'refilled')).resolves.toMatchObject({ output: 'refilled' })
   })
 })

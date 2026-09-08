@@ -2,7 +2,6 @@ import { RPCSerializer } from '@orpc/client'
 import { nowInSeconds, sleep } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
 import { describeCacheStoreContract } from '../../tests/__shared__/store-contract'
-import { holdResult } from '../../tests/__shared__/utils'
 import { UpstashCacheStore } from './upstash'
 
 const UPSTASH_REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL
@@ -24,9 +23,9 @@ describe.concurrent('upstash cache store integration', {
 
   function createTestingStore(
     options: ConstructorParameters<typeof UpstashCacheStore>[1] = {},
-    client: Redis = redis,
+    client = redis,
   ) {
-    const prefix = `orpc-upstash-cache-store-${crypto.randomUUID()}:`
+    const prefix = `orpc-upstashcachestore-${crypto.randomUUID()}:`
     return { store: new UpstashCacheStore(client, { prefix, ...options }), prefix }
   }
 
@@ -38,47 +37,80 @@ describe.concurrent('upstash cache store integration', {
     const deserializeSpy = vi.spyOn(serializer, 'deserialize')
     const { store } = createTestingStore({ serializer })
 
-    await store.set('k', { a: 1 })
+    await store.fetch('k', async () => ({ a: 1 }))
 
-    await expect(store.get('k')).resolves.toMatchObject({ output: { a: 1 } })
+    await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: { a: 1 } })
     expect(serializeSpy).toHaveBeenCalled()
     expect(deserializeSpy).toHaveBeenCalled()
   })
 
-  it('evicts at ttl without swr, and serves stale within the swr window', async () => {
+  it('fills again at ttl without swr, and serves stale within the swr window while refreshing', async () => {
     const { store } = createTestingStore()
 
-    await store.set('no-swr', 'v', { ttl: 1 })
-    await store.set('swr', 'v', { ttl: 1, swr: 10 })
+    await store.fetch('no-swr', async () => 'v', { ttl: 1 })
+    await store.fetch('swr', async () => 'v', { ttl: 1, swr: 10 })
 
     await sleep(1500)
 
-    await expect(store.get('no-swr')).resolves.toBeUndefined()
+    await expect(store.fetch('no-swr', async () => 'refilled', { ttl: 1 })).resolves.toMatchObject({ output: 'refilled' })
 
-    const stale = await store.get('swr')
-    expect(stale!.output).toBe('v')
-    expect(stale!.expiresAt).toBeLessThanOrEqual(nowInSeconds())
+    const waitUntil = vi.fn()
+    const stale = await store.fetch('swr', async () => 'fresh', { ttl: 1, swr: 10, waitUntil })
+    expect(stale.output).toBe('v')
+    expect(stale.expiresAt).toBeLessThanOrEqual(nowInSeconds())
+
+    expect(waitUntil).toHaveBeenCalledTimes(1)
+    await waitUntil.mock.calls[0]![0]
+
+    const fresh = await store.fetch('swr', async () => 'other', { ttl: 1, swr: 10 })
+    expect(fresh.output).toBe('fresh')
+    expect(fresh.expiresAt).toBeGreaterThan(stale.expiresAt!)
   })
 
-  it('stores entries and tag counters under the prefixed key families, defaulting to no prefix', async () => {
+  it('stores entries as hashes and tag counters under the prefixed key families, locking while filling', async () => {
     const { store, prefix } = createTestingStore()
 
-    await store.set('k', 'v', { tags: ['t'] })
+    await store.fetch('k', async () => {
+      await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1)
+      return 'v'
+    }, { tags: ['t'] })
     await store.revalidate({ tags: ['t'] })
 
-    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(1)
+    await expect(redis.type(`${prefix}e:k`)).resolves.toBe('hash')
     await expect(redis.exists(`${prefix}t:t`)).resolves.toBe(1)
-
-    const unprefixed = new UpstashCacheStore(redis)
-    const key = crypto.randomUUID()
-
-    await unprefixed.set(key, 'v')
-
-    await expect(redis.exists(`e:${key}`)).resolves.toBe(1)
-    await expect(unprefixed.get(key)).resolves.toMatchObject({ output: 'v' })
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
   })
 
-  it('reads envelopes when the client does not parse JSON responses', async () => {
+  it('defaults to no prefix', async () => {
+    const store = new UpstashCacheStore(redis)
+    const key = crypto.randomUUID()
+
+    await store.fetch(key, async () => 'v')
+
+    await expect(redis.exists(`e:${key}`)).resolves.toBe(1)
+    await expect(store.fetch(key, async () => 'other')).resolves.toMatchObject({ output: 'v' })
+  })
+
+  it('treats tags missing from the snapshot as version zero', async () => {
+    const { store, prefix } = createTestingStore()
+
+    await redis.hset(`${prefix}e:k`, { output: JSON.stringify({ body: { json: 'v' } }), tags: '["t"]', tagVersions: '{}' })
+
+    await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+  })
+
+  it('reloads scripts the server dropped, and rethrows other script errors', async () => {
+    const { store, prefix } = createTestingStore()
+
+    await store.fetch('k', async () => 'v')
+    await redis.scriptFlush()
+    await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+
+    await redis.hset(`${prefix}e:broken`, { output: '{}', tags: 'not json', tagVersions: '{}' })
+    await expect(store.fetch('broken', async () => 'v')).rejects.toThrow()
+  })
+
+  it('reads entries when the client does not parse JSON replies', async () => {
     const rawRedis = new Redis({
       url: UPSTASH_REDIS_REST_URL,
       token: UPSTASH_REDIS_REST_TOKEN,
@@ -86,41 +118,33 @@ describe.concurrent('upstash cache store integration', {
     })
     const { store } = createTestingStore({}, rawRedis)
 
-    await store.set('k', { a: 1 }, { tags: ['t'], ttl: 60 })
+    await store.fetch('k', async () => ({ a: 1 }), { tags: ['t'], ttl: 60 })
 
-    const entry = await store.get('k')
-    expect(entry!.output).toEqual({ a: 1 })
-    expect(entry!.tags).toEqual(['t'])
-    expect(entry!.expiresAt).toBeGreaterThan(nowInSeconds())
+    const entry = await store.fetch('k', async () => 'other', { tags: ['t'], ttl: 60 })
+    expect(entry.output).toEqual({ a: 1 })
+    expect(entry.tags).toEqual(['t'])
+    expect(entry.expiresAt).toBeGreaterThan(nowInSeconds())
 
     await store.revalidate({ tags: ['t'] })
-    await expect(store.get('k')).resolves.toBeUndefined()
+    await expect(store.fetch('k', async () => 'refilled', { tags: ['t'] })).resolves.toMatchObject({ output: 'refilled' })
   })
 
-  it('treats tags missing from the snapshot as version zero', async () => {
-    const { store, prefix } = createTestingStore()
+  it('stays consistent under concurrent fetches and a revalidation on a shared tag', async () => {
+    const { store } = createTestingStore()
+    const keys = Array.from({ length: 20 }, (_, index) => `k${index}`)
 
-    await redis.set(`${prefix}e:k`, JSON.stringify({ output: { json: 'v' }, tags: ['t'], tagVersions: {} }))
+    await Promise.all([
+      ...keys.map(key => store.fetch(key, async () => key, { tags: ['t'] })),
+      store.revalidate({ tags: ['t'] }),
+    ])
 
-    await expect(store.get('k')).resolves.toMatchObject({ output: 'v' })
-  })
-
-  it('drops an entry whose tag versions were read before a racing revalidation', async () => {
-    const { client, read, release } = holdResult(redis, 'mget')
-    const { store, prefix } = createTestingStore({}, client)
-
-    const set = store.set('k', 'v', { tags: ['t'] }) // entry written after release
-    await read // versions are read by now
-    await store.revalidate({ tags: ['t'] })
-    release()
-    await set
-
-    await expect(store.get('k')).resolves.toBeUndefined()
-    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(0)
+    const entries = await Promise.all(keys.map(key => store.fetch(key, async () => key, { tags: ['t'] })))
+    expect(entries.map(entry => entry.output)).toEqual(keys)
   })
 
   it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
-    const { store, prefix } = createTestingStore({ lockTtl: 1 })
+    const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
+    const waiterStore = new UpstashCacheStore(redis, { prefix })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
@@ -130,22 +154,24 @@ describe.concurrent('upstash cache store integration', {
       takenOver = resolve
     })
 
-    // Holds past its ttl, until the waiter has taken the lock over.
-    const holder = store.lock('k', () => takeover)
+    const holder = holderStore.fetch('k', async () => {
+      await takeover
+      return 'holder'
+    })
     await vi.waitFor(() => expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1), { timeout: 5000 })
 
-    const waiter = store.lock('k', async (waited) => {
+    const waiter = waiterStore.fetch('k', async () => {
       takenOver()
       await held
-      return waited
+      return 'waiter'
     })
 
-    await holder
-    // The holder's release must leave the waiter's lock alone.
+    await expect(holder).resolves.toMatchObject({ output: 'holder' })
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(1)
 
     release()
-    await expect(waiter).resolves.toBe(true)
+    await expect(waiter).resolves.toMatchObject({ output: 'waiter' })
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(0)
+    await expect(holderStore.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
   })
 })

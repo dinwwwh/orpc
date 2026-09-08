@@ -6,20 +6,25 @@ import { expect, it, vi } from 'vitest'
  * Adapter suites keep only what is specific to their backend.
  */
 export function describeCacheStoreContract(createStore: () => CacheStore): void {
-  it('round-trips outputs with their tags, including undefined', async () => {
+  it('fills a miss once, then serves the entry with its tags', async () => {
     const store = createStore()
+    const fill = vi.fn(async () => ({ nested: [1, 2] }))
 
-    await store.set('k', { nested: [1, 2] }, { tags: ['t'] })
-    await expect(store.get('k')).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
+    await expect(store.fetch('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
+    await expect(store.fetch('k', fill, { tags: ['t'] })).resolves.toEqual({ output: { nested: [1, 2] }, tags: ['t'], expiresAt: undefined })
+    expect(fill).toHaveBeenCalledTimes(1)
 
-    await store.set('u', undefined)
-    await expect(store.get('u')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
+    await store.fetch('u', async () => undefined)
+    await expect(store.fetch('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
   })
 
-  it('misses on unknown keys', async () => {
+  it('fills each key separately', async () => {
     const store = createStore()
 
-    await expect(store.get('unknown')).resolves.toBeUndefined()
+    await store.fetch('a', async () => 'a')
+
+    await expect(store.fetch('b', async () => 'b')).resolves.toMatchObject({ output: 'b' })
+    await expect(store.fetch('a', async () => 'refilled')).resolves.toMatchObject({ output: 'a' })
   })
 
   it('preserves Date, Map, Set, and BigInt outputs', async () => {
@@ -31,98 +36,81 @@ export function describeCacheStoreContract(createStore: () => CacheStore): void 
       big: 123n,
     }
 
-    await store.set('k', output)
+    await store.fetch('k', async () => output)
 
-    await expect(store.get('k')).resolves.toMatchObject({ output })
+    await expect(store.fetch('k', async () => 'refilled')).resolves.toMatchObject({ output })
   })
 
   it('invalidates entries by any of their tags, leaving others alone', async () => {
     const store = createStore()
 
-    await store.set('multi', 'v', { tags: ['a', 'b'] })
-    await store.set('other', 'v', { tags: ['c'] })
+    await store.fetch('multi', async () => 'v', { tags: ['a', 'b'] })
+    await store.fetch('other', async () => 'v', { tags: ['c'] })
 
     await store.revalidate({ tags: ['a'] })
 
-    await expect(store.get('multi')).resolves.toBeUndefined()
-    await expect(store.get('other')).resolves.toBeDefined()
+    await expect(store.fetch('multi', async () => 'refilled', { tags: ['a', 'b'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.fetch('other', async () => 'refilled', { tags: ['c'] })).resolves.toMatchObject({ output: 'v' })
   })
 
   it('revalidates many tags at once', async () => {
     const store = createStore()
 
-    await store.set('a', 'v', { tags: ['a'] })
-    await store.set('b', 'v', { tags: ['b'] })
+    await store.fetch('a', async () => 'v', { tags: ['a'] })
+    await store.fetch('b', async () => 'v', { tags: ['b'] })
 
     await store.revalidate({ tags: ['a', 'b'] })
 
-    await expect(store.get('a')).resolves.toBeUndefined()
-    await expect(store.get('b')).resolves.toBeUndefined()
+    await expect(store.fetch('a', async () => 'refilled', { tags: ['a'] })).resolves.toMatchObject({ output: 'refilled' })
+    await expect(store.fetch('b', async () => 'refilled', { tags: ['b'] })).resolves.toMatchObject({ output: 'refilled' })
   })
 
-  it('keeps entries set after a revalidation', async () => {
+  it('keeps entries filled after a revalidation', async () => {
     const store = createStore()
 
-    await store.set('k', 'old', { tags: ['t'] })
+    await store.fetch('k', async () => 'old', { tags: ['t'] })
     await store.revalidate({ tags: ['t'] })
-    await store.set('k', 'new', { tags: ['t'] })
+    await store.fetch('k', async () => 'new', { tags: ['t'] })
 
-    await expect(store.get('k')).resolves.toMatchObject({ output: 'new' })
+    await expect(store.fetch('k', async () => 'newer', { tags: ['t'] })).resolves.toMatchObject({ output: 'new' })
   })
 
-  it('runs lock callbacks one key at a time, telling later callers they waited', async () => {
+  it('fills once for concurrent callers of one key', async () => {
     const store = createStore()
-    const order: string[] = []
-    let release!: () => void
-    const held = new Promise<void>((resolve) => {
-      release = resolve
-    })
+    let finish!: (output: string) => void
+    const fill = vi.fn(() => new Promise<string>((resolve) => {
+      finish = resolve
+    }))
 
-    const first = store.lock!('k', async (waited) => {
-      order.push(`first:${waited}`)
-      await held
-      return 'first'
-    })
-    await vi.waitFor(() => expect(order).toEqual(['first:false']), { timeout: 5000 })
+    const fetches = Promise.all([store.fetch('k', fill), store.fetch('k', fill), store.fetch('k', fill)])
+    await vi.waitFor(() => expect(fill).toHaveBeenCalledTimes(1), { timeout: 5000 })
+    finish('v')
 
-    const second = store.lock!('k', async (waited) => {
-      order.push(`second:${waited}`)
-      return 'second'
-    })
-
-    // Other keys are independent of the held one.
-    await expect(store.lock!('other', async waited => waited)).resolves.toBe(false)
-    expect(order).toEqual(['first:false'])
-
-    release()
-
-    await expect(first).resolves.toBe('first')
-    await expect(second).resolves.toBe('second')
-    expect(order).toEqual(['first:false', 'second:true'])
+    const entries = await fetches
+    expect(entries.map(entry => entry.output)).toEqual(['v', 'v', 'v'])
+    expect(fill).toHaveBeenCalledTimes(1)
   })
 
-  it('hands the lock on when the holder throws', async () => {
+  it('lets a waiter fill when the holder failed to', async () => {
     const store = createStore()
     let fail!: (error: Error) => void
-    let acquired!: () => void
+    let started!: () => void
     const holding = new Promise<void>((resolve) => {
-      acquired = resolve
+      started = resolve
     })
 
-    const first = store.lock!('k', async () => {
-      acquired()
-      await new Promise<never>((_, reject) => {
+    const first = store.fetch('k', () => {
+      started()
+      return new Promise<never>((_, reject) => {
         fail = reject
       })
     })
     await holding
 
-    const second = store.lock!('k', async waited => waited)
+    const second = store.fetch('k', async () => 'fresh')
+    fail(new Error('handler down'))
 
-    fail(new Error('boom'))
-
-    await expect(first).rejects.toThrow('boom')
-    await expect(second).resolves.toBe(true)
-    await expect(store.lock!('k', async waited => waited)).resolves.toBe(false)
+    await expect(first).rejects.toThrow('handler down')
+    await expect(second).resolves.toMatchObject({ output: 'fresh' })
   })
 }

@@ -1,9 +1,79 @@
 import type { Public } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
-import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
+import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
 import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
 import { encodeCacheKey } from '../utils'
+
+/**
+ * Reads the entry as `[output, tags, expiresAt, shouldFill]`, dropping it when
+ * a tag was revalidated since it was stored. A missing or stale entry also
+ * takes the lock, and `shouldFill` reports whether this caller got it.
+ */
+const FETCH_SCRIPT = `
+local fields = redis.call('HMGET', KEYS[1], 'output', 'tags', 'tagVersions', 'expiresAt')
+local output, tags, versions, expiresAt = fields[1], fields[2], fields[3], fields[4]
+
+if output and tags then
+  local names = cjson.decode(tags)
+  local snapshot = cjson.decode(versions)
+  local keys = {}
+  for i, name in ipairs(names) do
+    keys[i] = ARGV[3] .. name
+  end
+  local live = redis.call('MGET', unpack(keys))
+  for i, name in ipairs(names) do
+    if tonumber(live[i] or 0) ~= (snapshot[name] or 0) then
+      redis.call('DEL', KEYS[1])
+      output = false
+      break
+    end
+  end
+end
+
+local stale = output and expiresAt and tonumber(expiresAt) <= tonumber(ARGV[4])
+local acquired = false
+if not output or stale then
+  acquired = redis.call('SET', KEYS[2], ARGV[1], 'NX', 'PX', ARGV[2]) and true or false
+end
+
+return { output or false, tags or false, expiresAt or false, acquired }
+`
+
+/**
+ * Stores the entry with its tag versions snapshotted in the same step, then
+ * releases the caller's lock.
+ */
+const STORE_SCRIPT = `
+redis.call('DEL', KEYS[1])
+redis.call('HSET', KEYS[1], 'output', ARGV[2])
+
+if ARGV[3] ~= '' then
+  local names = cjson.decode(ARGV[3])
+  local keys = {}
+  for i, name in ipairs(names) do
+    keys[i] = ARGV[6] .. name
+  end
+  local live = redis.call('MGET', unpack(keys))
+  local snapshot = {}
+  for i, name in ipairs(names) do
+    snapshot[name] = tonumber(live[i] or 0)
+  end
+  redis.call('HSET', KEYS[1], 'tags', ARGV[3], 'tagVersions', cjson.encode(snapshot))
+end
+
+if ARGV[4] ~= '' then
+  redis.call('HSET', KEYS[1], 'expiresAt', ARGV[4])
+end
+
+if ARGV[5] ~= '' then
+  redis.call('PEXPIRE', KEYS[1], ARGV[5])
+end
+
+if redis.call('GET', KEYS[2]) == ARGV[1] then
+  redis.call('DEL', KEYS[2])
+end
+`
 
 /**
  * Deletes the lock only while it still holds the caller's token, leaving one
@@ -15,19 +85,6 @@ if redis.call('GET', KEYS[1]) == ARGV[1] then
 end
 return 0
 `
-
-interface RedisCacheStoreEnvelope {
-  /**
-   * The cached output, encoded with the store's serializer.
-   */
-  output: unknown
-  tags?: readonly string[]
-  /**
-   * Tag version counters snapshotted at set time.
-   */
-  tagVersions?: Record<string, number>
-  expiresAt?: number | undefined
-}
 
 export interface RedisCacheStoreOptions {
   /**
@@ -55,151 +112,144 @@ export interface RedisCacheStoreOptions {
 
 /**
  * Cache store adapter for Redis with tag-based invalidation. Entries are
- * retained for `ttl + swr` via `EX` expiry; tag counters have no expiry
- * since expiring one would resurrect stale entries. Revalidated entries
- * are removed lazily on the next `get` of their key. Locks are held in
- * Redis with `SET NX`, so they span processes.
+ * hashes retained for `ttl + swr`; tag counters have no expiry since expiring
+ * one would resurrect stale entries. Revalidated entries are removed lazily
+ * on the next `fetch` of their key. Concurrent callers of one key are
+ * coalesced through a lock taken in the same script that reads the entry,
+ * so it spans processes.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class RedisCacheStore implements CacheStore {
   private readonly prefix: string
+  private readonly tagPrefix: string
   private readonly serializer: Public<RPCSerializer>
   private readonly lockTtl: number
 
-  /**
-   * Key encoding has no serializer option, so one is built here rather than
-   * per call by {@link encodeCacheKey}.
-   */
   private readonly keySerializer = new RPCJsonSerializer()
 
-  /**
-   * @param redis The Redis client to store entries in. Connected lazily when needed.
-   */
+  private readonly scriptShas = new Map<string, Awaited<ReturnType<typeof this.redis.scriptLoad>>>()
+
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
     options: RedisCacheStoreOptions = {},
   ) {
     this.prefix = options.prefix ?? ''
+    this.tagPrefix = `${this.prefix}t:`
     this.serializer = options.serializer ?? new RPCSerializer()
     this.lockTtl = options.lockTtl ?? 10
   }
 
-  async get(key: unknown): Promise<CacheEntry | undefined> {
+  async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
     await this.ensureConnection()
 
-    const entryKey = this.entryKey(key)
-    const raw = await this.redis.get(entryKey)
+    const encodedKey = encodeCacheKey(key, this.keySerializer)
+    const entryKey = `${this.prefix}e:${encodedKey}`
+    const lockKey = `${this.prefix}l:${encodedKey}`
+    const token = crypto.randomUUID()
 
-    if (raw === null) {
-      return undefined
-    }
+    while (true) {
+      const [output, tags, expiresAt, shouldFill] = await this.run(
+        FETCH_SCRIPT,
+        [entryKey, lockKey],
+        [token, String(this.lockTtl * 1000), this.tagPrefix, String(nowInSeconds())],
+      ) as [string | null, string | null, string | null, number | null]
 
-    const envelope = JSON.parse(raw.toString()) as RedisCacheStoreEnvelope
+      if (output !== null) {
+        const entry: CacheEntry = {
+          output: this.serializer.deserialize(JSON.parse(output).body),
+          tags: tags !== null ? JSON.parse(tags) : undefined,
+          expiresAt: expiresAt !== null ? Number(expiresAt) : undefined,
+        }
 
-    if (envelope.tags?.length) {
-      const versions = await this.redis.mGet(envelope.tags.map(tag => this.tagKey(tag)))
+        if (shouldFill) {
+          const refresh = this.store(entryKey, lockKey, token, fill, options)
+          options.waitUntil?.(refresh)
+        }
 
-      const revalidated = envelope.tags.some(
-        (tag, index) => Number(versions[index] ?? 0) !== (envelope.tagVersions?.[tag] ?? 0),
-      )
-
-      if (revalidated) {
-        await this.redis.del(entryKey)
-        return undefined
+        return entry
       }
+
+      if (shouldFill) {
+        return this.store(entryKey, lockKey, token, fill, options)
+      }
+
+      await sleep(50)
     }
-
-    return {
-      output: this.serializer.deserialize(envelope.output as any),
-      tags: envelope.tags,
-      expiresAt: envelope.expiresAt,
-    }
-  }
-
-  async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
-    const serialized = this.serializer.serialize(output)
-
-    await this.ensureConnection()
-
-    const tags = options?.tags
-
-    let tagVersions: Record<string, number> | undefined
-    if (tags?.length) {
-      const versions = await this.redis.mGet(tags.map(tag => this.tagKey(tag)))
-      tagVersions = {}
-      tags.forEach((tag, index) => {
-        tagVersions![tag] = Number(versions[index] ?? 0)
-      })
-    }
-
-    const expiresAt = options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
-    const retention = options?.ttl !== undefined ? options.ttl + (options.swr ?? 0) : undefined
-
-    const envelope: RedisCacheStoreEnvelope = {
-      output: serialized,
-      tags,
-      tagVersions,
-      expiresAt,
-    }
-
-    await this.redis.set(
-      this.entryKey(key),
-      stringifyJSON(envelope),
-      retention !== undefined ? { expiration: { type: 'EX', value: retention } } : undefined,
-    )
   }
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     await this.ensureConnection()
 
     if (tags.length === 1) {
-      await this.redis.incr(this.tagKey(tags[0]))
+      await this.redis.incr(`${this.tagPrefix}${tags[0]}`)
       return
     }
 
     const multi = this.redis.multi()
     for (const tag of tags) {
-      multi.incr(this.tagKey(tag))
+      multi.incr(`${this.tagPrefix}${tag}`)
     }
     await multi.exec()
-  }
-
-  async lock<T>(key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T> {
-    await this.ensureConnection()
-
-    const lockKey = this.lockKey(key)
-    const token = crypto.randomUUID()
-    let waited = false
-
-    while (await this.redis.set(lockKey, token, { condition: 'NX', expiration: { type: 'PX', value: this.lockTtl * 1000 } }) === null) {
-      waited = true
-      await sleep(50) // until the holder releases, or its ttl passes
-    }
-
-    try {
-      return await fn(waited)
-    }
-    finally {
-      await this.redis.eval(RELEASE_LOCK_SCRIPT, { keys: [lockKey], arguments: [token] })
-    }
-  }
-
-  private entryKey(key: unknown): string {
-    return `${this.prefix}e:${encodeCacheKey(key, this.keySerializer)}`
-  }
-
-  private tagKey(tag: string): string {
-    return `${this.prefix}t:${tag}`
-  }
-
-  private lockKey(key: unknown): string {
-    return `${this.prefix}l:${encodeCacheKey(key, this.keySerializer)}`
   }
 
   private async ensureConnection(): Promise<void> {
     if (!this.redis.isOpen) {
       await this.redis.connect()
     }
+  }
+
+  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry> {
+    let output: unknown
+    let serialized: string
+
+    try {
+      output = await fill()
+      serialized = stringifyJSON({ body: this.serializer.serialize(output) })
+    }
+    catch (error) {
+      await this.run(RELEASE_LOCK_SCRIPT, [lockKey], [token])
+      throw error
+    }
+
+    const tags = options.tags?.length ? options.tags : undefined
+    const expiresAt = options.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
+    const retention = options.ttl !== undefined ? options.ttl + (options.swr ?? 0) : undefined
+
+    await this.run(STORE_SCRIPT, [entryKey, lockKey], [
+      token,
+      serialized,
+      tags !== undefined ? stringifyJSON(tags) : '',
+      expiresAt !== undefined ? String(expiresAt) : '',
+      retention !== undefined ? String(Math.ceil(retention * 1000)) : '',
+      this.tagPrefix,
+    ])
+
+    return { output, tags, expiresAt }
+  }
+
+  private async run(script: string, keys: string[], args: string[]): Promise<unknown> {
+    try {
+      return await this.evalSha(script, keys, args)
+    }
+    catch (error) {
+      if (error instanceof Error && error.message.startsWith('NOSCRIPT')) {
+        this.scriptShas.delete(script)
+        return await this.evalSha(script, keys, args)
+      }
+
+      throw error
+    }
+  }
+
+  private async evalSha(script: string, keys: string[], args: string[]): Promise<unknown> {
+    let sha = this.scriptShas.get(script)
+
+    if (sha === undefined) {
+      sha = await this.redis.scriptLoad(script)
+      this.scriptShas.set(script, sha)
+    }
+
+    return await this.redis.evalSha(sha, { keys, arguments: args })
   }
 }

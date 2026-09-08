@@ -1,3 +1,4 @@
+import { nowInSeconds } from '@orpc/shared'
 import { cache } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 import { experimental_WorkersCacheStore } from './workers-cache'
@@ -7,12 +8,18 @@ describe('experimental_WorkersCacheStore', () => {
     purge: vi.fn(async () => ({ success: true })),
   }) as any
 
-  it('always misses and stores nothing', async () => {
+  it('fills every time and stores nothing', async () => {
     const purger = createPurger()
     const store = new experimental_WorkersCacheStore({ cache: purger })
+    const fill = vi.fn(async () => 'v')
 
-    await store.set('k', 'v', { tags: ['t'], ttl: 1000 })
-    await expect(store.get('k')).resolves.toBeUndefined()
+    const entry = await store.fetch('k', fill, { tags: ['t'], ttl: 1000 })
+    expect(entry.output).toBe('v')
+    expect(entry.tags).toEqual(['t'])
+    expect(entry.expiresAt).toBeGreaterThan(nowInSeconds())
+
+    await expect(store.fetch('k', fill)).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: undefined })
+    expect(fill).toHaveBeenCalledTimes(2)
     expect(purger.purge).not.toHaveBeenCalled()
   })
 

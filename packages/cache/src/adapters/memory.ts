@@ -1,8 +1,8 @@
 import type { Public } from '@orpc/shared'
-import type { CacheEntry, CacheRevalidateOptions, CacheSetOptions, CacheStore } from '../types'
+import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer } from '@orpc/client'
 import { MemoryLock, nowInSeconds } from '@orpc/shared'
-import { encodeCacheKey } from '../utils'
+import { encodeCacheKey, isCacheEntryStale } from '../utils'
 
 export interface MemoryCacheStoreOptions {
   /**
@@ -28,8 +28,8 @@ interface MemoryCacheStoreEntry {
 /**
  * In-memory cache store with tag-based invalidation, intended for
  * development, testing, and single-instance deployments. Expired and
- * revalidated entries are removed lazily on the next `get` of their key.
- * Locks are held within the process.
+ * revalidated entries are removed lazily on the next `fetch` of their key,
+ * and concurrent callers of one key are coalesced within the process.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -43,8 +43,39 @@ export class MemoryCacheStore implements CacheStore {
     this.serializer = options.serializer ?? new RPCJsonSerializer()
   }
 
-  async get(key: unknown): Promise<CacheEntry | undefined> {
+  async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
     const encodedKey = encodeCacheKey(key, this.serializer)
+    const entry = this.read(encodedKey)
+
+    if (entry === undefined) {
+      return this.memoryLock.run(encodedKey, async (waited) => {
+        const current = waited ? this.read(encodedKey) : undefined
+        return current ?? this.write(encodedKey, await fill(), options)
+      })
+    }
+
+    if (isCacheEntryStale(entry)) {
+      const refresh = this.memoryLock.run(encodedKey, async (waited) => {
+        const current = waited ? this.read(encodedKey) : undefined
+
+        if (current === undefined || isCacheEntryStale(current)) {
+          this.write(encodedKey, await fill(), options)
+        }
+      })
+
+      options.waitUntil?.(refresh)
+    }
+
+    return entry
+  }
+
+  async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
+    for (const tag of tags) {
+      this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1)
+    }
+  }
+
+  private read(encodedKey: string): CacheEntry | undefined {
     const entry = this.entries.get(encodedKey)
 
     if (!entry) {
@@ -72,27 +103,19 @@ export class MemoryCacheStore implements CacheStore {
     }
   }
 
-  async set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void> {
-    const tags = options?.tags
-    const expiresAt = options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
-    const evictAt = expiresAt !== undefined ? expiresAt + (options?.swr ?? 0) : undefined
+  private write(encodedKey: string, output: unknown, options: CacheFetchOptions): CacheEntry {
+    const tags = options.tags
+    const expiresAt = options.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
+    const evictAt = expiresAt !== undefined ? expiresAt + (options.swr ?? 0) : undefined
 
-    this.entries.set(encodeCacheKey(key, this.serializer), {
+    this.entries.set(encodedKey, {
       output,
       tags,
       tagVersions: tags?.map(tag => this.tagVersions.get(tag) ?? 0),
       expiresAt,
       evictAt,
     })
-  }
 
-  async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
-    for (const tag of tags) {
-      this.tagVersions.set(tag, (this.tagVersions.get(tag) ?? 0) + 1)
-    }
-  }
-
-  async lock<T>(key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T> {
-    return this.memoryLock.run(encodeCacheKey(key, this.serializer), fn)
+    return { output, tags, expiresAt }
   }
 }

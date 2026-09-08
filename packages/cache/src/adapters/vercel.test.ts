@@ -18,39 +18,9 @@ describe('vercelCacheStore', () => {
       const store = new VercelCacheStore()
       const key = crypto.randomUUID()
 
-      await store.set(key, 'v')
+      await store.fetch(key, async () => 'v')
 
-      await expect(store.get(key)).resolves.toMatchObject({ output: 'v' })
-    })
-  })
-
-  describe('locking', () => {
-    it('locks per key within the process, handing on after failures', async () => {
-      const store = new VercelCacheStore()
-      const order: string[] = []
-      let release!: () => void
-      const held = new Promise<void>((resolve) => {
-        release = resolve
-      })
-
-      const first = store.lock('k', async (waited) => {
-        order.push(`first:${waited}`)
-        await held
-      })
-      const second = store.lock('k', async (waited) => {
-        order.push(`second:${waited}`)
-      })
-      await expect(store.lock('other', async waited => waited)).resolves.toBe(false)
-      expect(order).toEqual(['first:false'])
-
-      release()
-      await Promise.all([first, second])
-      expect(order).toEqual(['first:false', 'second:true'])
-
-      await expect(store.lock('k', async () => {
-        throw new Error('boom')
-      })).rejects.toThrow('boom')
-      await expect(store.lock('k', async waited => waited)).resolves.toBe(false)
+      await expect(store.fetch(key, async () => 'other')).resolves.toMatchObject({ output: 'v' })
     })
   })
 
@@ -85,7 +55,7 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.set('k', 'v', { tags: ['t'], ttl: 1, swr: 1 })
+      await store.fetch('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 1 })
 
       expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: ['t'], expiresAt: 1, evictAt: 2 }), { tags: ['t'], ttl: 2 })
     })
@@ -94,7 +64,7 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.set('k', 'v', { ttl: 1 })
+      await store.fetch('k', async () => 'v', { ttl: 1 })
 
       expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ expiresAt: 1, evictAt: 1 }), { ttl: 1 })
     })
@@ -103,23 +73,65 @@ describe('vercelCacheStore', () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.set('k', 'v')
+      await store.fetch('k', async () => 'v')
 
       expect(cache.set).toHaveBeenCalledWith('k', expect.objectContaining({ tags: undefined }), {})
     })
 
-    it('returns stale entries within the swr window, then evicts defensively', async () => {
+    it('serves stale entries within the swr window, refreshes through waitUntil, and evicts defensively', async () => {
       const cache = createMockedCache()
       const store = new VercelCacheStore({ cache })
 
-      await store.set('k', 'v', { ttl: 1, swr: 1 })
+      await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
 
       vi.setSystemTime(1200) // past ttl, within swr
-      await expect(store.get('k')).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+      const waitUntil = vi.fn()
+      await expect(store.fetch('k', async () => {
+        throw new Error('handler down')
+      }, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+      await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
 
       vi.setSystemTime(2000) // past ttl + swr, backend has not evicted yet
-      await expect(store.get('k')).resolves.toBeUndefined()
+      await expect(store.fetch('k', async () => 'refilled', { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'refilled' })
       expect(cache.delete).toHaveBeenCalledWith('k')
+    })
+
+    it('refreshes once for concurrent stale hits, and again when the first refresh failed', async () => {
+      const cache = createMockedCache()
+      const store = new VercelCacheStore({ cache })
+      await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+
+      vi.setSystemTime(1200)
+      let finish!: (output: string) => void
+      const fill = vi.fn(() => new Promise<string>((resolve) => {
+        finish = resolve
+      }))
+      const waitUntil = vi.fn()
+
+      await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
+      await store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })
+      finish('fresh')
+      await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
+      expect(fill).toHaveBeenCalledTimes(1)
+      await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
+
+      vi.setSystemTime(2400) // stale again
+      let fail!: (error: Error) => void
+      const failingFill = vi.fn()
+        .mockImplementationOnce(() => new Promise<never>((_, reject) => {
+          fail = reject
+        }))
+        .mockResolvedValue('fresher')
+      const waitUntilAgain = vi.fn()
+
+      await store.fetch('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
+      await store.fetch('k', failingFill, { ttl: 1, swr: 1, waitUntil: waitUntilAgain })
+      fail(new Error('handler down'))
+
+      await expect(waitUntilAgain.mock.calls[0]![0]).rejects.toThrow('handler down')
+      await waitUntilAgain.mock.calls[1]![0]
+      expect(failingFill).toHaveBeenCalledTimes(2)
+      await expect(store.fetch('k', failingFill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresher' })
     })
 
     it('supports a custom serializer', async () => {
@@ -129,9 +141,9 @@ describe('vercelCacheStore', () => {
       const deserializeSpy = vi.spyOn(serializer, 'deserialize')
       const store = new VercelCacheStore({ cache, serializer })
 
-      await store.set('k', { a: 1 })
+      await store.fetch('k', async () => ({ a: 1 }))
 
-      await expect(store.get('k')).resolves.toMatchObject({ output: { a: 1 } })
+      await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: { a: 1 } })
       expect(serializeSpy).toHaveBeenCalled()
       expect(deserializeSpy).toHaveBeenCalled()
     })

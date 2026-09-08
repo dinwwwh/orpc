@@ -13,24 +13,22 @@ npm install @orpc/experimental-cache@beta
 
 ## Basic Usage
 
-The core concept is the `CacheStore` interface, which defines a standard way to store, look up, and invalidate cached output by tags. Stores may also implement `lock`, which runs a callback for one caller at a time per key so concurrent misses fill an entry once. You can create your own custom store or use one of the provided adapters. A router shares a single store, provided through the request context under the `cache/store` key, as defined by the `CacheContext` interface.
+The core concept is the `CacheStore` interface: `fetch` resolves the entry under a key, filling it once when there is none even for concurrent callers, and `revalidate` invalidates entries by tag. You can create your own custom store or use one of the provided adapters. A router shares a single store, provided through the request context under the `cache/store` key, as defined by the `CacheContext` interface.
 
 ```ts twoslash
 import { MemoryCacheStore } from '@orpc/experimental-cache/memory'
 // ---cut---
 const store = new MemoryCacheStore()
 
-await store.set('planet:1', { id: 1, name: 'Earth' }, {
+const entry = await store.fetch('planet:1', async () => ({ id: 1, name: 'Earth' }), {
   tags: ['planets', 'planet:1'],
   ttl: 60,
 })
 
-const entry = await store.get('planet:1')
-
-await store.revalidate({ tags: ['planets'] }) // now `get` misses
+await store.revalidate({ tags: ['planets'] }) // the next `fetch` fills again
 ```
 
-An entry stays fresh for `ttl` seconds and is retained for an extra `swr` window afterward, during which `get` still returns it with a past `expiresAt` so callers can serve it stale while refreshing. Revalidating a tag invalidates every entry associated with it, fresh or stale.
+An entry stays fresh for `ttl` seconds and is retained for an extra `swr` window afterward, during which `fetch` still returns it with a past `expiresAt` while one caller refreshes it in the background. Revalidating a tag invalidates every entry associated with it, fresh or stale.
 
 ## Adapters
 
@@ -47,7 +45,7 @@ Every duration is in seconds, matching what the underlying caches accept.
 
 Keys may be any serializable value. Strings are used verbatim, while anything else is encoded with `encodeCacheKey`: serialized first, so complex values like Date, Map, or Set become plain JSON, then canonicalized, so structurally equal keys resolve the same entry regardless of property order. Reuse it when implementing your own store.
 
-Every adapter except `experimental_WorkersCacheStore` implements `lock`. The Redis, Upstash, and Bun stores hold it in Redis with `SET NX`, so it spans processes and is released when the holder finishes, or after `lockTtl` if it never does. The memory and Vercel stores hold it within the process through `MemoryLock` from `@orpc/shared`, which suits stores of your own too.
+Every adapter coalesces concurrent callers of one key. The Redis, Upstash, and Bun stores take a lock in Redis within the same script that reads the entry, so a miss costs one round trip to read and lock and one to store and release, and the lock spans processes; it is released when the fill finishes, or after `lockTtl` if it never does. The memory and Vercel stores coalesce within the process through `MemoryLock` from `@orpc/shared`, which suits stores of your own too.
 
 <CodeGroup>
 
@@ -200,7 +198,7 @@ const store = new WorkersCacheStore()
 
 ## Cache Middleware
 
-The `cache` helper creates middleware that caches the output of [procedures](/docs/procedure). On a hit it returns the cached output without executing the handler, and on a miss it executes the handler and stores the result. When the store implements `lock`, concurrent misses for one key run the handler once and the rest are served from the entry it stores. The `key`, `tags`, `ttl`, `swr`, and `enabled` options accept static values or functions of the middleware options and input.
+The `cache` helper creates middleware that caches the output of [procedures](/docs/procedure). On a hit it returns the cached output without executing the handler, and on a miss it executes the handler and stores the result. Concurrent misses for one key run the handler once and the rest are served from the entry it stores. The `key`, `tags`, `ttl`, `swr`, and `enabled` options accept static values or functions of the middleware options and input.
 
 The `key` is optional: by default it is derived from the procedure path and input. When provided, it is used as given, so procedures sharing a key also share an entry.
 
@@ -240,7 +238,7 @@ A cached entry is shared by everyone using the same key. If output depends on th
 
 ### Stale While Revalidate
 
-When an entry is past `ttl` but within the `swr` window, the middleware returns the stale output immediately and re-executes the procedure in the background to refresh the entry. Concurrent stale hits refresh once when the store implements `lock`, and once each otherwise; the cache never serves anything older than `ttl + swr`.
+When an entry is past `ttl` but within the `swr` window, the middleware returns the stale output immediately and re-executes the procedure in the background to refresh the entry. Concurrent stale hits refresh once; the cache never serves anything older than `ttl + swr`.
 
 On runtimes that stop pending work once the response is sent, such as Cloudflare Workers, provide `cache/waitUntil` through the context so background refreshes can finish:
 

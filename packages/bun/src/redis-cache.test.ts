@@ -1,8 +1,8 @@
 import { RPCSerializer } from '@orpc/client'
 import { nowInSeconds, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
-import { afterAll, beforeAll, describe, expect, it, spyOn } from 'bun:test'
-import { holdResult, waitFor } from '../tests/__shared__/utils'
+import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
+import { waitFor } from '../tests/__shared__/utils'
 import { BunRedisCacheStore } from './redis-cache'
 
 const REDIS_URL = Bun.env.REDIS_URL
@@ -18,27 +18,25 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     redis.close()
   })
 
-  function createTestingStore(
-    options: ConstructorParameters<typeof BunRedisCacheStore>[1] = {},
-    client: RedisClient = redis,
-  ) {
+  function createTestingStore(options: ConstructorParameters<typeof BunRedisCacheStore>[1] = {}) {
     const prefix = `orpc-bun-redis-cache-store-${crypto.randomUUID()}:`
-    return { store: new BunRedisCacheStore(client, { prefix, ...options }), prefix }
+    return { store: new BunRedisCacheStore(redis, { prefix, ...options }), prefix }
   }
 
-  it('round-trips outputs with their tags and expiresAt, including undefined', async () => {
+  it('fills a miss once, then serves the entry with its tags and expiresAt', async () => {
     const { store } = createTestingStore()
+    const fill = mock(async () => ({ nested: [1, 2] }))
 
-    await store.set('k', { nested: [1, 2] }, { tags: ['t'], ttl: 120 })
+    const first = await store.fetch('k', fill, { tags: ['t'], ttl: 120 })
+    expect(first.output).toEqual({ nested: [1, 2] })
+    expect(first.tags).toEqual(['t'])
+    expect(first.expiresAt).toBeGreaterThan(nowInSeconds())
 
-    const entry = await store.get('k')
-    expect(entry!.output).toEqual({ nested: [1, 2] })
-    expect(entry!.tags).toEqual(['t'])
-    expect(entry!.expiresAt).toBeGreaterThan(nowInSeconds())
+    await expect(store.fetch('k', fill, { tags: ['t'], ttl: 120 })).resolves.toEqual(first)
+    expect(fill).toHaveBeenCalledTimes(1)
 
-    await store.set('u', undefined)
-    await expect(store.get('u')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
-    await expect(store.get('unknown')).resolves.toBeUndefined()
+    await store.fetch('u', async () => undefined)
+    await expect(store.fetch('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
   })
 
   it('preserves Date, Map, Set, and BigInt outputs', async () => {
@@ -50,23 +48,21 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
       big: 123n,
     }
 
-    await store.set('k', output)
-    await expect(store.get('k')).resolves.toMatchObject({ output })
+    await store.fetch('k', async () => output)
+    await expect(store.fetch('k', async () => 'refilled')).resolves.toMatchObject({ output })
   })
 
-  it('invalidates entries by any of their tags, and keeps ones set afterwards', async () => {
+  it('invalidates entries by any of their tags, and keeps ones filled afterwards', async () => {
     const { store } = createTestingStore()
 
-    await store.set('multi', 'v', { tags: ['a', 'b'] })
-    await store.set('other', 'v', { tags: ['c'] })
+    await store.fetch('multi', async () => 'v', { tags: ['a', 'b'] })
+    await store.fetch('other', async () => 'v', { tags: ['c'] })
 
     await store.revalidate({ tags: ['a', 'b'] })
 
-    await expect(store.get('multi')).resolves.toBeUndefined()
-    await expect(store.get('other')).resolves.toBeDefined()
-
-    await store.set('multi', 'new', { tags: ['a'] })
-    await expect(store.get('multi')).resolves.toMatchObject({ output: 'new' })
+    await expect(store.fetch('multi', async () => 'new', { tags: ['a'] })).resolves.toMatchObject({ output: 'new' })
+    await expect(store.fetch('other', async () => 'refilled', { tags: ['c'] })).resolves.toMatchObject({ output: 'v' })
+    await expect(store.fetch('multi', async () => 'newer', { tags: ['a'] })).resolves.toMatchObject({ output: 'new' })
   })
 
   it('supports a custom serializer', async () => {
@@ -75,135 +71,120 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     const deserializeSpy = spyOn(serializer, 'deserialize')
     const { store } = createTestingStore({ serializer })
 
-    await store.set('k', { a: 1 })
+    await store.fetch('k', async () => ({ a: 1 }))
 
-    await expect(store.get('k')).resolves.toMatchObject({ output: { a: 1 } })
+    await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: { a: 1 } })
     expect(serializeSpy).toHaveBeenCalled()
     expect(deserializeSpy).toHaveBeenCalled()
   })
 
-  it('evicts at ttl without swr, and serves stale within the swr window', async () => {
+  it('fills again at ttl without swr, and serves stale within the swr window while refreshing', async () => {
     const { store } = createTestingStore()
 
-    await store.set('no-swr', 'v', { ttl: 1 })
-    await store.set('swr', 'v', { ttl: 1, swr: 10 })
+    await store.fetch('no-swr', async () => 'v', { ttl: 1 })
+    await store.fetch('swr', async () => 'v', { ttl: 1, swr: 10 })
 
     await sleep(1500)
 
-    await expect(store.get('no-swr')).resolves.toBeUndefined()
+    await expect(store.fetch('no-swr', async () => 'refilled', { ttl: 1 })).resolves.toMatchObject({ output: 'refilled' })
 
-    const stale = await store.get('swr')
-    expect(stale!.output).toBe('v')
-    expect(stale!.expiresAt).toBeLessThanOrEqual(nowInSeconds())
+    const waitUntil = mock((_promise: Promise<unknown>) => {})
+    const stale = await store.fetch('swr', async () => 'fresh', { ttl: 1, swr: 10, waitUntil })
+    expect(stale.output).toBe('v')
+    expect(stale.expiresAt).toBeLessThanOrEqual(nowInSeconds())
+
+    expect(waitUntil).toHaveBeenCalledTimes(1)
+    await waitUntil.mock.calls[0]![0]
+
+    const fresh = await store.fetch('swr', async () => 'other', { ttl: 1, swr: 10 })
+    expect(fresh.output).toBe('fresh')
+    expect(fresh.expiresAt).toBeGreaterThan(stale.expiresAt!)
   }, { timeout: 20_000 })
 
-  it('stores entries and tag counters under the prefixed key families, defaulting to no prefix', async () => {
+  it('stores entries as hashes and tag counters under the prefixed key families, locking while filling', async () => {
     const { store, prefix } = createTestingStore()
 
-    await store.set('k', 'v', { tags: ['t'] })
+    await store.fetch('k', async () => {
+      await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(true)
+      return 'v'
+    }, { tags: ['t'] })
     await store.revalidate({ tags: ['t'] })
 
-    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(true)
+    await expect(redis.send('TYPE', [`${prefix}e:k`])).resolves.toBe('hash')
     await expect(redis.exists(`${prefix}t:t`)).resolves.toBe(true)
+    await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
 
     const unprefixed = new BunRedisCacheStore(redis)
     const key = crypto.randomUUID()
-
-    await unprefixed.set(key, 'v')
-
+    await unprefixed.fetch(key, async () => 'v')
     await expect(redis.exists(`e:${key}`)).resolves.toBe(true)
-    await expect(unprefixed.get(key)).resolves.toMatchObject({ output: 'v' })
   })
 
   it('treats tags missing from the snapshot as version zero', async () => {
     const { store, prefix } = createTestingStore()
 
-    await redis.set(`${prefix}e:k`, JSON.stringify({ output: { json: 'v' }, tags: ['t'], tagVersions: {} }))
+    await redis.send('HSET', [`${prefix}e:k`, 'output', JSON.stringify({ body: { json: 'v' } }), 'tags', '["t"]', 'tagVersions', '{}'])
 
-    await expect(store.get('k')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+  })
+
+  it('reloads scripts the server dropped, and rethrows other script errors', async () => {
+    const { store, prefix } = createTestingStore()
+
+    await store.fetch('k', async () => 'v')
+    await redis.send('SCRIPT', ['FLUSH'])
+    await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
+
+    await redis.send('HSET', [`${prefix}e:broken`, 'output', '{}', 'tags', 'not json', 'tagVersions', '{}'])
+    await expect(store.fetch('broken', async () => 'v')).rejects.toThrow()
   })
 
   it('encodes non-string keys stably', async () => {
     const { store } = createTestingStore()
 
-    await store.set([['planet', 'find'], { b: 2, a: 1 }], 'v')
+    await store.fetch([['planet', 'find'], { b: 2, a: 1 }], async () => 'v')
 
-    await expect(store.get([['planet', 'find'], { a: 1, b: 2 }])).resolves.toMatchObject({ output: 'v' })
-    await expect(store.get([['planet', 'find'], { a: 1, b: 3 }])).resolves.toBeUndefined()
+    await expect(store.fetch([['planet', 'find'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'v' })
+    await expect(store.fetch([['planet', 'find'], { a: 1, b: 3 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
   })
 
-  it('drops an entry whose tag versions were read before a racing revalidation', async () => {
-    const { client, read, release } = holdResult(redis, 'mget')
-    const { store, prefix } = createTestingStore({}, client)
-
-    const set = store.set('k', 'v', { tags: ['t'] }) // entry written after release
-    await read // versions are read by now
-    await store.revalidate({ tags: ['t'] })
-    release()
-    await set
-
-    await expect(store.get('k')).resolves.toBeUndefined()
-    await expect(redis.exists(`${prefix}e:k`)).resolves.toBe(false)
-  })
-
-  it('stays consistent under concurrent sets, gets, and a revalidation on a shared tag', async () => {
+  it('fills once for concurrent callers of one key, and lets a waiter fill when the holder failed', async () => {
     const { store } = createTestingStore()
-    const keys = Array.from({ length: 20 }, (_, index) => `k${index}`)
+    let finish!: (output: string) => void
+    const fill = mock(() => new Promise<string>((resolve) => {
+      finish = resolve
+    }))
 
-    await Promise.all([
-      ...keys.map(key => store.set(key, key, { tags: ['t'] })),
-      store.revalidate({ tags: ['t'] }),
-      ...keys.map(key => store.get(key)),
-    ])
+    const fetches = Promise.all([store.fetch('k', fill), store.fetch('k', fill), store.fetch('k', fill)])
+    await waitFor(() => expect(fill).toHaveBeenCalledTimes(1), { timeout: 5000 })
+    finish('v')
 
-    // Entries snapshotted before the revalidation miss, the rest hit with their own output.
-    const entries = await Promise.all(keys.map(key => store.get(key)))
-    entries.forEach((entry, index) => {
-      if (entry !== undefined) {
-        expect(entry.output).toBe(keys[index])
-      }
+    const entries = await fetches
+    expect(entries.map(entry => entry.output)).toEqual(['v', 'v', 'v'])
+    expect(fill).toHaveBeenCalledTimes(1)
+
+    let fail!: (error: Error) => void
+    let started!: () => void
+    const holding = new Promise<void>((resolve) => {
+      started = resolve
     })
-
-    await store.revalidate({ tags: ['t'] })
-
-    await expect(Promise.all(keys.map(key => store.get(key)))).resolves.toEqual(keys.map(() => undefined))
-  })
-
-  it('runs lock callbacks one key at a time, handing on after failures', async () => {
-    const { store } = createTestingStore()
-    const order: string[] = []
-    let release!: () => void
-    const held = new Promise<void>((resolve) => {
-      release = resolve
+    const first = store.fetch('failing', () => {
+      started()
+      return new Promise<never>((_, reject) => {
+        fail = reject
+      })
     })
+    await holding
+    const second = store.fetch('failing', async () => 'fresh')
+    fail(new Error('handler down'))
 
-    const first = store.lock('k', async (waited) => {
-      order.push(`first:${waited}`)
-      await held
-      return 'first'
-    })
-    await waitFor(() => expect(order).toEqual(['first:false']), { timeout: 5000 })
-
-    const second = store.lock('k', async (waited) => {
-      order.push(`second:${waited}`)
-      return 'second'
-    })
-    await expect(store.lock('other', async waited => waited)).resolves.toBe(false)
-    expect(order).toEqual(['first:false'])
-
-    release()
-    await expect(first).resolves.toBe('first')
-    await expect(second).resolves.toBe('second')
-    expect(order).toEqual(['first:false', 'second:true'])
-
-    await expect(store.lock('k', async () => {
-      throw new Error('boom')
-    })).rejects.toThrow('boom')
-    await expect(store.lock('k', async waited => waited)).resolves.toBe(false)
+    await expect(first).rejects.toThrow('handler down')
+    await expect(second).resolves.toMatchObject({ output: 'fresh' })
   })
 
   it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
-    const { store, prefix } = createTestingStore({ lockTtl: 1 })
+    const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
+    const waiterStore = new BunRedisCacheStore(redis, { prefix })
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
@@ -213,22 +194,24 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
       takenOver = resolve
     })
 
-    // Holds past its ttl, until the waiter has taken the lock over.
-    const holder = store.lock('k', () => takeover)
+    const holder = holderStore.fetch('k', async () => {
+      await takeover
+      return 'holder'
+    })
     await waitFor(async () => expect(await redis.exists(`${prefix}l:k`)).toBe(true), { timeout: 5000 })
 
-    const waiter = store.lock('k', async (waited) => {
+    const waiter = waiterStore.fetch('k', async () => {
       takenOver()
       await held
-      return waited
+      return 'waiter'
     })
 
-    await holder
-    // The holder's release must leave the waiter's lock alone.
+    await expect(holder).resolves.toMatchObject({ output: 'holder' })
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(true)
 
     release()
-    await expect(waiter).resolves.toBe(true)
+    await expect(waiter).resolves.toMatchObject({ output: 'waiter' })
     await expect(redis.exists(`${prefix}l:k`)).resolves.toBe(false)
+    await expect(holderStore.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'waiter' })
   }, { timeout: 20_000 })
 })

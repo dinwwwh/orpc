@@ -16,7 +16,7 @@ export interface CacheEntry {
   expiresAt?: number | undefined
 }
 
-export interface CacheSetOptions {
+export interface CacheFetchOptions {
   /**
    * Tags associated with the entry. Revalidating any of them invalidates the entry.
    *
@@ -39,6 +39,14 @@ export interface CacheSetOptions {
    * @default 0
    */
   swr?: number
+
+  /**
+   * Takes ownership of the background refresh of a stale entry, like
+   * `ctx.waitUntil` on Cloudflare Workers. The promise rejects when the
+   * refresh fails, so this is also where such failures are handled; without
+   * it they surface as unhandled rejections.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void
 }
 
 export interface CacheRevalidateOptions {
@@ -49,38 +57,26 @@ export interface CacheRevalidateOptions {
 }
 
 /**
- * Storage contract used by the cache middleware. Implementations own
- * expiry and tag tracking: `set` records tags, `revalidate` invalidates
- * every entry associated with them.
+ * Storage contract used by the cache middleware. Implementations own expiry,
+ * tag tracking, and how concurrent callers of one key are coalesced.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#basic-usage | Cache Helpers - Basic Usage}
  */
 export interface CacheStore {
   /**
-   * Resolves the entry stored under `key`, or `undefined` on miss/evicted/revalidated.
-   * Stale entries (past `expiresAt` but within the stale-while-revalidate window) are returned.
-   * Keys may be any serializable value; implementations encode them stably,
-   * so structurally equal keys resolve the same entry.
+   * Resolves the entry stored under `key`, filling it through `fill` when
+   * there is none. Concurrent callers of one key fill once and share that
+   * entry. A stale entry, past `expiresAt` but within `swr`, is returned as is
+   * while one caller refreshes it in the background. Keys may be any
+   * serializable value; implementations encode them stably, so structurally
+   * equal keys resolve the same entry.
    */
-  get(key: unknown): Promise<CacheEntry | undefined>
-
-  /**
-   * Stores `output` under `key`, replacing any previous entry.
-   */
-  set(key: unknown, output: unknown, options?: CacheSetOptions): Promise<void>
+  fetch(key: unknown, fill: () => Promise<unknown>, options?: CacheFetchOptions): Promise<CacheEntry>
 
   /**
    * Invalidates every entry associated with any of the given tags.
    */
   revalidate(options: CacheRevalidateOptions): Promise<void>
-
-  /**
-   * Runs `fn` for one caller at a time per key, so a miss is filled once
-   * rather than once per concurrent caller. `waited` is `true` when another
-   * caller held the lock first, so the entry may exist by now. Stores without
-   * it let every caller fill.
-   */
-  lock?<T>(key: unknown, fn: (waited: boolean) => Promise<T>): Promise<T>
 }
 
 /**
