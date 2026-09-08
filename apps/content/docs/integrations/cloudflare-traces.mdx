@@ -70,10 +70,9 @@ Define the `name` property on your middleware to improve span naming and make tr
 
 ## Limitations
 
-Workers Traces expose a smaller API than OpenTelemetry, so some span details are dropped:
+Compared with the [OpenTelemetry integration](/docs/integrations/opentelemetry), a few span details are dropped because the Workers custom spans API has no equivalent:
 
-- Spans cannot be renamed, so request spans keep their `METHOD /path` name instead of the procedure path. The procedure path is still recorded in the `rpc.method` attribute.
-- Spans have no events, so the `yielded` and `enqueued` events of streamed inputs and outputs are not recorded.
-- Workers Traces treat every recorded exception as a failure, so exceptions that must not fail a span, such as client aborts, are stored in the `exception.type` and `exception.message` attributes instead.
-- Trace context is not injected into or extracted from headers. Workers propagate it automatically across [service bindings and Durable Objects](https://developers.cloudflare.com/changelog/post/2026-05-07-automatic-tracing-across-do-and-worker-subrequests/).
-- The runtime truncates span names to 64 bytes.
+- Request spans keep their `METHOD /path` name instead of being renamed to the procedure path. The procedure path is still recorded in the `rpc.method` attribute.
+- Streamed inputs and outputs record no `yielded` and `enqueued` events.
+- Client aborts are recorded as `exception.type` and `exception.message` attributes instead of an exception event, because any exception recorded on a Workers span marks it as failed.
+- Trace context is not injected into or extracted from request headers.
