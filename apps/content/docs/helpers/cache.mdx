@@ -45,7 +45,7 @@ Every duration is in seconds, matching what the underlying caches accept.
 
 Keys may be any serializable value. Strings are used verbatim, while anything else is encoded with `encodeCacheKey`: serialized first, so complex values like Date, Map, or Set become plain JSON, then canonicalized, so structurally equal keys resolve the same entry regardless of property order. Reuse it when implementing your own store.
 
-Every adapter coalesces concurrent callers of one key. The Redis, Upstash, and Bun stores take a lock in Redis within the same script that reads the entry, so a miss costs one round trip to read and lock and one to store and release, and the lock spans processes; it is released when the fill finishes, or after `lockTtl` if it never does. The memory and Vercel stores coalesce within the process through `MemoryLock` from `@orpc/shared`, which suits stores of your own too.
+Every adapter coalesces concurrent callers of one key. The Redis, Upstash, and Bun stores take a lock in Redis within the same script that reads the entry, so a miss costs one round trip to read and lock and one to store and release, and the lock spans processes; it is released when the fill finishes, or after `lockTtl` if it never does. The memory store holds it within the process. The Vercel store takes any `Lock` from `@orpc/shared` through its `lock` option and defaults to `MemoryLock`, held within the process, since the Runtime Cache has no atomic primitive; both suit stores of your own too.
 
 <CodeGroup>
 
@@ -160,6 +160,7 @@ const store = new BunRedisCacheStore(redis, {
 
 ```ts vercel
 import { VercelCacheStore } from '@orpc/experimental-cache/vercel'
+import { MemoryLock } from '@orpc/shared'
 import { getCache } from '@vercel/functions'
 
 const store = new VercelCacheStore({
@@ -177,6 +178,14 @@ const store = new VercelCacheStore({
    * @default RPCSerializer
    */
   serializer: undefined,
+
+  /**
+   * Coalesces concurrent callers of one key. The Runtime Cache has no
+   * atomic primitive, so the default holds the lock within the process.
+   *
+   * @default new MemoryLock()
+   */
+  lock: new MemoryLock(),
 })
 ```
 

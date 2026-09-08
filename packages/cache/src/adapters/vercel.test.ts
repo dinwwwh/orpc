@@ -1,3 +1,4 @@
+import type { Lock } from '@orpc/shared'
 import type { RuntimeCache } from '@vercel/functions'
 import { RPCSerializer } from '@orpc/client'
 import { getCache } from '@vercel/functions'
@@ -132,6 +133,22 @@ describe('vercelCacheStore', () => {
       await waitUntilAgain.mock.calls[1]![0]
       expect(failingFill).toHaveBeenCalledTimes(2)
       await expect(store.fetch('k', failingFill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresher' })
+    })
+
+    it('runs misses and stale refreshes through a custom lock', async () => {
+      const cache = createMockedCache()
+      const lock: Lock = { run: (_key, fn) => fn(false) }
+      const runSpy = vi.spyOn(lock, 'run')
+      const store = new VercelCacheStore({ cache, lock })
+
+      await store.fetch('k', async () => 'v', { ttl: 1, swr: 1 })
+      expect(runSpy).toHaveBeenCalledWith('k', expect.any(Function))
+
+      vi.setSystemTime(1200)
+      const waitUntil = vi.fn()
+      await store.fetch('k', async () => 'fresh', { ttl: 1, swr: 1, waitUntil })
+      await waitUntil.mock.calls[0]![0]
+      expect(runSpy).toHaveBeenCalledTimes(2)
     })
 
     it('supports a custom serializer', async () => {

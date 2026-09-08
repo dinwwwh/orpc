@@ -1,4 +1,4 @@
-import type { Public } from '@orpc/shared'
+import type { Lock, Public } from '@orpc/shared'
 import type { RuntimeCache } from '@vercel/functions'
 import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '../types'
 import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
@@ -30,21 +30,30 @@ export interface VercelCacheStoreOptions {
    * @default RPCSerializer
    */
   serializer?: undefined | Public<RPCSerializer>
+
+  /**
+   * Coalesces concurrent callers of one key, so a miss is filled once and a
+   * stale entry refreshed once. The Runtime Cache has no atomic primitive,
+   * so the default holds the lock within the process.
+   *
+   * @default new MemoryLock()
+   */
+  lock?: Lock
 }
 
 /**
  * Cache store adapter for the Vercel Runtime Cache. Tags are expired
  * natively via `expireTag`, and entries are retained for `ttl + swr`.
  * Outside Vercel, the default `getCache()` falls back to an in-memory
- * cache. Concurrent callers of one key are coalesced within the process,
- * since the Runtime Cache has no atomic primitive.
+ * cache. Concurrent callers of one key are coalesced through the `lock`
+ * option, within the process by default.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export class VercelCacheStore implements CacheStore {
   private readonly cache: RuntimeCache
   private readonly serializer: Public<RPCSerializer>
-  private readonly memoryLock = new MemoryLock()
+  private readonly lock: Lock
 
   /**
    * Key encoding has no serializer option, so one is built here rather than
@@ -55,6 +64,7 @@ export class VercelCacheStore implements CacheStore {
   constructor(options: VercelCacheStoreOptions = {}) {
     this.cache = options.cache ?? getCache()
     this.serializer = options.serializer ?? new RPCSerializer()
+    this.lock = options.lock ?? new MemoryLock()
   }
 
   async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
@@ -62,14 +72,14 @@ export class VercelCacheStore implements CacheStore {
     const entry = await this.read(encodedKey)
 
     if (entry === undefined) {
-      return this.memoryLock.run(encodedKey, async (waited) => {
+      return this.lock.run(encodedKey, async (waited) => {
         const current = waited ? await this.read(encodedKey) : undefined
         return current ?? this.write(encodedKey, await fill(), options)
       })
     }
 
     if (isCacheEntryStale(entry)) {
-      const refresh = this.memoryLock.run(encodedKey, async (waited) => {
+      const refresh = this.lock.run(encodedKey, async (waited) => {
         const current = waited ? await this.read(encodedKey) : undefined
 
         if (current === undefined || isCacheEntryStale(current)) {
