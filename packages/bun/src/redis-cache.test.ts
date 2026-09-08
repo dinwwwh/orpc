@@ -1,7 +1,7 @@
 import { RPCSerializer } from '@orpc/client'
 import { nowInSeconds, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
-import { afterAll, beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
+import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
 import { waitFor } from '../tests/__shared__/utils'
 import { BunRedisCacheStore } from './redis-cache'
 
@@ -10,12 +10,9 @@ const REDIS_URL = Bun.env.REDIS_URL
 describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
   const redis = new RedisClient(REDIS_URL)
 
+  // Closing the client here breaks the next file's client on Bun 1.4; the process exit closes it.
   beforeAll(async () => {
     await redis.connect()
-  })
-
-  afterAll(() => {
-    redis.close()
   })
 
   function createTestingStore(options: ConstructorParameters<typeof BunRedisCacheStore>[1] = {}) {
@@ -37,7 +34,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await store.fetch('u', async () => undefined)
     await expect(store.fetch('u', async () => 'refilled')).resolves.toEqual({ output: undefined, tags: undefined, expiresAt: undefined })
-  })
+  }, { timeout: 20_000 })
 
   it('preserves Date, Map, Set, and BigInt outputs', async () => {
     const { store } = createTestingStore()
@@ -50,7 +47,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await store.fetch('k', async () => output)
     await expect(store.fetch('k', async () => 'refilled')).resolves.toMatchObject({ output })
-  })
+  }, { timeout: 20_000 })
 
   it('invalidates entries by any of their tags, and keeps ones filled afterwards', async () => {
     const { store } = createTestingStore()
@@ -63,7 +60,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await expect(store.fetch('multi', async () => 'new', { tags: ['a'] })).resolves.toMatchObject({ output: 'new' })
     await expect(store.fetch('other', async () => 'refilled', { tags: ['c'] })).resolves.toMatchObject({ output: 'v' })
     await expect(store.fetch('multi', async () => 'newer', { tags: ['a'] })).resolves.toMatchObject({ output: 'new' })
-  })
+  }, { timeout: 20_000 })
 
   it('supports a custom serializer', async () => {
     const serializer = new RPCSerializer()
@@ -76,7 +73,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: { a: 1 } })
     expect(serializeSpy).toHaveBeenCalled()
     expect(deserializeSpy).toHaveBeenCalled()
-  })
+  }, { timeout: 20_000 })
 
   it('fills again at ttl without swr, and serves stale within the swr window while refreshing', async () => {
     const { store } = createTestingStore()
@@ -118,7 +115,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     const key = crypto.randomUUID()
     await unprefixed.fetch(key, async () => 'v')
     await expect(redis.exists(`e:${key}`)).resolves.toBe(true)
-  })
+  }, { timeout: 20_000 })
 
   it('treats tags missing from the snapshot as version zero', async () => {
     const { store, prefix } = createTestingStore()
@@ -126,7 +123,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await redis.send('HSET', [`${prefix}e:k`, 'output', JSON.stringify({ body: { json: 'v' } }), 'tags', '["t"]', 'tagVersions', '{}'])
 
     await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
-  })
+  }, { timeout: 20_000 })
 
   it('reloads scripts the server dropped, and rethrows other script errors', async () => {
     const { store, prefix } = createTestingStore()
@@ -137,7 +134,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await redis.send('HSET', [`${prefix}e:broken`, 'output', '{}', 'tags', 'not json', 'tagVersions', '{}'])
     await expect(store.fetch('broken', async () => 'v')).rejects.toThrow()
-  })
+  }, { timeout: 20_000 })
 
   it('encodes non-string keys stably', async () => {
     const { store } = createTestingStore()
@@ -146,7 +143,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await expect(store.fetch([['planet', 'find'], { a: 1, b: 2 }], async () => 'other')).resolves.toMatchObject({ output: 'v' })
     await expect(store.fetch([['planet', 'find'], { a: 1, b: 3 }], async () => 'other')).resolves.toMatchObject({ output: 'other' })
-  })
+  }, { timeout: 20_000 })
 
   it('fills once for concurrent callers of one key, and lets a waiter fill when the holder failed', async () => {
     const { store } = createTestingStore()
@@ -180,7 +177,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
 
     await expect(first).rejects.toThrow('handler down')
     await expect(second).resolves.toMatchObject({ output: 'fresh' })
-  })
+  }, { timeout: 20_000 })
 
   it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
     const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })

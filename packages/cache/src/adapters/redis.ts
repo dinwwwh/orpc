@@ -86,7 +86,20 @@ end
 return 0
 `
 
-export interface RedisCacheStoreOptions {
+const REVALIDATE_SCRIPT = `
+for _, key in ipairs(KEYS) do
+  redis.call('INCR', key)
+end
+`
+
+/**
+ * Replies arrive parsed from some clients, such as Upstash, and raw from others.
+ */
+function parseReply(value: unknown): unknown {
+  return typeof value === 'string' ? JSON.parse(value) : value
+}
+
+export interface BaseRedisCacheStoreOptions {
   /**
    * The prefix to use for Redis keys.
    *
@@ -111,29 +124,24 @@ export interface RedisCacheStoreOptions {
 }
 
 /**
- * Cache store adapter for Redis with tag-based invalidation. Entries are
- * hashes retained for `ttl + swr`; tag counters have no expiry since expiring
- * one would resurrect stale entries. Revalidated entries are removed lazily
- * on the next `fetch` of their key. Concurrent callers of one key are
- * coalesced through a lock taken in the same script that reads the entry,
- * so it spans processes.
+ * Cache store for Redis-compatible databases, driven by Lua scripts so a hit
+ * is one round trip and a miss two. Entries are hashes retained for
+ * `ttl + swr`; tag counters have no expiry since expiring one would resurrect
+ * stale entries. Revalidated entries are removed lazily on the next `fetch`
+ * of their key. Concurrent callers of one key are coalesced through a lock
+ * taken in the same script that reads the entry, so it spans processes.
+ * Subclasses only run the scripts through their client.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class RedisCacheStore implements CacheStore {
+export abstract class BaseRedisCacheStore implements CacheStore {
   private readonly prefix: string
   private readonly tagPrefix: string
   private readonly serializer: Public<RPCSerializer>
   private readonly lockTtl: number
-
   private readonly keySerializer = new RPCJsonSerializer()
 
-  private readonly scriptShas = new Map<string, Awaited<ReturnType<typeof this.redis.scriptLoad>>>()
-
-  constructor(
-    private readonly redis: RedisClientType<any, any, any, any, any>,
-    options: RedisCacheStoreOptions = {},
-  ) {
+  constructor(options: BaseRedisCacheStoreOptions = {}) {
     this.prefix = options.prefix ?? ''
     this.tagPrefix = `${this.prefix}t:`
     this.serializer = options.serializer ?? new RPCSerializer()
@@ -141,8 +149,6 @@ export class RedisCacheStore implements CacheStore {
   }
 
   async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
-    await this.ensureConnection()
-
     const encodedKey = encodeCacheKey(key, this.keySerializer)
     const entryKey = `${this.prefix}e:${encodedKey}`
     const lockKey = `${this.prefix}l:${encodedKey}`
@@ -153,13 +159,13 @@ export class RedisCacheStore implements CacheStore {
         FETCH_SCRIPT,
         [entryKey, lockKey],
         [token, String(this.lockTtl * 1000), this.tagPrefix, String(nowInSeconds())],
-      ) as [string | null, string | null, string | null, number | null]
+      ) as [unknown, unknown, unknown, unknown]
 
       if (output !== null) {
         const entry: CacheEntry = {
-          output: this.serializer.deserialize(JSON.parse(output).body),
-          tags: tags !== null ? JSON.parse(tags) : undefined,
-          expiresAt: expiresAt !== null ? Number(expiresAt) : undefined,
+          output: this.serializer.deserialize((parseReply(output) as { body?: unknown }).body as any),
+          tags: tags === null ? undefined : parseReply(tags) as string[],
+          expiresAt: expiresAt === null ? undefined : Number(expiresAt),
         }
 
         if (shouldFill) {
@@ -179,25 +185,13 @@ export class RedisCacheStore implements CacheStore {
   }
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
-    await this.ensureConnection()
-
-    if (tags.length === 1) {
-      await this.redis.incr(`${this.tagPrefix}${tags[0]}`)
-      return
-    }
-
-    const multi = this.redis.multi()
-    for (const tag of tags) {
-      multi.incr(`${this.tagPrefix}${tag}`)
-    }
-    await multi.exec()
+    await this.run(REVALIDATE_SCRIPT, tags.map(tag => `${this.tagPrefix}${tag}`), [])
   }
 
-  private async ensureConnection(): Promise<void> {
-    if (!this.redis.isOpen) {
-      await this.redis.connect()
-    }
-  }
+  /**
+   * Runs a Lua script through the client, by sha where the client allows it.
+   */
+  protected abstract run(script: string, keys: string[], args: string[]): Promise<unknown>
 
   private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry> {
     let output: unknown
@@ -227,22 +221,32 @@ export class RedisCacheStore implements CacheStore {
 
     return { output, tags, expiresAt }
   }
+}
 
-  private async run(script: string, keys: string[], args: string[]): Promise<unknown> {
-    try {
-      return await this.evalSha(script, keys, args)
-    }
-    catch (error) {
-      if (error instanceof Error && error.message.startsWith('NOSCRIPT')) {
-        this.scriptShas.delete(script)
-        return await this.evalSha(script, keys, args)
-      }
+export type RedisCacheStoreOptions = BaseRedisCacheStoreOptions
 
-      throw error
-    }
+/**
+ * Cache store adapter for Redis. Connects the client lazily when needed and
+ * runs the scripts by sha, loading each once per client and again if the
+ * server dropped it.
+ *
+ * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
+ */
+export class RedisCacheStore extends BaseRedisCacheStore {
+  private readonly scriptShas = new Map<string, Awaited<ReturnType<typeof this.redis.scriptLoad>>>()
+
+  constructor(
+    private readonly redis: RedisClientType<any, any, any, any, any>,
+    options: RedisCacheStoreOptions = {},
+  ) {
+    super(options)
   }
 
-  private async evalSha(script: string, keys: string[], args: string[]): Promise<unknown> {
+  protected async run(script: string, keys: string[], args: string[], reloaded = false): Promise<unknown> {
+    if (!this.redis.isOpen) {
+      await this.redis.connect()
+    }
+
     let sha = this.scriptShas.get(script)
 
     if (sha === undefined) {
@@ -250,6 +254,16 @@ export class RedisCacheStore implements CacheStore {
       this.scriptShas.set(script, sha)
     }
 
-    return await this.redis.evalSha(sha, { keys, arguments: args })
+    try {
+      return await this.redis.evalSha(sha, { keys, arguments: args })
+    }
+    catch (error) {
+      if (!reloaded && error instanceof Error && error.message.startsWith('NOSCRIPT')) {
+        this.scriptShas.delete(script)
+        return await this.run(script, keys, args, true)
+      }
+
+      throw error
+    }
   }
 }

@@ -15,28 +15,23 @@ const REDIS_URL = Bun.env.REDIS_URL
  *
  * All adapters must connect to the same server.
  */
-describe.concurrent('cache redis adapters compatibility', async () => {
-  const stores: Array<{ name: string, store: CacheStore }> = []
-  const prefix = `redis-adapters:${crypto.randomUUID()}:`
+const stores: Array<{ name: string, store: CacheStore }> = []
+const prefix = `redis-adapters:${crypto.randomUUID()}:`
 
-  if (REDIS_URL) {
-    const redis = createClient({ url: REDIS_URL })
+if (REDIS_URL) {
+  const redis = createClient({ url: REDIS_URL })
+  const bunRedis = new RedisClient(REDIS_URL)
 
-    afterAll(() => {
-      redis.close()
-    })
+  afterAll(() => {
+    redis.close()
+    bunRedis.close()
+  })
 
-    stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix }) })
+  stores.push({ name: 'redis', store: new RedisCacheStore(redis, { prefix }) })
+  stores.push({ name: 'bun redis', store: new BunRedisCacheStore(bunRedis, { prefix }) })
+}
 
-    const bunRedis = new RedisClient(REDIS_URL)
-
-    afterAll(() => {
-      bunRedis.close()
-    })
-
-    stores.push({ name: 'bun redis', store: new BunRedisCacheStore(bunRedis, { prefix }) })
-  }
-
+describe.concurrent('cache redis adapters compatibility', () => {
   describe.skipIf(stores.length < 2)('cross-adapter compatibility', () => {
     for (const source of stores) {
       for (const target of stores) {
