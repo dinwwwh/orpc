@@ -33,7 +33,7 @@ class CloudflareSpan implements TracingSpan {
      * [OpenTelemetry exception event](https://opentelemetry.io/docs/specs/semconv/exceptions/exceptions-spans/).
      */
     this.span.setAttributes({
-      'exception.type': exception.name,
+      'exception.type': exception.code ?? exception.name,
       'exception.message': exception.message,
       'exception.stacktrace': exception.stack,
     })

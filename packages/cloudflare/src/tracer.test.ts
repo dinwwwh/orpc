@@ -139,6 +139,15 @@ describe('cloudflareTracer', () => {
         'exception.message': 'aborted',
         'exception.stacktrace': 'stack',
       })
+
+      fake.setAttributes.mockClear()
+      span.recordException('info', { name: 'ORPCError', message: 'bad request', code: 'BAD_REQUEST' })
+
+      expect(fake.setAttributes).toHaveBeenCalledWith({
+        'exception.type': 'BAD_REQUEST',
+        'exception.message': 'bad request',
+        'exception.stacktrace': undefined,
+      })
     })
   })
 
