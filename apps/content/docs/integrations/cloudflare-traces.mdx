@@ -15,8 +15,6 @@ This guide assumes familiarity with [Cloudflare Workers Traces](https://develope
 npm install @orpc/cloudflare@beta
 ```
 
-Local development needs [Wrangler](https://developers.cloudflare.com/workers/wrangler/) 4.129.1 or the [Cloudflare Vite plugin](https://developers.cloudflare.com/workers/vite-plugin/) 1.54.5 or newer, which bundle the runtime that provides `tracing.getActiveSpan` and `span.recordException`.
-
 ## Setup
 
 Enable traces in your Wrangler configuration, then register `CloudflareTracer` once at module scope. oRPC then records the same spans as the [OpenTelemetry integration](/docs/integrations/opentelemetry), nested under the spans Workers create automatically.

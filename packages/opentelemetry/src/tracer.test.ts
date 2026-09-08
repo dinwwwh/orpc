@@ -162,18 +162,16 @@ describe('openTelemetryTracer', () => {
     expect(headers).toEqual({ existing: 'header', traceparent: `00-${traceId}-${spanId}-01` })
   })
 
-  it('extracts the remote parent and its baggage from headers', async () => {
+  it('extracts the remote parent from headers', async () => {
     const tracer = createTracer()
     const headers = {
       traceparent: '00-4bf92f3577b34da6a2ce929d0e0e4736-00f067aa0ba902b7-01',
-      baggage: 'tenant=orpc',
     }
 
     const parent = tracer.extract!(headers)
     expect(parent).toBeInstanceOf(OpenTelemetrySpan)
 
     await tracer.startActiveSpan('child', parent, async (child) => {
-      expect(propagation.getBaggage(context.active())?.getEntry('tenant')?.value).toBe('orpc')
       child.end()
     })
 
@@ -182,27 +180,13 @@ describe('openTelemetryTracer', () => {
     expect(child.parentSpanContext?.spanId).toBe('00f067aa0ba902b7')
   })
 
-  it('extracts baggage without trace context into a new trace', async () => {
-    const tracer = createTracer()
-
-    const parent = tracer.extract!({ baggage: 'tenant=orpc' })
-    expect(parent).toBeInstanceOf(OpenTelemetrySpan)
-
-    await tracer.startActiveSpan('child', parent, async (child) => {
-      expect(propagation.getBaggage(context.active())?.getEntry('tenant')?.value).toBe('orpc')
-      child.end()
-    })
-
-    expect(finishedSpan('child').parentSpanContext).toBeUndefined()
-  })
-
-  it('extracts nothing when headers carry no trace context', async () => {
+  it('falls back to the active span when headers carry no trace context', async () => {
     const tracer = createTracer()
 
     expect(tracer.extract!({})).toBeUndefined()
 
     await tracer.startActiveSpan('outer', undefined, async (outer) => {
-      expect(tracer.extract!({})).toBeUndefined()
+      expect((tracer.extract!({}) as OpenTelemetrySpan).span).toBe((outer as OpenTelemetrySpan).span)
       outer.end()
     })
   })

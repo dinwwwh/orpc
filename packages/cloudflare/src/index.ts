@@ -1,4 +1,5 @@
 export * from './publisher'
 export * from './publisher-object'
 export * from './ratelimit'
-export * from './tracer'
+export type { experimental_CloudflareTracerOptions } from './tracer'
+export { experimental_CloudflareTracer } from './tracer'

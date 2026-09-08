@@ -10,7 +10,6 @@ class CloudflareSpan implements TracingSpan {
   constructor(readonly span: Span) {}
 
   setAttribute(key: string, value: TracingAttributeValue): void {
-    // Workers Traces only accept primitive attribute values
     this.span.setAttribute(key, Array.isArray(value) ? toSpanAttributeValue(value) : value)
   }
 

@@ -1,15 +1,9 @@
 import type { Context, ContextAPI, Tracer as OpenTelemetryApiTracer, PropagationAPI, Span, TraceAPI } from '@opentelemetry/api'
 import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
-import { INVALID_SPAN_CONTEXT, SpanStatusCode } from '@opentelemetry/api'
+import { SpanStatusCode } from '@opentelemetry/api'
 
 export class OpenTelemetrySpan implements TracingSpan {
-  constructor(
-    readonly span: Span,
-    /**
-     * The full context of a remote parent, so extracted baggage keeps flowing when this span is used as parent.
-     */
-    readonly context?: Context,
-  ) {}
+  constructor(readonly span: Span) {}
 
   setAttribute(key: string, value: TracingAttributeValue): void {
     this.span.setAttribute(key, value)
@@ -71,16 +65,8 @@ export class OpenTelemetryTracer implements Tracer {
       }
 
       this.extract = (headers) => {
-        const active = this.context.active()
-        const context = propagation.extract(active, headers)
-
-        if (context === active) {
-          return undefined
-        }
-
-        // Keep the whole context, headers can carry baggage without a span
-        const span = this.trace.getSpan(context) ?? this.trace.wrapSpanContext(INVALID_SPAN_CONTEXT)
-        return new OpenTelemetrySpan(span, context)
+        const span = this.trace.getSpan(propagation.extract(this.context.active(), headers))
+        return span === undefined ? undefined : new OpenTelemetrySpan(span)
       }
     }
   }
@@ -113,10 +99,6 @@ export class OpenTelemetryTracer implements Tracer {
   }
 
   private contextOf(parent: TracingSpan): Context {
-    /**
-     * Every span this tracer hands out is an OpenTelemetrySpan.
-     */
-    const { span, context } = parent as OpenTelemetrySpan
-    return context ?? this.trace.setSpan(this.context.active(), span)
+    return this.trace.setSpan(this.context.active(), (parent as OpenTelemetrySpan).span)
   }
 }
