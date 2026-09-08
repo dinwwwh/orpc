@@ -238,6 +238,42 @@ describe('standardHandler', () => {
       expect(result).toEqual({ matched: true, response: OK_RESPONSE })
       expect(codec.encodeOutput).toHaveBeenCalledWith(['e1', 'e2'], expect.anything(), ['ping'], expect.anything())
     })
+
+    it('safely traces ReadableStream input', async () => {
+      const input = new ReadableStream({
+        start(controller) {
+          controller.enqueue('chunk')
+          controller.close()
+        },
+      })
+
+      setupHappyPath({ decodeInput: vi.fn().mockResolvedValue(input) })
+      client.mockImplementation(async (stream: ReadableStream) => {
+        expect(stream).not.toBe(input)
+        const out: unknown[] = []
+        for await (const v of stream) out.push(v)
+        return out
+      })
+
+      const result = await handler.handle(makeRequest(), OPTIONS)
+
+      expect(result).toEqual({ matched: true, response: OK_RESPONSE })
+      expect(codec.encodeOutput).toHaveBeenCalledWith(['chunk'], expect.anything(), ['ping'], expect.anything())
+    })
+
+    it('passes AsyncIteratorObject and ReadableStream input through untouched without a tracer', async ({ onTestFinished }) => {
+      const tracer = sharedExperimental.getTracer()
+      sharedExperimental.setTracer(undefined)
+      onTestFinished(() => sharedExperimental.setTracer(tracer))
+
+      for (const input of [(async function* () {})(), new ReadableStream()]) {
+        setupHappyPath({ decodeInput: vi.fn().mockResolvedValue(input) })
+
+        await handler.handle(makeRequest(), OPTIONS)
+
+        expect(client).toHaveBeenLastCalledWith(input, expect.anything())
+      }
+    })
   })
 
   describe('error handling', () => {

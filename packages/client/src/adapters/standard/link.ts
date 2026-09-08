@@ -4,7 +4,7 @@ import type { ClientContext, ClientLink, ClientOptions } from '../../types'
 import type { StandardLinkCodec } from './codec'
 import type { StandardLinkPlugin } from './plugin'
 import type { StandardLinkTransport } from './transport'
-import { getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
 import { CompositeStandardLinkPlugin } from './plugin'
 
 export interface StandardLinkInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
@@ -61,12 +61,20 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
       span?.setAttribute('rpc.system', ORPC_NAME)
       span?.setAttribute('rpc.method', path.join('.'))
 
-      if (isAsyncIteratorObject(input)) {
+      if (getTracer() && isAsyncIteratorObject(input)) {
         /**
          * @warning
          * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
         input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
+      }
+
+      else if (getTracer() && input instanceof ReadableStream) {
+        /**
+         * @warning
+         * Remember use `override` for ReadableStream to remain other special properties
+         */
+        input = override(input, traceReadableStream('consume_octet_stream_input', input))
       }
 
       return intercept(this.interceptors, { ...options, path, input }, async ({ path, input, ...options }) => {
@@ -116,7 +124,7 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
 
         const output = decodedResult.output
 
-        if (isAsyncIteratorObject(output)) {
+        if (getTracer() && isAsyncIteratorObject(output)) {
           /**
            * Do not pass the active span as parent here, as it is a lazy span.
            *
@@ -124,6 +132,14 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
            * Remember use `override` for AsyncIteratorObject to remain other special properties
            */
           return override(output, traceAsyncIterator('consume_async_iterator_object_output', output))
+        }
+
+        else if (getTracer() && output instanceof ReadableStream) {
+          /**
+           * @warning
+           * Remember use `override` for ReadableStream to remain other special properties
+           */
+          return override(output, traceReadableStream('consume_octet_stream_output', output))
         }
 
         return output

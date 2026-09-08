@@ -1,7 +1,7 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec } from './codec'
 import type { StandardLinkTransport } from './transport'
-import { isAsyncIteratorObject } from '@orpc/shared'
+import { getTracer, isAsyncIteratorObject, setTracer } from '@orpc/shared'
 import { ORPCError } from '../../error'
 import { StandardLink } from './link'
 
@@ -21,6 +21,31 @@ describe('standardLink', () => {
     return {
       send: vi.fn(),
     }
+  }
+
+  function makeStream(chunk: string): ReadableStream<string> {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(chunk)
+        controller.close()
+      },
+    })
+  }
+
+  async function readAll(stream: ReadableStream): Promise<unknown[]> {
+    const chunks: unknown[] = []
+    for await (const chunk of stream) {
+      chunks.push(chunk)
+    }
+    return chunks
+  }
+
+  function mockRoundTrip(codec: StandardLinkCodec<any>, transport: StandardLinkTransport<any>, output: unknown, headers: Record<string, string> = {}): StandardRequest {
+    const request: StandardRequest = { method: 'POST', url: '/test', headers, body: undefined }
+    vi.mocked(codec.encodeInput).mockResolvedValueOnce(request)
+    vi.mocked(transport.send).mockResolvedValueOnce({ status: 200, headers: {}, resolveBody: () => Promise.resolve(undefined) })
+    vi.mocked(codec.decodeResponse).mockResolvedValueOnce({ kind: 'output', output })
+    return request
   }
 
   it('workflow is correct', async () => {
@@ -156,11 +181,92 @@ describe('standardLink', () => {
     const tracedOutput = await link.call(['test'], input, { context: {} })
 
     const passedInput = vi.mocked(codec.encodeInput).mock.calls[0]![0]
-    expect(isAsyncIteratorObject(passedInput)).not.toBe(input) // should be a wrapped version of the original input
+    expect(passedInput).not.toBe(input) // should be a wrapped version of the original input
     expect(isAsyncIteratorObject(passedInput)).toBe(true)
 
     expect(tracedOutput).not.toBe(output) // should be a wrapped version of the original output
     expect(isAsyncIteratorObject(tracedOutput)).toBe(true)
+  })
+
+  it('traces input & output ReadableStream', async () => {
+    const codec = makeCodec()
+    const transport = makeTransport()
+    const link = new StandardLink(codec, transport)
+
+    const input = makeStream('in')
+    const output = makeStream('out')
+
+    mockRoundTrip(codec, transport, output)
+
+    const tracedOutput = await link.call(['test'], input, { context: {} }) as ReadableStream
+
+    const passedInput = vi.mocked(codec.encodeInput).mock.calls[0]![0] as ReadableStream
+    expect(passedInput).not.toBe(input) // should be a wrapped version of the original input
+    expect(passedInput).toBeInstanceOf(ReadableStream)
+    await expect(readAll(passedInput)).resolves.toEqual(['in'])
+
+    expect(tracedOutput).not.toBe(output) // should be a wrapped version of the original output
+    expect(tracedOutput).toBeInstanceOf(ReadableStream)
+    await expect(readAll(tracedOutput)).resolves.toEqual(['out'])
+  })
+
+  it('passes AsyncIteratorObject and ReadableStream through untouched without a tracer', async ({ onTestFinished }) => {
+    const tracer = getTracer()
+    setTracer(undefined)
+    onTestFinished(() => setTracer(tracer))
+
+    async function* gen() {
+      yield 1
+    }
+
+    for (const [input, output] of [[gen(), gen()], [makeStream('in'), makeStream('out')]]) {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const link = new StandardLink(codec, transport)
+
+      mockRoundTrip(codec, transport, output)
+
+      await expect(link.call(['test'], input, { context: {} })).resolves.toBe(output)
+      expect(vi.mocked(codec.encodeInput).mock.calls[0]![0]).toBe(input)
+    }
+  })
+
+  it('injects the trace context of the call into the request headers', async ({ onTestFinished }) => {
+    const tracer = getTracer()
+    const span = { setAttribute: vi.fn(), updateName: vi.fn(), addEvent: vi.fn(), recordException: vi.fn(), end: vi.fn() }
+    const inject = vi.fn((_span: unknown, headers: Record<string, unknown>) => {
+      headers.traceparent = '00-test'
+    })
+    setTracer({ getActiveSpan: () => undefined, startActiveSpan: (_name: string, _parent: unknown, fn: (span: unknown) => unknown) => fn(span), inject } as any)
+    onTestFinished(() => setTracer(tracer))
+
+    const codec = makeCodec()
+    const transport = makeTransport()
+    const link = new StandardLink(codec, transport)
+    const request = mockRoundTrip(codec, transport, 'output', { 'x-custom': 'value' })
+
+    await expect(link.call(['test'], 'input', { context: {} })).resolves.toBe('output')
+
+    expect(inject).toHaveBeenCalledTimes(1)
+    expect(inject).toHaveBeenCalledWith(span, { 'x-custom': 'value', 'traceparent': '00-test' })
+    expect(vi.mocked(transport.send).mock.calls[0]![0].headers).toEqual({ 'x-custom': 'value', 'traceparent': '00-test' })
+    expect(request.headers).toEqual({ 'x-custom': 'value' }) // the encoded request is not mutated
+  })
+
+  it('sends the request as is when the tracer does not propagate', async ({ onTestFinished }) => {
+    const tracer = getTracer()
+    const span = { setAttribute: vi.fn(), updateName: vi.fn(), addEvent: vi.fn(), recordException: vi.fn(), end: vi.fn() }
+    setTracer({ getActiveSpan: () => undefined, startActiveSpan: (_name: string, _parent: unknown, fn: (span: unknown) => unknown) => fn(span) } as any)
+    onTestFinished(() => setTracer(tracer))
+
+    const codec = makeCodec()
+    const transport = makeTransport()
+    const link = new StandardLink(codec, transport)
+    const request = mockRoundTrip(codec, transport, 'output')
+
+    await expect(link.call(['test'], 'input', { context: {} })).resolves.toBe('output')
+
+    expect(vi.mocked(transport.send).mock.calls[0]![0]).toBe(request)
   })
 
   it('supports plugins', async () => {

@@ -6,7 +6,7 @@ import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
@@ -119,12 +119,20 @@ export class StandardHandler<T extends Context> {
               let input = await runWithSpan('decode_input', decodeInput)
               step = undefined
 
-              if (isAsyncIteratorObject(input)) {
+              if (getTracer() && isAsyncIteratorObject(input)) {
                 /**
                  * @warning
                  * Remember use `override` for AsyncIteratorObject to remain other special properties
                  */
                 input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
+              }
+
+              else if (getTracer() && input instanceof ReadableStream) {
+                /**
+                 * @warning
+                 * Remember use `override` for ReadableStream to remain other special properties
+                 */
+                input = override(input, traceReadableStream('consume_octet_stream_input', input))
               }
 
               const client = createProcedureClient(procedure, {
