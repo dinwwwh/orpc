@@ -74,7 +74,7 @@ export class experimental_CloudflareTracer implements Tracer {
   }
 
   startActiveSpan<T>(name: string, _parent: TracingSpan | undefined, fn: (span: TracingSpan) => Promise<T>): Promise<T> {
-    return this.tracing.enterSpan(name, span => fn(new CloudflareSpan(span)))
+    return this.tracing.startActiveSpan(name, span => fn(new CloudflareSpan(span)))
   }
 
   getActiveSpan(): TracingSpan | undefined {

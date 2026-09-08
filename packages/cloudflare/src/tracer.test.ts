@@ -16,8 +16,8 @@ function createFakeSpan() {
 function createFakeTracing(span = createFakeSpan()) {
   return {
     span,
-    enterSpan: vi.fn((_name: string, callback: (span: any) => unknown) => callback(span)),
-    startActiveSpan: vi.fn(),
+    enterSpan: vi.fn(),
+    startActiveSpan: vi.fn((_name: string, callback: (span: any) => unknown) => callback(span)),
     startSpan: vi.fn(() => span),
     getActiveSpan: vi.fn(() => span),
   }
@@ -38,7 +38,7 @@ describe('cloudflareTracer', () => {
     expect(getTracer()).toBeUndefined()
   })
 
-  it('starts active spans with enterSpan', async () => {
+  it('starts active spans with the manually ended startActiveSpan', async () => {
     const fake = createFakeTracing()
     const tracer = new CloudflareTracer({ tracing: fake as any })
 
@@ -49,7 +49,9 @@ describe('cloudflareTracer', () => {
     })
 
     expect(result).toBe('out')
-    expect(fake.enterSpan).toHaveBeenCalledWith('name', expect.any(Function))
+    expect(fake.startActiveSpan).toHaveBeenCalledWith('name', expect.any(Function))
+    expect(fake.enterSpan).not.toHaveBeenCalled()
+    expect(fake.span.end).not.toHaveBeenCalled()
   })
 
   it('starts detached spans with startSpan', () => {

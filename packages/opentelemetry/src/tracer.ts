@@ -1,6 +1,6 @@
 import type { Context, ContextAPI, Tracer as OpenTelemetryApiTracer, PropagationAPI, Span, TraceAPI } from '@opentelemetry/api'
 import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
-import { SpanStatusCode } from '@opentelemetry/api'
+import { INVALID_SPAN_CONTEXT, SpanStatusCode } from '@opentelemetry/api'
 
 export class OpenTelemetrySpan implements TracingSpan {
   constructor(
@@ -71,9 +71,19 @@ export class OpenTelemetryTracer implements Tracer {
       }
 
       this.extract = (headers) => {
-        const context = propagation.extract(this.context.active(), headers)
-        const span = this.trace.getSpan(context)
-        return span === undefined ? undefined : new OpenTelemetrySpan(span, context)
+        const active = this.context.active()
+        const context = propagation.extract(active, headers)
+
+        if (context === active) {
+          return undefined
+        }
+
+        /**
+         * Headers can carry baggage without trace context, so the parent keeps the
+         * whole extracted context and starts a new trace when no span was extracted.
+         */
+        const span = this.trace.getSpan(context) ?? this.trace.wrapSpanContext(INVALID_SPAN_CONTEXT)
+        return new OpenTelemetrySpan(span, context)
       }
     }
   }
