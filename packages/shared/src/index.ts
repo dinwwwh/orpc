@@ -11,7 +11,6 @@ export * from './interceptor'
 export * from './iterator'
 export * from './lock'
 export * from './object'
-export * from './opentelemetry'
 export * from './plugin'
 export * from './promise'
 export * from './proxy'
@@ -19,6 +18,7 @@ export * from './queue'
 export * from './signal'
 export * from './stream'
 export * from './time'
+export * from './tracing'
 export * from './types'
 export * from './uri'
 export * from './value'
@@ -35,12 +35,12 @@ export {
   sleep,
   stringifyJSON,
   toArray,
-} from '@standardserver/shared'
+} from '@standard-server/shared'
 
 export type {
   AsyncCleanupFn,
   AsyncIteratorClassNextFn,
-} from '@standardserver/shared'
+} from '@standard-server/shared'
 
 export type {
   Arrayable,

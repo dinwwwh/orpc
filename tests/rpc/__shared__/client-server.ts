@@ -1,9 +1,10 @@
 import type { AnyRouter, Context, RouterClient } from '@orpc/server'
+import type { Public } from '@orpc/shared'
 import { RPCSerializer } from '@orpc/client'
 
 export interface ClientServerTestOptions {
   context?: Context
-  serializer?: Pick<RPCSerializer, keyof RPCSerializer>
+  serializer?: Public<RPCSerializer>
 }
 
 export interface CreateClientServerTest {

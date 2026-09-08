@@ -1,15 +1,15 @@
 import type { AnyORPCError, ClientContext, ClientOptions } from '@orpc/client'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '@orpc/client/standard'
 import type { AnyProcedureContract, RouterContract } from '@orpc/contract'
-import type { Promisable, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standardserver/core'
+import type { Promisable, Public, Value } from '@orpc/shared'
+import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { OpenAPIMeta } from '../../meta'
 import { createORPCErrorFromJson, createORPCErrorFromMalformedResponse, isORPCErrorJson } from '@orpc/client'
 import { getRouterContract, ProcedureContract } from '@orpc/contract'
 import { unlazy } from '@orpc/server'
 import { isTypescriptObject, mergeHttpPath, pathToHttpPath, stringifyJSON, value } from '@orpc/shared'
-import { mergeStandardHeaders, parseStandardUrl } from '@standardserver/core'
-import { toStandardHeaders } from '@standardserver/fetch'
+import { mergeStandardHeaders, parseStandardUrl } from '@standard-server/core'
+import { toStandardHeaders } from '@standard-server/fetch'
 import {
   DEFAULT_OPENAPI_INPUT_STRUCTURE,
   DEFAULT_OPENAPI_METHOD,
@@ -37,7 +37,7 @@ export interface OpenAPILinkCodecOptions<T extends ClientContext> {
   /**
    * Override the default OpenAPI serializer.
    */
-  serializer?: Pick<OpenAPISerializer, keyof OpenAPISerializer>
+  serializer?: Public<OpenAPISerializer>
 
   /**
    * Customize how an error response body is converted into an ORPC error.

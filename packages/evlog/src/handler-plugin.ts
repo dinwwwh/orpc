@@ -1,11 +1,11 @@
 import type { Context, ErrorMap, ProcedureClientInterceptor, Schema } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
-import type { StandardRequest } from '@standardserver/core'
+import type { StandardRequest } from '@standard-server/core'
 import type { LogLevel, RequestLogger } from 'evlog'
 import type { BaseEvlogOptions, FrameworkIntegrationHelpers, FrameworkIntegrationSpec } from 'evlog/toolkit'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, sleep, toArray, wrapReadableStream } from '@orpc/shared'
-import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standardserver/core'
+import { ErrorEvent, flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { defineFrameworkIntegration } from 'evlog/toolkit'
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
 
@@ -43,12 +43,12 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
   name = '~evlog'
 
   /**
-   * - Logging interceptors should run after OpenTelemetry interceptors
+   * - Logging interceptors should run after tracing interceptors
    *   so they execute within the active request span.
    * - Logging interceptors should run after batch interceptors
    *   so they log each individual request instead of the batch request.
    */
-  before = ['~opentelemetry', '~batch', '~hibernation']
+  before = ['~tracing', '~batch', '~hibernation']
 
   private readonly logAbort: Exclude<EvlogHandlerPluginOptions<T>['logAbort'], undefined>
   private readonly procedureErrorLevel: Exclude<EvlogHandlerPluginOptions<T>['procedureErrorLevel'], undefined>
@@ -210,7 +210,7 @@ export class EvlogHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
     }
 
-    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap, any> = async ({ next, context }) => {
+    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async ({ next, context }) => {
       const logger = getLogger(context)
       const output = await next()
 

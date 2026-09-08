@@ -1,8 +1,8 @@
 import type { RedisClientType } from 'redis'
 import type { RedisPublisherOptions } from './redis'
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
-import { getEventMeta, withEventMeta } from '@standardserver/core'
+import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { createClient } from 'redis'
 import { RedisPublisher } from './redis'
 
@@ -251,7 +251,7 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
       }
     }
 
-    const serializer = new RPCSerializer({
+    const serializer = new RPCJsonSerializer({
       handlers: {
         person: {
           condition: p => p instanceof Person,

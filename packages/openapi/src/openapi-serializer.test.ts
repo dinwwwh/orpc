@@ -1,6 +1,6 @@
 import { ORPCError } from '@orpc/client'
 import { isAsyncIteratorObject } from '@orpc/shared'
-import { ErrorEvent } from '@standardserver/core'
+import { ErrorEvent } from '@standard-server/core'
 import { OpenAPISerializer } from './openapi-serializer'
 
 describe('openAPISerializer', () => {
@@ -150,7 +150,6 @@ describe('openAPISerializer', () => {
             data: {
               code: 'INTERNAL_SERVER_ERROR',
               defined: false,
-              inferable: false,
               message: 'Internal Server Error',
             },
           })

@@ -1,27 +1,23 @@
 {
   "name": "@orpc/cloudflare-playground",
   "type": "module",
-  "version": "2.0.0-beta.32",
+  "version": "2.0.0-beta.34",
   "private": true,
   "scripts": {
     "prepare": "wrangler types",
     "dev": "vite --port 3000",
     "type:check": "wrangler types && tsc",
     "build": "vite build",
-    "preview": "vite preview --port 3000",
-    "jaeger": "docker run -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest"
+    "preview": "vite preview --port 3000"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.53.0",
-    "@microlabs/otel-cf-workers": "1.0.0-rc.52",
-    "@opentelemetry/api": "^1.9.1",
+    "@cloudflare/vite-plugin": "^1.54.5",
     "@orpc/client": "beta",
     "@orpc/cloudflare": "beta",
     "@orpc/evlog": "beta",
     "@orpc/hibernation": "beta",
     "@orpc/json-schema": "beta",
     "@orpc/openapi": "beta",
-    "@orpc/opentelemetry": "beta",
     "@orpc/publisher": "beta",
     "@orpc/server": "beta",
     "@orpc/tanstack-query": "beta",
@@ -36,6 +32,6 @@
     "ts-pattern": "^5.9.0",
     "typescript": "^6.0.3",
     "vite": "^8.2.2",
-    "wrangler": "^4.124.0"
+    "wrangler": "^4.129.1"
   }
 }

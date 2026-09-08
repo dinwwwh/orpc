@@ -1,10 +1,10 @@
 import type { Promisable } from 'type-fest'
-import type { StartSpanOptions } from './opentelemetry'
+import type { StartSpanOptions } from './tracing'
 import type { PromiseWithError, ThrowableError } from './types'
-import { AsyncIteratorClass } from '@standardserver/shared'
+import { AsyncIteratorClass } from '@standard-server/shared'
 import { once } from './function'
-import { recordSpanError, runInSpanContext, startSpan } from './opentelemetry'
 import { AsyncIdQueue } from './queue'
+import { recordSpanError, runInSpanContext, startSpan } from './tracing'
 
 export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMappedReturn> {
   /**
@@ -12,7 +12,7 @@ export interface WrapAsyncIteratorOptions<TYield, TReturn, TMappedYield, TMapped
    * Useful when you want execution to happen within a specific context,
    * such as AsyncLocalStorage.
    */
-  runWith?: <T>(run: () => Promise<T>) => Promise<T>
+  runWith?: <T>(run: () => Promise<T>) => Promisable<T>
   mapResult?: (result: IteratorResult<TYield, TReturn>) => Promisable<IteratorResult<TMappedYield, TMappedReturn>>
   mapError?: (error: ThrowableError) => Promisable<ThrowableError>
   onError?: (error: ThrowableError) => Promisable<void>

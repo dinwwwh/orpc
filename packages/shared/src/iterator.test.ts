@@ -1,10 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { AsyncIteratorClass, sleep } from '@standardserver/shared'
+import { AsyncIteratorClass, sleep } from '@standard-server/shared'
 import { consumeAsyncIterator, replicateAsyncIterator, traceAsyncIterator, wrapAsyncIterator } from './iterator'
-import * as OpenTelemetry from './opentelemetry'
+import * as Tracing from './tracing'
 
-const runInSpanContextSpy = vi.spyOn(OpenTelemetry, 'runInSpanContext')
-const startSpanSpy = vi.spyOn(OpenTelemetry, 'startSpan')
+const runInSpanContextSpy = vi.spyOn(Tracing, 'runInSpanContext')
+const startSpanSpy = vi.spyOn(Tracing, 'startSpan')
 
 beforeEach(() => {
   vi.clearAllMocks()

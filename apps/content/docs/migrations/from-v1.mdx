@@ -49,7 +49,7 @@ The Hey API and Durable Iterator integrations no longer exist in v2. In place of
 Two formats changed on the wire:
 
 - The [RPC serializer](/docs/rpc/serializer) format, described in the [RPC Protocol](/docs/rpc/protocol).
-- The error response body, which adds an `inferable` field and no longer contains a `status` field, since [`status` was removed from errors](#status-removed-from-errors).
+- The error response body, which no longer contains a `status` field, since [`status` was removed from errors](#status-removed-from-errors).
 
 Because of these changes, a v1 [RPC Link](/docs/rpc/link) or [OpenAPI Link](/docs/openapi/link) cannot talk to a v2 server (and vice versa). Deploy the upgraded server and clients together.
 
@@ -443,19 +443,19 @@ const handler = new RPCHandler(router)
 
 </CodeGroup>
 
-### `isDefinedError` renamed to `isInferableError`
+### `safe` result changed
 
-`isDefinedError` still works as a deprecated alias. The `safe` result also changed: the third element is now the typed error itself (or `null`) instead of a boolean, and a fourth `isSuccess` element was added. See [Client Error Handling](/docs/client/error-handling).
+The third element of the `safe` result is now the typed error itself (or `null`) instead of a boolean, and a fourth `isSuccess` element was added. See [Client Error Handling](/docs/client/error-handling).
 
 <CodeGroup>
 
 ```ts v2
-import { isInferableError, safe } from '@orpc/client'
+import { isDefinedError, safe } from '@orpc/client'
 
-const [error, data, inferableError, isSuccess] = await safe(client.example({ id: 1 }))
+const [error, data, definedError, isSuccess] = await safe(client.example({ id: 1 }))
 
-if (inferableError) {
-  console.log(inferableError.data.retryAfter)
+if (definedError) {
+  console.log(definedError.data.retryAfter)
 }
 ```
 
@@ -999,6 +999,7 @@ const generator = new OpenAPIGenerator({
 })
 
 const spec = await generator.generate(router, {
+  version: '3.1.1',
   base: {
     info: { title: 'My App', version: '0.0.0' },
   },
@@ -1020,10 +1021,11 @@ const spec = await generator.generate(router, {
 
 </CodeGroup>
 
-Two smaller changes in the same area:
+Three smaller changes in the same area:
 
 - The `oo` helper (`oo.spec`) was removed. To customize the operation object, attach [`openapi({ spec })` metadata](/docs/openapi/specification#customizing-the-operation-object) directly on the procedure or router.
 - The `shouldHoistDef` option was replaced by [`customComponentName`](/docs/openapi/specification#hoisting-defs). Root `$defs` are now always hoisted into `components.schemas`; this option only renames them.
+- Documents are generated as OpenAPI 3.2.0 by default. The example above passes [`version: '3.1.1'`](/docs/openapi/specification#openapi-version) to keep the v1 behavior.
 
 ### `OpenAPIReferencePlugin` renamed and reshaped
 
@@ -1128,7 +1130,7 @@ orpc.live.experimental_liveOptions({ input: {} })
 
 </CodeGroup>
 
-`experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCSerializer` (see [Custom serializers](#custom-serializers-use-a-serializer-instance)).
+`experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCJsonSerializer` (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)).
 
 ### SWR and Pinia Colada
 
@@ -1198,7 +1200,7 @@ Base64Url, Cookie, Encryption, and Signing helpers are unchanged in `@orpc/serve
 
 ### Publisher
 
-The package is now `@orpc/publisher`. The resume option was restructured, and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
+The package is now `@orpc/publisher`. The resume option was restructured, `customJsonSerializers` became a `serializer` instance (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)), and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
 
 <CodeGroup>
 
@@ -1269,7 +1271,6 @@ These renames still compile through deprecated aliases, so you can migrate them 
 
 | v1 name                      | v2 name                       | Package                          |
 | ---------------------------- | ----------------------------- | -------------------------------- |
-| `isDefinedError`             | `isInferableError`            | `@orpc/client`                   |
 | `InferClientErrorUnion`      | `InferClientError`            | `@orpc/client`                   |
 | `ClientPromiseResult`        | `PromiseWithError`            | `@orpc/client`                   |
 | `eventIterator`              | `asyncIteratorObject`         | `@orpc/server`, `@orpc/contract` |

@@ -926,11 +926,11 @@ describe('staticFileHandlerPlugin', () => {
     expect(freshRes.status).toBe(304)
   })
 
-  describe('opentelemetry', () => {
+  describe('tracing', () => {
     it('renames the active span to the mounted base path', async ({ onTestFinished }) => {
       const span = { updateName: vi.fn(), setAttribute: vi.fn() }
-      const spy = vi.spyOn(sharedModule, 'getOpenTelemetryConfig').mockReturnValue({
-        trace: { getActiveSpan: () => span },
+      const spy = vi.spyOn(sharedModule, 'getTracer').mockReturnValue({
+        getActiveSpan: () => span,
       } as any)
       onTestFinished(() => spy.mockRestore())
 

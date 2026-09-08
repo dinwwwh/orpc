@@ -1,7 +1,7 @@
 import type { UpstashPublisherOptions } from './upstash'
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
-import { getEventMeta, withEventMeta } from '@standardserver/core'
+import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { Redis } from '@upstash/redis'
 import { UpstashPublisher } from './upstash'
 
@@ -306,7 +306,7 @@ describe.concurrent(
         ) { }
       }
 
-      const serializer = new RPCSerializer({
+      const serializer = new RPCJsonSerializer({
         handlers: {
           person: {
             condition: p => p instanceof Person,

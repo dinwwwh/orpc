@@ -4,7 +4,7 @@ import type { Logger } from 'pino'
 import type { LoggerContext } from './context'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { isAbortError, isAsyncIteratorObject, ORPC_NAME, override, toArray, wrapReadableStream } from '@orpc/shared'
-import { flattenStandardHeader } from '@standardserver/core'
+import { flattenStandardHeader } from '@standard-server/core'
 import pino from 'pino'
 import { getLogger, LOGGER_CONTEXT_SYMBOL } from './context'
 
@@ -59,12 +59,12 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
   name = '~pino'
 
   /**
-   * - Logging interceptors should run after OpenTelemetry interceptors
+   * - Logging interceptors should run after tracing interceptors
    *   so they execute within the active request span.
    * - Logging interceptors should run after batch interceptors
    *   so they log each individual request instead of the batch request.
    */
-  before = ['~opentelemetry', '~batch', '~hibernation']
+  before = ['~tracing', '~batch', '~hibernation']
 
   private readonly logger: Exclude<PinoHandlerPluginOptions<T>['logger'], undefined>
   private readonly generateRequestId: Exclude<PinoHandlerPluginOptions<T>['generateRequestId'], undefined>
@@ -176,7 +176,7 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
       }
     }
 
-    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap, any> = async ({ next, context }) => {
+    const clientInterceptor: ProcedureClientInterceptor<T, Schema<unknown>, ErrorMap> = async ({ next, context }) => {
       const output = await next()
 
       if (isAsyncIteratorObject(output)) {

@@ -1,13 +1,13 @@
 import type { Context } from '@orpc/server'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor } from '@orpc/server/standard'
-import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standardserver/core'
+import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Stats } from 'node:fs'
 import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { getOpenTelemetryConfig, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, toArray, tryDecodeURIComponent } from '@orpc/shared'
-import { flattenStandardHeader, parseStandardUrl } from '@standardserver/core'
-import { toWebReadableStream } from '@standardserver/node'
+import { getTracer, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, toArray, tryDecodeURIComponent } from '@orpc/shared'
+import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
 
 /**
@@ -115,9 +115,9 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
   name = '~static-file'
 
   /**
-   * Ensure the OpenTelemetry span is available when the interceptor renames it.
+   * Ensure the request span is available when the interceptor renames it.
    */
-  after = ['~opentelemetry']
+  after = ['~tracing']
 
   private readonly rootDir: string
   /** `rootDir` with a trailing separator, precomputed for the lexical containment check. */
@@ -173,7 +173,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
        * The request url is excluded because span names should have low cardinality,
        * so only the configured base path is used.
        */
-      getOpenTelemetryConfig()?.trace.getActiveSpan()?.updateName(`${request.method} ${base === '/' ? '' : base}/* (static file)`)
+      getTracer()?.getActiveSpan()?.updateName(`${request.method} ${base === '/' ? '' : base}/* (static file)`)
 
       return { matched: true, response }
     }

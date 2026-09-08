@@ -121,7 +121,7 @@ const publisher = new RedisPublisher<Events>(client, {
   /**
    * Serializer for serialize and deserialize payloads.
    *
-   * @default RPCSerializer
+   * @default RPCJsonSerializer
    */
   serializer: undefined,
 
@@ -166,7 +166,7 @@ const publisher = new UpstashPublisher<Events>(redis, {
   /**
    * Serializer for serialize and deserialize payloads.
    *
-   * @default RPCSerializer
+   * @default RPCJsonSerializer
    */
   serializer: undefined,
 
@@ -218,7 +218,7 @@ const publisher = new BunRedisPublisher<Events>(redis, {
   /**
    * Serializer for serialize and deserialize payloads.
    *
-   * @default RPCSerializer
+   * @default RPCJsonSerializer
    */
   serializer: undefined,
 
@@ -309,7 +309,7 @@ export default {
       /**
        * Serializer for serialize and deserialize payloads.
        *
-       * @default RPCSerializer
+       * @default RPCJsonSerializer
        */
       serializer: undefined,
 

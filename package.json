@@ -1,7 +1,7 @@
 {
   "name": "@orpc/monorepo",
   "type": "module",
-  "version": "2.0.0-beta.32",
+  "version": "2.0.0-beta.34",
   "private": true,
   "packageManager": "pnpm@12.0.0",
   "scripts": {
@@ -10,11 +10,11 @@
     "bench": "vitest bench --run",
     "test": "pnpm run -r test && vitest run",
     "test:coverage": "pnpm run -r test:coverage && vitest run --coverage",
-    "lint": "eslint --max-warnings=0 .",
-    "lint:fix": "eslint --max-warnings=0 --fix .",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
     "repo:fix": "sherif --fix",
     "docs:validate": "node scripts/verify-docs-jsdoc.ts && pnpm run -r docs:validate",
-    "sponsors:sync": "node scripts/sync-sponsors.ts && eslint --max-warnings=0 --fix **/README.md"
+    "sponsors:sync": "node scripts/sync-sponsors.ts && eslint --fix **/README.md"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^9.2.0",
@@ -42,10 +42,10 @@
     "@orpc/tanstack-query": "workspace:*",
     "@orpc/valibot": "workspace:*",
     "@orpc/zod": "workspace:*",
-    "@standardserver/core": "^0.8.2",
-    "@standardserver/fetch": "^0.8.2",
-    "@standardserver/peer": "^0.8.2",
-    "@standardserver/shared": "^0.8.2",
+    "@standard-server/core": "~0.9.0",
+    "@standard-server/fetch": "~0.9.0",
+    "@standard-server/peer": "~0.9.0",
+    "@standard-server/shared": "~0.9.0",
     "@tanstack/ai": "^0.46.0",
     "@tanstack/ai-client": "^0.24.0",
     "@testing-library/dom": "^10.4.1",
@@ -83,6 +83,6 @@
     "pre-commit": "pnpm lint-staged"
   },
   "lint-staged": {
-    "*": "eslint --no-warn-ignored --max-warnings=0 --fix"
+    "*": "eslint --no-warn-ignored --fix"
   }
 }

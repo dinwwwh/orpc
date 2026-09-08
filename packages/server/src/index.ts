@@ -47,7 +47,6 @@ export {
   cloneORPCError,
   COMMON_ERROR_STATUS_MAP,
   isDefinedError,
-  isInferableError,
   ORPCError,
   RPCJsonSerializer,
   RPCSerializer,
@@ -135,7 +134,7 @@ export type {
   StandardRequest,
   StandardResponse,
   StandardUrl,
-} from '@standardserver/core'
+} from '@standard-server/core'
 
 export {
   ErrorEvent,
@@ -152,4 +151,4 @@ export {
    * @see {@link https://orpc.dev/docs/async-iterator-object#last-event-id--event-metadata | AsyncIteratorObject (SSE) - Last Event ID & Event Metadata}
    */
   withEventMeta,
-} from '@standardserver/core'
+} from '@standard-server/core'

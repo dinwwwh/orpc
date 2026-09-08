@@ -59,7 +59,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
       },
     })
 
-    expect(doc.paths?.['/planets/{id}']?.get?.responses?.[404]).toEqual(expect.objectContaining({
+    expect(doc.paths?.['/planets/{id}']?.get?.responses?.['404']).toEqual(expect.objectContaining({
       content: {
         'application/json': {
           schema: {
@@ -80,7 +80,6 @@ describe('openAPIGenerator e2e: typed errors', () => {
       type: 'object',
       properties: {
         defined: { const: true },
-        inferable: { type: 'boolean' },
         code: { const: 'CONFLICT' },
         status: { const: 409 },
         message: { type: 'string' },
@@ -92,20 +91,19 @@ describe('openAPIGenerator e2e: typed errors', () => {
           required: ['existingId'],
         }),
       },
-      required: ['defined', 'inferable', 'code', 'status', 'message', 'data'],
+      required: ['defined', 'code', 'status', 'message', 'data'],
     })
 
     expect(doc.components?.schemas?.UndefinedError).toEqual({
       type: 'object',
       properties: {
         defined: { const: false },
-        inferable: { type: 'boolean' },
         code: { type: 'string' },
         status: { type: 'number' },
         message: { type: 'string' },
         data: {},
       },
-      required: ['defined', 'inferable', 'code', 'status', 'message'],
+      required: ['defined', 'code', 'status', 'message'],
     })
   })
 
@@ -149,7 +147,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
       },
     })
 
-    expect(doc.paths?.['/planets/{id}']?.get?.responses?.[410]).toEqual({
+    expect(doc.paths?.['/planets/{id}']?.get?.responses?.['410']).toEqual({
       description: 'Planet is gone',
       content: {
         'application/json': {

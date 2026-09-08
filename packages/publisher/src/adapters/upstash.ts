@@ -1,10 +1,11 @@
-import type { ThrowableError } from '@orpc/shared'
-import type { EventMeta } from '@standardserver/core'
+import type { RPCJsonSerialization } from '@orpc/client'
+import type { Public, ThrowableError } from '@orpc/shared'
+import type { EventMeta } from '@standard-server/core'
 import type { Redis } from '@upstash/redis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { once } from '@orpc/shared'
-import { getEventMeta, unwrapEvent, withEventMeta } from '@standardserver/core'
+import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
 import { Publisher } from '../publisher'
 
 export interface UpstashPublisherOptions extends PublisherOptions {
@@ -18,9 +19,9 @@ export interface UpstashPublisherOptions extends PublisherOptions {
   /**
    * Serializer for serialize and deserialize payloads.
    *
-   * @default RPCSerializer
+   * @default RPCJsonSerializer
    */
-  serializer?: undefined | Pick<RPCSerializer, keyof RPCSerializer>
+  serializer?: undefined | Public<RPCJsonSerializer>
 
   /**
    * Configuration for event resume support.
@@ -61,7 +62,7 @@ export interface UpstashPublisherOptions extends PublisherOptions {
  */
 export class UpstashPublisher<T extends Record<string, object>> extends Publisher<T> {
   private readonly prefix: string
-  private readonly serializer: Pick<RPCSerializer, keyof RPCSerializer>
+  private readonly serializer: Public<RPCJsonSerializer>
   private readonly listenersMap = new Map<keyof T, Array<(payload: any) => void>>()
   private readonly onErrorsMap = new Map<keyof T, Array<(error: ThrowableError) => void>>()
   private readonly subscriptionMap = new Map<keyof T, ReturnType<typeof this.redis.subscribe>>() // Upstash subscription objects
@@ -82,7 +83,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
     this.prefix = prefix ?? ''
     this.resumeEnabled = resume?.enabled ?? false
     this.resumeSeconds = resume?.seconds ?? 300
-    this.serializer = serializer ?? new RPCSerializer()
+    this.serializer = serializer ?? new RPCJsonSerializer()
   }
 
   private readonly firstPublishTimeMap: Map<string, number> = new Map()
@@ -317,12 +318,13 @@ export class UpstashPublisher<T extends Record<string, object>> extends Publishe
     }
   }
 
-  private serializePayload(payload: object): { payload: unknown, meta?: undefined | EventMeta } {
+  private serializePayload(payload: object): { payload: RPCJsonSerialization, meta?: undefined | EventMeta } {
     const [original, meta] = unwrapEvent(payload)
-    return { payload: this.serializer.serialize(original, { useFormDataForBlobFields: false }), meta }
+    const { json, meta: jsonMeta } = this.serializer.serialize(original)
+    return { payload: { json, meta: jsonMeta }, meta }
   }
 
-  private deserializePayload(id: string | undefined, { payload, meta }: { payload: unknown, meta?: undefined | EventMeta }): object {
+  private deserializePayload(id: string | undefined, { payload, meta }: { payload: RPCJsonSerialization, meta?: undefined | EventMeta }): object {
     return withEventMeta(
       this.serializer.deserialize(payload) as object,
       id === undefined ? { ...meta } : { ...meta, id },

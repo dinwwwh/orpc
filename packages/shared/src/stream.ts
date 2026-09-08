@@ -1,11 +1,11 @@
 import type { Promisable } from 'type-fest'
-import type { StartSpanOptions } from './opentelemetry'
+import type { StartSpanOptions } from './tracing'
 import type { ThrowableError } from './types'
-import { AsyncIteratorClass } from '@standardserver/shared'
+import { AsyncIteratorClass } from '@standard-server/shared'
 import { once } from './function'
 import { isPlainObject } from './object'
-import { recordSpanError, runInSpanContext, startSpan } from './opentelemetry'
 import { promiseWithResolvers } from './promise'
+import { recordSpanError, runInSpanContext, startSpan } from './tracing'
 
 export function replicateReadableStream<T>(
   stream: ReadableStream<T>,
@@ -37,7 +37,7 @@ export interface WrapReadableStreamOptions<T, TMapped> {
    * Useful when you want execution to happen within a specific context,
    * such as AsyncLocalStorage.
    */
-  runWith?: <T>(run: () => Promise<T>) => Promise<T>
+  runWith?: <T>(run: () => Promise<T>) => Promisable<T>
   mapResult?: (result: ReadableStreamReadResult<T>) => Promisable<ReadableStreamReadResult<TMapped>>
   mapError?: (error: ThrowableError) => Promisable<ThrowableError>
   onError?: (error: ThrowableError) => Promisable<void>

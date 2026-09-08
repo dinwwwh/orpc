@@ -1,6 +1,6 @@
 import type { AnyORPCError } from '@orpc/client'
-import type { Promisable, Value } from '@orpc/shared'
-import type { StandardLazyRequest, StandardResponse } from '@standardserver/core'
+import type { Promisable, Public, Value } from '@orpc/shared'
+import type { StandardLazyRequest, StandardResponse } from '@standard-server/core'
 import type { Context } from '../../context'
 import type { AnyProcedure } from '../../procedure'
 import type { AnyRouter } from '../../router'
@@ -8,7 +8,7 @@ import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure, Stand
 import type { RPCMatcherOptions } from './rpc-matcher'
 import { COMMON_ERROR_STATUS_MAP, RPCSerializer } from '@orpc/client'
 import { getOwn, parseEmptyableJSON, value } from '@orpc/shared'
-import { parseStandardUrl } from '@standardserver/core'
+import { parseStandardUrl } from '@standard-server/core'
 import { DEFAULT_ERROR_STATUS, DEFAULT_SUCCESS_STATUS } from '../../constants'
 import { RPCMatcher } from './rpc-matcher'
 
@@ -16,7 +16,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Pick<RPCSerializer, keyof RPCSerializer>
+  serializer?: Public<RPCSerializer>
 
   /**
    * Resolve HTTP status for encoded successful outputs.
@@ -39,7 +39,7 @@ export interface RPCHandlerCodecOptions<T extends Context> extends RPCMatcherOpt
 
 export class RPCHandlerCodec<T extends Context> implements StandardHandlerCodec<T> {
   private readonly matcher: RPCMatcher
-  private readonly serializer: Pick<RPCSerializer, keyof RPCSerializer>
+  private readonly serializer: Public<RPCSerializer>
   private readonly errorStatusMap: Exclude<RPCHandlerCodecOptions<T>['errorStatusMap'], undefined>
   private readonly outputStatus: RPCHandlerCodecOptions<T>['outputStatus']
 

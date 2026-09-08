@@ -40,32 +40,12 @@ export default antfu({
     'no-restricted-imports': ['error', {
       patterns: [{
         group: [
-          '/json-schema-typed',
-          '/openapi-types',
+          '/@openapi-spec/types',
           '/@standard-schema/spec',
-          '/@hey-api/spec-types',
           '/compression',
         ],
         message: 'Please import from @orpc/* instead',
       }],
-      paths: [
-        {
-          name: '@opentelemetry/api',
-          allowImportNames: [
-            'AttributeValue',
-            'Context',
-            'ContextAPI',
-            'Exception',
-            'PropagationAPI',
-            'Span',
-            'SpanOptions',
-            'SpanStatusCode',
-            'TraceAPI',
-            'Tracer',
-          ],
-          message: 'Require explicit runtime import from @orpc/opentelemetry',
-        },
-      ],
     }],
     'pnpm/json-enforce-catalog': 'off',
   },

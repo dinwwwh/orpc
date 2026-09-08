@@ -1,10 +1,11 @@
-import type { ThrowableError } from '@orpc/shared'
-import type { EventMeta } from '@standardserver/core'
+import type { RPCJsonSerialization } from '@orpc/client'
+import type { Public, ThrowableError } from '@orpc/shared'
+import type { EventMeta } from '@standard-server/core'
 import type { RedisClientType } from 'redis'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
-import { getEventMeta, unwrapEvent, withEventMeta } from '@standardserver/core'
+import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
 import { Publisher } from '../publisher'
 
 export interface RedisPublisherOptions extends PublisherOptions {
@@ -27,9 +28,9 @@ export interface RedisPublisherOptions extends PublisherOptions {
   /**
    * Serializer for serialize and deserialize payloads.
    *
-   * @default RPCSerializer
+   * @default RPCJsonSerializer
    */
-  serializer?: undefined | Pick<RPCSerializer, keyof RPCSerializer>
+  serializer?: undefined | Public<RPCJsonSerializer>
 
   /**
    * Configuration for event resume support.
@@ -88,7 +89,7 @@ export class RedisPublisher<T extends Record<string, object>> extends Publisher<
     super(options)
 
     this.prefix = options.prefix ?? ''
-    this.serializer = options.serializer ?? new RPCSerializer()
+    this.serializer = options.serializer ?? new RPCJsonSerializer()
     this.resumeEnabled = options.resume?.enabled ?? false
     this.resumeSeconds = options.resume?.seconds ?? 300
     this.subscriber = options.subscriber ?? redis.duplicate()
@@ -221,12 +222,13 @@ export class RedisPublisher<T extends Record<string, object>> extends Publisher<
     })
   }
 
-  private serializePayload(payload: object): { payload: unknown, meta?: undefined | EventMeta } {
+  private serializePayload(payload: object): { payload: RPCJsonSerialization, meta?: undefined | EventMeta } {
     const [original, meta] = unwrapEvent(payload)
-    return { payload: this.serializer.serialize(original, { useFormDataForBlobFields: false }), meta }
+    const { json, meta: jsonMeta } = this.serializer.serialize(original)
+    return { payload: { json, meta: jsonMeta }, meta }
   }
 
-  private deserializePayload(id: string | undefined, { payload, meta }: { payload: unknown, meta?: undefined | EventMeta }): object {
+  private deserializePayload(id: string | undefined, { payload, meta }: { payload: RPCJsonSerialization, meta?: undefined | EventMeta }): object {
     return withEventMeta(
       this.serializer.deserialize(payload) as object,
       id === undefined ? { ...meta } : { ...meta, id },

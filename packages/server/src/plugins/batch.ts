@@ -1,12 +1,12 @@
 import type { BatchLinkPluginMode } from '@orpc/client/plugins'
 import type { Promisable, Value } from '@orpc/shared'
-import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standardserver/core'
-import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standardserver/peer'
+import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@standard-server/core'
+import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
 import { toArray, value } from '@orpc/shared'
-import { flattenStandardHeader, parseStandardUrl } from '@standardserver/core'
-import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standardserver/peer'
+import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
+import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
 
 /**
  * Content type for batch responses that use the length-prefixed binary framing
@@ -85,10 +85,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
   name = '~batch'
 
   /**
-   * Run batch interceptors before OpenTelemetry interceptors
+   * Run batch interceptors inside the tracing interceptors
    * so each subrequest gets its own span instead of sharing one batch-level span.
    */
-  after = ['~opentelemetry']
+  after = ['~tracing']
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>

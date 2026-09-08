@@ -1,7 +1,7 @@
 {
   "name": "@orpc/opentelemetry",
   "type": "module",
-  "version": "2.0.0-beta.32",
+  "version": "2.0.0-beta.34",
   "description": "OpenTelemetry integration for oRPC: distributed tracing for typesafe APIs",
   "license": "MIT",
   "funding": [
@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",
-    "@opentelemetry/instrumentation": "^0.221.0"
+    "@opentelemetry/instrumentation": "^0.221.0",
+    "@opentelemetry/sdk-trace-node": "^2.10.0"
   }
 }

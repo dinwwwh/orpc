@@ -1,7 +1,7 @@
 {
   "name": "@orpc/publisher",
   "type": "module",
-  "version": "2.0.0-beta.32",
+  "version": "2.0.0-beta.34",
   "description": "Typesafe pub/sub for oRPC event streaming, with memory, Redis, and Upstash adapters",
   "license": "MIT",
   "funding": [
@@ -80,7 +80,7 @@
   "dependencies": {
     "@orpc/client": "workspace:*",
     "@orpc/shared": "workspace:*",
-    "@standardserver/core": "^0.8.2"
+    "@standard-server/core": "~0.9.0"
   },
   "devDependencies": {
     "@upstash/redis": "^1.38.2",
