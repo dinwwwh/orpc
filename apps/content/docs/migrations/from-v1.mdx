@@ -1130,7 +1130,7 @@ orpc.live.experimental_liveOptions({ input: {} })
 
 </CodeGroup>
 
-`experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCSerializer` (see [Custom serializers](#custom-serializers-use-a-serializer-instance)).
+`experimental_defaults` became `scoped`, and the hydration serializer changed from `StandardRPCJsonSerializer` to `RPCJsonSerializer` (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)).
 
 ### SWR and Pinia Colada
 
@@ -1200,7 +1200,7 @@ Base64Url, Cookie, Encryption, and Signing helpers are unchanged in `@orpc/serve
 
 ### Publisher
 
-The package is now `@orpc/publisher`. The resume option was restructured, and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
+The package is now `@orpc/publisher`. The resume option was restructured, `customJsonSerializers` became a `serializer` instance (see [RPC JSON Serializer](/docs/rpc/serializer#rpc-json-serializer)), and the Redis adapter switched from `ioredis` to `node-redis`. See [Publisher Helpers](/docs/helpers/publisher).
 
 <CodeGroup>
 

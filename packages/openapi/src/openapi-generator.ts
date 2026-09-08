@@ -1,7 +1,7 @@
 import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
-import type { Value } from '@orpc/shared'
+import type { Public, Value } from '@orpc/shared'
 import type { OpenAPIMeta } from './meta'
 import type { OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './openapi-generator-operation'
 import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types'
@@ -32,7 +32,7 @@ export interface OpenAPIGeneratorOptions {
   /**
    * The serializer used to serialize the generated OpenAPI documentation
    */
-  serializer?: Pick<OpenAPISerializer, keyof OpenAPISerializer> | undefined
+  serializer?: Public<OpenAPISerializer> | undefined
 }
 
 export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion> {
@@ -100,7 +100,7 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
  * @see {@link https://orpc.dev/docs/openapi/specification#openapi-generator | OpenAPI Specification - OpenAPI Generator}
  */
 export class OpenAPIGenerator {
-  private readonly serializer: Pick<OpenAPISerializer, keyof OpenAPISerializer>
+  private readonly serializer: Public<OpenAPISerializer>
   private readonly converter: Pick<JsonSchemaConverter, 'convert'>
 
   constructor(options: OpenAPIGeneratorOptions = {}) {

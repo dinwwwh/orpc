@@ -1,6 +1,6 @@
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '@orpc/publisher'
 import type { Public } from '@orpc/shared'
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { Publisher } from '@orpc/publisher'
 import { isTypescriptObject, stringifyJSON } from '@orpc/shared'
 import { unwrapEvent, withEventMeta } from '@standard-server/core'
@@ -16,9 +16,9 @@ export interface DurablePublisherOptions extends PublisherOptions {
   /**
    * Serializer for serialize and deserialize payloads.
    *
-   * @default RPCSerializer
+   * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCSerializer>
+  serializer?: undefined | Public<RPCJsonSerializer>
 
   /**
    * Custom function to get the Durable Object stub for publishing.
@@ -36,7 +36,7 @@ export interface DurablePublisherOptions extends PublisherOptions {
  */
 export class DurablePublisher<T extends Record<string, object>> extends Publisher<T> {
   private readonly prefix: string
-  private readonly serializer: Public<RPCSerializer>
+  private readonly serializer: Public<RPCJsonSerializer>
   private readonly getStubByName: Exclude<DurablePublisherOptions['getStubByName'], undefined>
 
   constructor(
@@ -45,7 +45,7 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
   ) {
     super(options)
     this.prefix = prefix ?? ''
-    this.serializer = options.serializer ?? new RPCSerializer()
+    this.serializer = options.serializer ?? new RPCJsonSerializer()
     this.getStubByName = getStubByName ?? ((namespace, event) => namespace.getByName(event))
   }
 
@@ -53,11 +53,12 @@ export class DurablePublisher<T extends Record<string, object>> extends Publishe
     const stub = this.getStubByName(this.namespace, this.prefix + event)
 
     const [data, meta] = unwrapEvent(payload)
+    const { json, meta: jsonMeta } = this.serializer.serialize(data)
 
     const response = await stub.fetch('http://localhost/publish', {
       method: 'POST',
       body: stringifyJSON({
-        data: this.serializer.serialize(data, { useFormDataForBlobFields: false }),
+        data: { json, meta: jsonMeta },
         meta,
       }),
       headers: {
