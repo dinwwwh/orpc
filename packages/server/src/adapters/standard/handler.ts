@@ -6,8 +6,8 @@ import type { ProcedureClientInterceptor } from '../../procedure-client'
 import type { StandardHandlerCodec, StandardHandlerCodecResolvedProcedure } from './codec'
 import type { StandardHandlerPlugin } from './plugin'
 import { ORPCError, toORPCError } from '@orpc/client'
-import { getOpenTelemetryConfig, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator } from '@orpc/shared'
-import { flattenStandardHeader } from '@standard-server/core'
+import { getTracer, intercept, isAsyncIteratorObject, matchesHttpPathPrefix, ORPC_NAME, override, recordSpanError, runWithSpan, toArray, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
+import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { createProcedureClient } from '../../procedure-client'
 import { CompositeStandardHandlerPlugin } from './plugin'
 
@@ -65,7 +65,7 @@ export class StandardHandler<T extends Context> {
     options: StandardHandlerOptions<T>,
   ) {
     options = new CompositeStandardHandlerPlugin([
-      new OtelHandlerPlugin(),
+      new TracingHandlerPlugin(),
       ...toArray(options.plugins),
     ]).init(options)
 
@@ -83,7 +83,7 @@ export class StandardHandler<T extends Context> {
       this.routingInterceptors,
       { context, prefix, request },
       async ({ context, prefix, request }) => {
-        const span = getOpenTelemetryConfig()?.trace.getActiveSpan()
+        const span = getTracer()?.getActiveSpan()
 
         let step: 'decode_input' | 'call_procedure' | undefined
 
@@ -119,12 +119,20 @@ export class StandardHandler<T extends Context> {
               let input = await runWithSpan('decode_input', decodeInput)
               step = undefined
 
-              if (isAsyncIteratorObject(input)) {
+              if (getTracer() && isAsyncIteratorObject(input)) {
                 /**
                  * @warning
                  * Remember use `override` for AsyncIteratorObject to remain other special properties
                  */
                 input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
+              }
+
+              else if (getTracer() && input instanceof ReadableStream) {
+                /**
+                 * @warning
+                 * Remember use `override` for ReadableStream to remain other special properties
+                 */
+                input = override(input, traceReadableStream('consume_octet_stream_input', input))
               }
 
               const client = createProcedureClient(procedure, {
@@ -176,24 +184,26 @@ export class StandardHandler<T extends Context> {
   }
 }
 
-export class OtelHandlerPlugin implements StandardHandlerPlugin<any> {
-  name = '~opentelemetry'
+export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
+  name = '~tracing'
 
   init(options: StandardHandlerOptions<any>): StandardHandlerOptions<any> {
     return {
       ...options,
       routingInterceptors: [
-        // Should be placed before user-provided interceptors to help them access the current active context.
+        // Should be placed before user-provided interceptors to help them access the current active span.
         async ({ next, request }) => {
-          const otelConfig = getOpenTelemetryConfig()
+          const tracer = getTracer()
+          const parent = tracer?.extract?.(request.headers)
 
-          let propagationContext
-          if (otelConfig?.propagation) {
-            propagationContext = otelConfig.propagation.extract(otelConfig.context.active(), request.headers)
-          }
+          /**
+           * The search part is excluded because span names should have low cardinality.
+           * The name is replaced with the procedure path once the request is routed.
+           */
+          const [pathname] = parseStandardUrl(request.url)
 
           return runWithSpan(
-            { name: `${request.method} ${request.url}`, context: propagationContext },
+            { name: `${request.method} ${pathname}`, parent },
             () => next(),
           )
         },

@@ -1,5 +1,4 @@
 import { encodeHibernationRPCEvent, HibernationAsyncIteratorClass, HibernationHandlerPlugin } from '@orpc/hibernation'
-import { ORPCInstrumentation } from '@orpc/opentelemetry'
 import { onError, os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/websocket'
 import { DurableObject } from 'cloudflare:workers'
@@ -57,14 +56,6 @@ export class ChatRoomDO extends DurableObject {
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    /**
-     * `@microlabs/otel-cf-workers` cannot instrument hibernatable WebSocket handlers,
-     * and its tracer throws when used outside an instrumented trigger. In dev the
-     * Durable Object shares the isolate with the instrumented worker, so oRPC
-     * tracing must be suspended while handling WebSocket messages.
-     */
-    new ORPCInstrumentation().disable()
-
     await handler.message(ws, message, {
       context: {
         ws,
@@ -74,14 +65,6 @@ export class ChatRoomDO extends DurableObject {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
-    /**
-     * `@microlabs/otel-cf-workers` cannot instrument hibernatable WebSocket handlers,
-     * and its tracer throws when used outside an instrumented trigger. In dev the
-     * Durable Object shares the isolate with the instrumented worker, so oRPC
-     * tracing must be suspended while handling WebSocket messages.
-     */
-    new ORPCInstrumentation().disable()
-
     await handler.close(ws)
   }
 }

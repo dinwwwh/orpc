@@ -1,9 +1,9 @@
 import type { InstrumentationConfig, InstrumentationModuleDefinition } from '@opentelemetry/instrumentation'
-// eslint-disable-next-line no-restricted-imports
 import { context, propagation, trace } from '@opentelemetry/api'
 import { InstrumentationBase } from '@opentelemetry/instrumentation'
-import { setOpenTelemetryConfig } from '@orpc/shared'
+import { setTracer } from '@orpc/shared'
 import pkg from '../package.json'
+import { OpenTelemetryTracer } from './tracer'
 
 export interface ORPCInstrumentationConfig extends InstrumentationConfig {
   /**
@@ -31,15 +31,15 @@ export class ORPCInstrumentation extends InstrumentationBase<ORPCInstrumentation
   }
 
   override enable(): void {
-    setOpenTelemetryConfig({
+    setTracer(new OpenTelemetryTracer({
       tracer: trace.getTracer(pkg.name, pkg.version),
       trace,
       context,
       propagation: (this._config.propagationEnabled ?? true) ? propagation : undefined,
-    })
+    }))
   }
 
   override disable(): void {
-    setOpenTelemetryConfig(undefined)
+    setTracer(undefined)
   }
 }

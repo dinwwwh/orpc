@@ -1,4 +1,3 @@
-import { INSTRUMENTATION_CONFIG } from './instrumentation'
 import { RPCHandler } from '@orpc/server/fetch'
 import { router } from './routers'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
@@ -8,8 +7,9 @@ import { EvlogHandlerPlugin } from '@orpc/evlog'
 import { OpenAPIGenerator } from '@orpc/openapi'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
-import { DurablePublisher, DurablePublisherObject } from '@orpc/cloudflare'
-import { instrument } from '@microlabs/otel-cf-workers'
+import { experimental_CloudflareTracer as CloudflareTracer, DurablePublisher, DurablePublisherObject } from '@orpc/cloudflare'
+
+new CloudflareTracer().enable()
 
 const zodConverter = new ZodToJsonSchemaConverter()
 
@@ -58,7 +58,7 @@ const rpcHandler = new RPCHandler(router, {
   ],
 })
 
-export default instrument({
+export default {
   async fetch(request, env, _ctx) {
     if (new URL(request.url).pathname === '/chat-room' && request.headers.get('upgrade') === 'websocket') {
       const id = env.CHAT_ROOM_DON.idFromName('default')
@@ -85,7 +85,7 @@ export default instrument({
 
     return new Response(null, { status: 404 })
   },
-} satisfies ExportedHandler<Env>, INSTRUMENTATION_CONFIG)
+} satisfies ExportedHandler<Env>
 
 export { ChatRoomDO } from './dos/chat-room'
 

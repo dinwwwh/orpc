@@ -85,10 +85,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
   name = '~batch'
 
   /**
-   * Run batch interceptors before OpenTelemetry interceptors
+   * Run batch interceptors inside the tracing interceptors
    * so each subrequest gets its own span instead of sharing one batch-level span.
    */
-  after = ['~opentelemetry']
+  after = ['~tracing']
 
   private readonly maxSize: Exclude<BatchHandlerPluginOptions<T>['maxSize'], undefined>
   private readonly mapSubrequest: Exclude<BatchHandlerPluginOptions<T>['mapSubrequest'], undefined>

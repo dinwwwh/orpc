@@ -921,6 +921,41 @@ describe('createProcedureClient', () => {
     await expect(reader.read()).resolves.toEqual({ value: undefined, done: true })
   })
 
+  describe('without a tracer', () => {
+    beforeEach(() => {
+      const tracer = SharedV2Module.getTracer()
+      SharedV2Module.setTracer(undefined)
+      return () => SharedV2Module.setTracer(tracer)
+    })
+
+    it('still wraps output AsyncIteratorObject to reconcile iteration errors', async () => {
+      const errorMap: ErrorMap = { BAD_REQUEST: { message: 'Bad Request' } }
+      const procedure = os.errors(errorMap).handler(handler)
+      const error = new ORPCError('BAD_REQUEST', { data: 'data' })
+      const handlerIterator = (async function* () {
+        throw error
+      }())
+      handler.mockResolvedValueOnce(handlerIterator as any)
+      const reconciledError = new ORPCError('__reconciled__')
+      reconcileErrorSpy.mockResolvedValueOnce(reconciledError)
+
+      const iterator = await createProcedureClient(procedure)() as any
+      expect(iterator).toSatisfy(isAsyncIteratorObject)
+      expect(overrideSpy).toHaveBeenCalledWith(handlerIterator, expect.any(Object))
+
+      await expect(iterator.next()).rejects.toThrow(reconciledError)
+      expect(reconcileErrorSpy).toHaveBeenCalledWith(errorMap, error)
+    })
+
+    it('returns output ReadableStream as is', async () => {
+      const handlerStream = new ReadableStream()
+      handler.mockResolvedValueOnce(handlerStream as any)
+
+      await expect(createProcedureClient(procedure)()).resolves.toBe(handlerStream)
+      expect(overrideSpy).not.toHaveBeenCalled()
+    })
+  })
+
   describe('reconcile error', () => {
     const errorMap: ErrorMap = {
       BAD_REQUEST: { message: 'Bad Request' },

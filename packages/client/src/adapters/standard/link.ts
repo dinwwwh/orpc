@@ -4,7 +4,7 @@ import type { ClientContext, ClientLink, ClientOptions } from '../../types'
 import type { StandardLinkCodec } from './codec'
 import type { StandardLinkPlugin } from './plugin'
 import type { StandardLinkTransport } from './transport'
-import { getOpenTelemetryConfig, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, ORPC_NAME, override, runWithSpan, traceAsyncIterator, traceReadableStream } from '@orpc/shared'
 import { CompositeStandardLinkPlugin } from './plugin'
 
 export interface StandardLinkInterceptorOptions<T extends ClientContext> extends ClientOptions<T> {
@@ -61,7 +61,7 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
       span?.setAttribute('rpc.system', ORPC_NAME)
       span?.setAttribute('rpc.method', path.join('.'))
 
-      if (isAsyncIteratorObject(input)) {
+      if (getTracer() && isAsyncIteratorObject(input)) {
         /**
          * @warning
          * Remember use `override` for AsyncIteratorObject to remain other special properties
@@ -69,26 +69,30 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
         input = override(input, traceAsyncIterator('consume_async_iterator_object_input', input))
       }
 
+      else if (getTracer() && input instanceof ReadableStream) {
+        /**
+         * @warning
+         * Remember use `override` for ReadableStream to remain other special properties
+         */
+        input = override(input, traceReadableStream('consume_octet_stream_input', input))
+      }
+
       return intercept(this.interceptors, { ...options, path, input }, async ({ path, input, ...options }) => {
         /**
          * In browsers, the OpenTelemetry context manager may not work reliably with async functions,
-         * so we should manually manage the context here.
+         * so we should manually pass the parent span here.
          */
-        const otel = getOpenTelemetryConfig()
-        let activeContext: ReturnType<Exclude<typeof otel, undefined>['context']['active']> | undefined
-        const activeSpan = otel?.trace.getActiveSpan() ?? span
-        if (activeSpan && otel) {
-          activeContext = otel.trace.setSpan(otel.context.active(), activeSpan)
-        }
+        const tracer = getTracer()
+        const activeSpan = tracer?.getActiveSpan() ?? span
 
         let request = await runWithSpan(
-          { name: 'encode_input', context: activeContext },
+          { name: 'encode_input', parent: activeSpan },
           () => this.codec.encodeInput(input, path, options),
         )
 
-        if (activeContext && otel?.propagation) {
+        if (activeSpan && tracer?.inject) {
           const headers = { ...request.headers }
-          otel.propagation.inject(activeContext, headers)
+          tracer.inject(activeSpan, headers)
           request = { ...request, headers }
         }
 
@@ -98,23 +102,19 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
           ({ path, request, ...options }) => {
             /**
              * In browsers, the OpenTelemetry context manager may not work reliably with async functions,
-             * so we should manually manage the context here.
+             * so we should manually pass the parent span here.
              */
-            let activeTransportContext: ReturnType<Exclude<typeof otel, undefined>['context']['active']> | undefined
-            const activeTransportSpan = otel?.trace.getActiveSpan() ?? activeSpan
-            if (activeTransportSpan && otel) {
-              activeTransportContext = otel.trace.setSpan(otel.context.active(), activeTransportSpan)
-            }
+            const activeTransportSpan = tracer?.getActiveSpan() ?? activeSpan
 
             return runWithSpan(
-              { name: 'send_request', context: activeTransportContext },
+              { name: 'send_request', parent: activeTransportSpan },
               () => this.transport.send(request, path, options),
             )
           },
         )
 
         const decodedResult = await runWithSpan(
-          { name: 'decode_response', context: activeContext },
+          { name: 'decode_response', parent: activeSpan },
           () => this.codec.decodeResponse(response, path, options),
         )
 
@@ -124,14 +124,22 @@ export class StandardLink<T extends ClientContext> implements ClientLink<T> {
 
         const output = decodedResult.output
 
-        if (isAsyncIteratorObject(output)) {
+        if (getTracer() && isAsyncIteratorObject(output)) {
           /**
-           * Do not use otelContext here, as it is a lazy span.
+           * Do not pass the active span as parent here, as it is a lazy span.
            *
            * @warning
            * Remember use `override` for AsyncIteratorObject to remain other special properties
            */
           return override(output, traceAsyncIterator('consume_async_iterator_object_output', output))
+        }
+
+        else if (getTracer() && output instanceof ReadableStream) {
+          /**
+           * @warning
+           * Remember use `override` for ReadableStream to remain other special properties
+           */
+          return override(output, traceReadableStream('consume_octet_stream_output', output))
         }
 
         return output

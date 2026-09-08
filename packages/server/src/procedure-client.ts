@@ -7,7 +7,7 @@ import type { MiddlewareDone } from './middleware'
 import type { AnyProcedure, Procedure, ProcedureHandlerOptions } from './procedure'
 import { ORPCError, wrapAsyncIteratorPreservingEventMeta } from '@orpc/client'
 import { createORPCErrorConstructorMap, reconcileORPCError, ValidationError } from '@orpc/contract'
-import { intercept, isAsyncIteratorObject, isPlainObject, mergeTwoLevels, override, resolveMaybeOptionalOptions, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
+import { getTracer, intercept, isAsyncIteratorObject, isPlainObject, mergeTwoLevels, override, resolveMaybeOptionalOptions, runWithSpan, toArray, traceAsyncIterator, traceReadableStream, value } from '@orpc/shared'
 import { unlazy } from './lazy'
 
 export type ProcedureClient<
@@ -115,12 +115,12 @@ export function createProcedureClient<
          * Remember use `override` for AsyncIteratorObject to remain other special properties
          */
         return override(output, wrapAsyncIteratorPreservingEventMeta(
-          traceAsyncIterator('consume_async_iterator_object_output', output),
+          getTracer() ? traceAsyncIterator('consume_async_iterator_object_output', output) : output,
           { mapError: reconcileError },
         )) as typeof output
       }
 
-      if ((output as any) instanceof ReadableStream) {
+      else if (getTracer() && (output as unknown) instanceof ReadableStream) {
         /**
          * @warning
          * Remember use `override` for ReadableStream to remain other special properties

@@ -62,6 +62,10 @@ registerInstrumentations({
 You can configure OpenTelemetry for your server, client, or both, depending on your needs.
 :::
 
+:::tip
+On Cloudflare Workers, the [Cloudflare Workers Traces integration](/docs/integrations/cloudflare-traces) records the same spans without an OpenTelemetry SDK.
+:::
+
 ## Context Propagation
 
 By default, `ORPCInstrumentation` enables [context propagation](https://opentelemetry.io/docs/concepts/context-propagation/) between the client and server. You can disable it by setting `propagationEnabled` to `false` if you do not need it or if another instrumentation already handles it.

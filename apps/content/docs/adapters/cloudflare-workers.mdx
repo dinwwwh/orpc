@@ -89,3 +89,7 @@ oRPC forwards `request.signal` to every procedure call so handlers can stop work
 ```
 
 If your `compatibility_date` is before `2026-03-03`, also add [`unhandled_rejection_after_microtask_checkpoint`](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#defer-unhandled-rejection-processing-to-after-microtask-checkpoint). Without it, Workers can report false `unhandledrejection` errors for promises that are handled a microtask later.
+
+## Traces
+
+Use the [Cloudflare Workers Traces integration](/docs/integrations/cloudflare-traces) to record oRPC spans in Workers Traces.
