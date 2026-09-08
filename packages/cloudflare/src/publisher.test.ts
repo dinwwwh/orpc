@@ -1,4 +1,4 @@
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
 import { sleep } from '@standard-server/shared'
 import { reset } from 'cloudflare:test'
@@ -158,7 +158,7 @@ describe('durable publisher', () => {
       ) {}
     }
 
-    const serializer = new RPCSerializer({
+    const serializer = new RPCJsonSerializer({
       handlers: {
         person: {
           condition: p => p instanceof Person,
@@ -171,7 +171,7 @@ describe('durable publisher', () => {
     const getStubByName = vi.fn((namespace, event) => namespace.getByName(event))
     const publisher = new DurablePublisher<any>(env.PUBLISHER_DON, {
       prefix: 'prefix:',
-      serializer: serializer as any,
+      serializer,
       getStubByName,
     })
 
@@ -230,7 +230,7 @@ describe('durable publisher', () => {
 
   it('reports bad messages and socket errors but keeps good ones', async () => {
     const socket = makeSocket()
-    const serializer = new RPCSerializer()
+    const serializer = new RPCJsonSerializer()
     const stub = {
       fetch: vi.fn(async () => ({
         webSocket: socket as unknown as WebSocket,

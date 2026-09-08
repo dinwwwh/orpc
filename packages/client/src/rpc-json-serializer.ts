@@ -177,7 +177,7 @@ export interface RPCJsonSerializerOptions {
  * Serializes and deserializes native types like Date, BigInt, Set, and Map
  * into a JSON value plus separate metadata describing how to restore them.
  *
- * @see {@link https://orpc.dev/docs/integrations/tanstack-query#custom-serializers | TanStack Query Integration - Custom Serializers}
+ * @see {@link https://orpc.dev/docs/rpc/serializer#rpc-json-serializer | RPC Serializer - RPC JSON Serializer}
  */
 export class RPCJsonSerializer {
   private readonly handlers: Exclude<RPCJsonSerializerOptions['handlers'], undefined>

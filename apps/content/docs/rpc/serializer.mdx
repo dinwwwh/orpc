@@ -85,6 +85,30 @@ const link = new RPCLink({
 
 :::
 
+## RPC JSON Serializer
+
+`RPCJsonSerializer` is the JSON layer behind `RPCSerializer`. Use it directly wherever only JSON is accepted.
+
+```ts twoslash
+import { RPCJsonSerializer } from '@orpc/client'
+
+const serializer = new RPCJsonSerializer({
+  handlers: {
+    // same handlers as RPCSerializer
+  },
+})
+
+const { json, meta } = serializer.serialize({
+  name: 'John',
+  createdAt: new Date('2024-01-01'),
+})
+// json: { name: 'John', createdAt: '2024-01-01T00:00:00.000Z' }
+// meta: [['date', 'createdAt']]
+
+const data = serializer.deserialize({ json, meta })
+// data: { name: 'John', createdAt: Date }
+```
+
 ## Serialization Format
 
 In most cases, serialized data includes two optional fields: `json` and `meta`. `json` contains JSON-serializable data. `meta` contains the metadata needed to deserialize values.
@@ -190,5 +214,5 @@ If the receiver mistakenly handles this payload as a regular (non-stream) body, 
 
 ## Learn More
 
-The serializer is a small, self-contained module, making it easy to understand.
-To explore its behavior in detail, see the [source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/rpc-serializer.ts).
+The serializers are small, self-contained modules, making them easy to understand.
+To explore their behavior in detail, see the source code of [`RPCSerializer`](https://github.com/middleapi/orpc/blob/main/packages/client/src/rpc-serializer.ts) and [`RPCJsonSerializer`](https://github.com/middleapi/orpc/blob/main/packages/client/src/rpc-json-serializer.ts).

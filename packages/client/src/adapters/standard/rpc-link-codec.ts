@@ -1,4 +1,4 @@
-import type { Promisable, Value } from '@orpc/shared'
+import type { Promisable, Public, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
 import type { ClientContext, ClientOptions } from '../../types'
 import type { StandardLinkCodec, StandardLinkCodecDecodedResponse } from '../standard'
@@ -50,7 +50,7 @@ export interface RPCLinkCodecOptions<T extends ClientContext> {
   /**
    * Override the default RPC serializer.
    */
-  serializer?: Pick<RPCSerializer, keyof RPCSerializer>
+  serializer?: Public<RPCSerializer>
 }
 
 const END_SLASH_REGEX = /\/$/
