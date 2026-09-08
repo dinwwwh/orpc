@@ -13,15 +13,9 @@ npm run dev
 - Visit [http://localhost:3000](http://localhost:3000) to view the app.
 - Visit [http://localhost:3000/api](http://localhost:3000/api) to explore the OpenAPI client.
 
-## OpenTelemetry
+## Traces
 
-Collect OpenTelemetry traces with [Jaeger](https://www.jaegertracing.io/) by running this in a separate terminal:
-
-```bash
-npm run jaeger
-```
-
-Then play with your app and open [http://localhost:16686](http://localhost:16686) to see the traces in the Jaeger dashboard.
+[Workers Traces](https://developers.cloudflare.com/workers/observability/traces/) are enabled in `wrangler.jsonc` and oRPC records its spans through `CloudflareTracer`. Play with your app and open [http://localhost:3000/cdn-cgi/local/explorer](http://localhost:3000/cdn-cgi/local/explorer) to follow requests through the oRPC pipeline in [Local Explorer](https://developers.cloudflare.com/workers/local-development/local-explorer/). Deployed workers show the same traces in the Cloudflare dashboard.
 
 ## Sponsors
 

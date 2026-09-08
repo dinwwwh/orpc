@@ -5,7 +5,7 @@ import type { ApiReferenceConfiguration as ScalarProviderConfig } from '@scalar/
 import type { StandardUrl } from '@standard-server/core'
 import type { SwaggerUIOptions } from 'swagger-ui'
 import type { OpenAPIDocument, OpenAPIVersion } from '../types'
-import { getOpenTelemetryConfig, matchesHttpPath, mergeHttpPath, stringifyJSON, toArray, value } from '@orpc/shared'
+import { getTracer, matchesHttpPath, mergeHttpPath, stringifyJSON, toArray, value } from '@orpc/shared'
 
 export type OpenAPIReferenceHandlerPluginProvider = 'scalar' | 'swagger'
 
@@ -164,7 +164,7 @@ export class OpenAPIReferenceHandlerPlugin<
             return result
           }
 
-          const span = getOpenTelemetryConfig()?.trace.getActiveSpan()
+          const span = getTracer()?.getActiveSpan()
           const spec = await value(this.spec, routingInterceptorOptions)
 
           if (isSpecPath) {

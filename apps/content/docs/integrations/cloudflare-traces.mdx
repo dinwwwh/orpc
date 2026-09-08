@@ -1,0 +1,79 @@
+---
+title: "Cloudflare Workers Traces Integration"
+description: "Record oRPC procedure, middleware, and stream spans in Cloudflare Workers Traces through the Workers custom spans API, with no OpenTelemetry SDK."
+sidebar:
+  label: "Cloudflare Traces"
+---
+
+:::warning
+This guide assumes familiarity with [Cloudflare Workers Traces](https://developers.cloudflare.com/workers/observability/traces/). Review the official documentation if needed.
+:::
+
+## Installation
+
+```package-install
+npm install @orpc/cloudflare@beta
+```
+
+Local development needs [Wrangler](https://developers.cloudflare.com/workers/wrangler/) 4.129.1 or the [Cloudflare Vite plugin](https://developers.cloudflare.com/workers/vite-plugin/) 1.54.5 or newer, which bundle the runtime that provides `tracing.getActiveSpan` and `span.recordException`.
+
+## Setup
+
+Enable traces in your Wrangler configuration, then register `CloudflareTracer` once at module scope with the `tracing` API from `cloudflare:workers`. oRPC then records the same spans as the [OpenTelemetry integration](/docs/integrations/opentelemetry), nested under the spans Workers create automatically.
+
+```jsonc title="wrangler.jsonc"
+{
+  "observability": {
+    "traces": {
+      "enabled": true
+    }
+  }
+}
+```
+
+```ts
+import { experimental_CloudflareTracer as CloudflareTracer } from '@orpc/cloudflare'
+import { tracing } from 'cloudflare:workers'
+
+new CloudflareTracer(tracing).enable()
+```
+
+:::info
+`CloudflareTracer` covers both handlers and links, so a Worker that calls another oRPC server also records client spans. oRPC uses a single tracer, so do not enable `ORPCInstrumentation` alongside it.
+:::
+
+:::tip
+During local development, [Local Explorer](https://developers.cloudflare.com/workers/local-development/local-explorer/) shows these spans without deploying: press `e` in `wrangler dev`, or open `/cdn-cgi/local/explorer` on the Vite dev server.
+:::
+
+## Middleware Span
+
+oRPC creates a span for each [middleware](/docs/middleware) execution. Use `tracing.getActiveSpan()` to add attributes to it:
+
+```ts
+import { tracing } from 'cloudflare:workers'
+
+export const someMiddleware = os.middleware(async (ctx, next) => {
+  tracing.getActiveSpan()?.setAttribute('someAttribute', 'someValue')
+
+  return next()
+})
+
+Object.defineProperty(someMiddleware, 'name', {
+  value: 'someName',
+})
+```
+
+:::tip
+Define the `name` property on your middleware to improve span naming and make traces easier to read.
+:::
+
+## Limitations
+
+Workers Traces expose a smaller API than OpenTelemetry, so some span details are dropped:
+
+- Spans cannot be renamed, so request spans keep their `METHOD /path` name instead of the procedure path. The procedure path is still recorded in the `rpc.method` attribute.
+- Spans have no events, so the `yielded` and `enqueued` events of streamed inputs and outputs are not recorded.
+- Workers Traces treat every recorded exception as a failure, so exceptions that must not fail a span, such as client aborts, are stored in the `exception.type` and `exception.message` attributes instead.
+- Trace context is not injected into or extracted from headers. Workers propagate it automatically across [service bindings and Durable Objects](https://developers.cloudflare.com/changelog/post/2026-05-07-automatic-tracing-across-do-and-worker-subrequests/).
+- The runtime truncates span names to 64 bytes.

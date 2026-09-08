@@ -5,9 +5,9 @@ const referenceLinks = [
     description: 'Browse every procedure, powered by Scalar.',
   },
   {
-    href: 'http://localhost:16686',
-    label: 'Jaeger Dashboard',
-    description: 'Trace requests as they flow through the oRPC pipeline - "npm run jaeger"',
+    href: '/cdn-cgi/local/explorer/observability',
+    label: 'Local Explorer',
+    description: 'Trace requests as they flow through the oRPC pipeline with Workers Traces.',
   },
 ]
 

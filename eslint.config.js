@@ -48,23 +48,26 @@ export default antfu({
       paths: [
         {
           name: '@opentelemetry/api',
-          allowImportNames: [
-            'AttributeValue',
-            'Context',
-            'ContextAPI',
-            'Exception',
-            'PropagationAPI',
-            'Span',
-            'SpanOptions',
-            'SpanStatusCode',
-            'TraceAPI',
-            'Tracer',
-          ],
-          message: 'Require explicit runtime import from @orpc/opentelemetry',
+          message: 'Only @orpc/opentelemetry may depend on @opentelemetry/api',
         },
       ],
     }],
     'pnpm/json-enforce-catalog': 'off',
+  },
+}, {
+  files: ['packages/opentelemetry/**'],
+  rules: {
+    // the OpenTelemetry integration is the one place that talks to @opentelemetry/api at runtime
+    'no-restricted-imports': ['error', {
+      patterns: [{
+        group: [
+          '/@openapi-spec/types',
+          '/@standard-schema/spec',
+          '/compression',
+        ],
+        message: 'Please import from @orpc/* instead',
+      }],
+    }],
   },
 }, {
   files: ['packages/*/src/**'],

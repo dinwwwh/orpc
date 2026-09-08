@@ -59,12 +59,12 @@ export class PinoHandlerPlugin<T extends Context> implements StandardHandlerPlug
   name = '~pino'
 
   /**
-   * - Logging interceptors should run after OpenTelemetry interceptors
+   * - Logging interceptors should run after tracing interceptors
    *   so they execute within the active request span.
    * - Logging interceptors should run after batch interceptors
    *   so they log each individual request instead of the batch request.
    */
-  before = ['~opentelemetry', '~batch', '~hibernation']
+  before = ['~tracing', '~batch', '~hibernation']
 
   private readonly logger: Exclude<PinoHandlerPluginOptions<T>['logger'], undefined>
   private readonly generateRequestId: Exclude<PinoHandlerPluginOptions<T>['generateRequestId'], undefined>

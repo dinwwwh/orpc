@@ -1,6 +1,3 @@
-/* eslint-disable no-restricted-imports */
-
-import { ROOT_CONTEXT } from '@opentelemetry/api'
 import { ORPCError } from '@orpc/client'
 import * as sharedExperimental from '@orpc/shared'
 import { createProcedureClient } from '../../procedure-client'
@@ -327,25 +324,43 @@ describe('standardHandler', () => {
     })
   })
 
-  describe('openTelemetry', () => {
-    it('extracts propagation context from request headers', async () => {
+  describe('tracing', () => {
+    function createSpan() {
+      return { setAttribute: vi.fn(), updateName: vi.fn(), addEvent: vi.fn(), recordException: vi.fn(), end: vi.fn() }
+    }
+
+    it('starts the request span under the parent extracted from request headers', async ({ onTestFinished }) => {
       codec.resolveProcedure.mockResolvedValue(undefined)
 
-      const activeContext = ROOT_CONTEXT
-      const extract = vi.fn(() => ROOT_CONTEXT)
-      const active = vi.fn(() => activeContext)
+      const span = createSpan()
+      const parent = { name: 'parent' }
+      const extract = vi.fn(() => parent)
+      const startActiveSpan = vi.fn((_name, _options, fn) => fn(span))
 
-      vi.spyOn(sharedExperimental, 'getOpenTelemetryConfig').mockReturnValue({
-        trace: { getActiveSpan: () => undefined },
-        context: { active } as any,
-        propagation: { extract } as any,
-      } as any)
+      sharedExperimental.setTracer({ getActiveSpan: () => span, extract, startActiveSpan } as any)
+      onTestFinished(() => sharedExperimental.setTracer(undefined))
 
-      const request = makeRequest({ headers: { traceparent: '00-test' } })
+      const request = makeRequest({ headers: { traceparent: '00-test' }, url: '/api/v1/ping?search=1' })
       await handler.handle(request, OPTIONS)
 
-      expect(active).toHaveBeenCalledOnce()
-      expect(extract).toHaveBeenCalledWith(activeContext, request.headers)
+      expect(extract).toHaveBeenCalledWith(request.headers)
+      expect(startActiveSpan).toHaveBeenCalledWith('POST /api/v1/ping', parent, expect.any(Function))
+      expect(startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
+      expect(span.updateName).toHaveBeenCalledWith('orpc_no_match')
+      expect(span.end).toHaveBeenCalledTimes(2)
+    })
+
+    it('starts the request span without parent when the tracer cannot extract one', async ({ onTestFinished }) => {
+      codec.resolveProcedure.mockResolvedValue(undefined)
+
+      const startActiveSpan = vi.fn((_name, _options, fn) => fn(createSpan()))
+
+      sharedExperimental.setTracer({ getActiveSpan: () => undefined, startActiveSpan } as any)
+      onTestFinished(() => sharedExperimental.setTracer(undefined))
+
+      await handler.handle(makeRequest(), OPTIONS)
+
+      expect(startActiveSpan).toHaveBeenCalledWith('POST /api/v1/ping', undefined, expect.any(Function))
     })
   })
 })
