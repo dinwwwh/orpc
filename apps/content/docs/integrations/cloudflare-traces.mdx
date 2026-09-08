@@ -74,5 +74,4 @@ Workers Traces still lack some APIs oRPC relies on, so:
 
 - Request spans are not renamed to the procedure path. The path is still recorded in the `rpc.method` attribute.
 - Streamed inputs and outputs record no `yielded` and `enqueued` events.
-- Client aborts are recorded as `exception.type` and `exception.message` attributes.
-- Trace context is not injected into or extracted from request headers.
+- Trace context is not injected into or extracted from request headers by oRPC, Cloudflare Workers propagate it themselves.
