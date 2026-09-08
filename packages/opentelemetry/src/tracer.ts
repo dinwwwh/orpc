@@ -78,10 +78,7 @@ export class OpenTelemetryTracer implements Tracer {
           return undefined
         }
 
-        /**
-         * Headers can carry baggage without trace context, so the parent keeps the
-         * whole extracted context and starts a new trace when no span was extracted.
-         */
+        // Keep the whole context, headers can carry baggage without a span
         const span = this.trace.getSpan(context) ?? this.trace.wrapSpanContext(INVALID_SPAN_CONTEXT)
         return new OpenTelemetrySpan(span, context)
       }
