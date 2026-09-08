@@ -85,13 +85,8 @@ export class experimental_CloudflareTracer implements Tracer {
 
   /**
    * Makes oRPC record its spans with this tracer.
-   * Does nothing when the runtime exposes no tracing API.
    */
   enable(): void {
-    if (this.tracing === undefined) {
-      return
-    }
-
     setTracer(this)
   }
 
