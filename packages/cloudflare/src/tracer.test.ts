@@ -1,8 +1,7 @@
 import type { Tracer } from '@orpc/shared'
 import { getTracer, setTracer } from '@orpc/shared'
-import { tracing } from 'cloudflare:workers'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CloudflareSpan, experimental_CloudflareTracer as CloudflareTracer } from './tracer'
+import { experimental_CloudflareSpan as CloudflareSpan, experimental_CloudflareTracer as CloudflareTracer } from './tracer'
 
 function createFakeSpan() {
   return {
@@ -30,7 +29,7 @@ describe('cloudflareTracer', () => {
   })
 
   it('enables and disables itself as the oRPC tracer', () => {
-    const tracer = new CloudflareTracer(createFakeTracing() as any)
+    const tracer = new CloudflareTracer({ tracing: createFakeTracing() as any })
 
     tracer.enable()
     expect(getTracer()).toBe(tracer)
@@ -41,7 +40,7 @@ describe('cloudflareTracer', () => {
 
   it('starts active spans with enterSpan', async () => {
     const fake = createFakeTracing()
-    const tracer = new CloudflareTracer(fake as any)
+    const tracer = new CloudflareTracer({ tracing: fake as any })
 
     const result = await tracer.startActiveSpan('name', undefined, async (span) => {
       expect(span).toBeInstanceOf(CloudflareSpan)
@@ -55,7 +54,7 @@ describe('cloudflareTracer', () => {
 
   it('starts detached spans with startSpan', () => {
     const fake = createFakeTracing()
-    const tracer = new CloudflareTracer(fake as any)
+    const tracer = new CloudflareTracer({ tracing: fake as any })
 
     const span = tracer.startSpan('name') as CloudflareSpan
     expect(span.span).toBe(fake.span)
@@ -67,7 +66,7 @@ describe('cloudflareTracer', () => {
 
   it('returns the active span', () => {
     const fake = createFakeTracing()
-    const tracer = new CloudflareTracer(fake as any)
+    const tracer = new CloudflareTracer({ tracing: fake as any })
 
     expect((tracer.getActiveSpan() as CloudflareSpan).span).toBe(fake.span)
 
@@ -76,14 +75,14 @@ describe('cloudflareTracer', () => {
   })
 
   it('runs the callback directly for withActiveSpan', async () => {
-    const tracer = new CloudflareTracer(createFakeTracing() as any)
+    const tracer = new CloudflareTracer({ tracing: createFakeTracing() as any })
     const span = tracer.startSpan('name')
 
     expect(tracer.withActiveSpan(span, () => 'out')).toBe('out')
   })
 
   it('has no propagation methods', () => {
-    const tracer: Tracer = new CloudflareTracer(createFakeTracing() as any)
+    const tracer: Tracer = new CloudflareTracer({ tracing: createFakeTracing() as any })
     expect(tracer.inject).toBeUndefined()
     expect(tracer.extract).toBeUndefined()
   })
@@ -146,8 +145,15 @@ describe('cloudflareTracer', () => {
    * so only the older methods run against the real runtime here.
    */
   describe('with the runtime tracing api', () => {
+    it('defaults to the tracing export of cloudflare:workers', () => {
+      const tracer = new CloudflareTracer()
+
+      tracer.enable()
+      expect(getTracer()).toBe(tracer)
+    })
+
     it('records spans without throwing', async () => {
-      const tracer = new CloudflareTracer(tracing)
+      const tracer = new CloudflareTracer()
 
       const result = await tracer.startActiveSpan('active', undefined, async (span) => {
         span.setAttribute('key', 'value')
@@ -169,7 +175,7 @@ describe('cloudflareTracer', () => {
     })
 
     it('rethrows errors from active spans', async () => {
-      const tracer = new CloudflareTracer(tracing)
+      const tracer = new CloudflareTracer()
 
       await expect(tracer.startActiveSpan('failing', undefined, async () => {
         throw new Error('boom')

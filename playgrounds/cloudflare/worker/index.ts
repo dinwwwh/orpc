@@ -8,9 +8,8 @@ import { OpenAPIGenerator } from '@orpc/openapi'
 import { ZodToJsonSchemaConverter } from '@orpc/zod'
 import { SmartCoercionHandlerPlugin } from '@orpc/json-schema'
 import { experimental_CloudflareTracer as CloudflareTracer, DurablePublisher, DurablePublisherObject } from '@orpc/cloudflare'
-import { tracing } from 'cloudflare:workers'
 
-new CloudflareTracer(tracing).enable()
+new CloudflareTracer().enable()
 
 const zodConverter = new ZodToJsonSchemaConverter()
 

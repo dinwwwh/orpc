@@ -19,7 +19,7 @@ Local development needs [Wrangler](https://developers.cloudflare.com/workers/wra
 
 ## Setup
 
-Enable traces in your Wrangler configuration, then register `CloudflareTracer` once at module scope with the `tracing` API from `cloudflare:workers`. oRPC then records the same spans as the [OpenTelemetry integration](/docs/integrations/opentelemetry), nested under the spans Workers create automatically.
+Enable traces in your Wrangler configuration, then register `CloudflareTracer` once at module scope. oRPC then records the same spans as the [OpenTelemetry integration](/docs/integrations/opentelemetry), nested under the spans Workers create automatically.
 
 ```jsonc title="wrangler.jsonc"
 {
@@ -33,9 +33,8 @@ Enable traces in your Wrangler configuration, then register `CloudflareTracer` o
 
 ```ts
 import { experimental_CloudflareTracer as CloudflareTracer } from '@orpc/cloudflare'
-import { tracing } from 'cloudflare:workers'
 
-new CloudflareTracer(tracing).enable()
+new CloudflareTracer().enable()
 ```
 
 :::info

@@ -1,7 +1,8 @@
 import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
 import { setTracer, toSpanAttributeValue } from '@orpc/shared'
+import { tracing } from 'cloudflare:workers'
 
-export class CloudflareSpan implements TracingSpan {
+class CloudflareSpan implements TracingSpan {
   constructor(readonly span: Span) {}
 
   setAttribute(key: string, value: TracingAttributeValue): void {
@@ -40,13 +41,28 @@ export class CloudflareSpan implements TracingSpan {
   }
 }
 
+export { CloudflareSpan as experimental_CloudflareSpan }
+
+export interface experimental_CloudflareTracerOptions {
+  /**
+   * The Workers tracing API to record spans with.
+   *
+   * @default tracing from `cloudflare:workers`
+   */
+  tracing?: Tracing
+}
+
 /**
  * Records oRPC spans with Cloudflare Workers Traces.
  *
  * @see {@link https://orpc.dev/docs/integrations/cloudflare-traces | Cloudflare Workers Traces Integration}
  */
 export class experimental_CloudflareTracer implements Tracer {
-  constructor(private readonly tracing: Tracing) {}
+  private readonly tracing: Tracing
+
+  constructor(options: experimental_CloudflareTracerOptions = {}) {
+    this.tracing = options.tracing ?? tracing
+  }
 
   startSpan(name: string): TracingSpan {
     // Workers Traces nest spans by async context, so the parent option is not needed
@@ -69,8 +85,13 @@ export class experimental_CloudflareTracer implements Tracer {
 
   /**
    * Makes oRPC record its spans with this tracer.
+   * Does nothing when the runtime exposes no tracing API.
    */
   enable(): void {
+    if (this.tracing === undefined) {
+      return
+    }
+
     setTracer(this)
   }
 
