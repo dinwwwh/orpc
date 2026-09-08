@@ -70,9 +70,9 @@ Define the `name` property on your middleware to improve span naming and make tr
 
 ## Limitations
 
-Compared with the [OpenTelemetry integration](/docs/integrations/opentelemetry), a few span details are dropped because the Workers custom spans API has no equivalent:
+Workers Traces still lack some APIs oRPC relies on, so:
 
-- Request spans keep their `METHOD /path` name instead of being renamed to the procedure path. The procedure path is still recorded in the `rpc.method` attribute.
+- Request spans are not renamed to the procedure path. The path is still recorded in the `rpc.method` attribute.
 - Streamed inputs and outputs record no `yielded` and `enqueued` events.
-- Client aborts are recorded as `exception.type` and `exception.message` attributes instead of an exception event, because any exception recorded on a Workers span marks it as failed.
+- Client aborts are recorded as `exception.type` and `exception.message` attributes.
 - Trace context is not injected into or extracted from request headers.
