@@ -1,6 +1,10 @@
 import type { Promisable, Tracer, TracingAttributeValue, TracingException, TracingExceptionLevel, TracingSpan } from '@orpc/shared'
 import { setTracer, toSpanAttributeValue } from '@orpc/shared'
-import { tracing } from 'cloudflare:workers'
+/**
+ * A namespace import keeps `@orpc/cloudflare` loadable on runtimes that predate the
+ * `tracing` export, so users of the other adapters are not affected by it.
+ */
+import * as workers from 'cloudflare:workers'
 
 class CloudflareSpan implements TracingSpan {
   constructor(readonly span: Span) {}
@@ -61,7 +65,7 @@ export class experimental_CloudflareTracer implements Tracer {
   private readonly tracing: Tracing
 
   constructor(options: experimental_CloudflareTracerOptions = {}) {
-    this.tracing = options.tracing ?? tracing
+    this.tracing = options.tracing ?? workers.tracing
   }
 
   startSpan(name: string): TracingSpan {
