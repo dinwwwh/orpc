@@ -558,6 +558,38 @@ describe('openAPIGenerator version', () => {
     })
   })
 
+  it.each(['3.2.0', '3.1.0', '3.0.3'] as const)('preserves error titles in OpenAPI %s', async (version) => {
+    const doc = await generator.generate({
+      create: oc.meta(openapi({ method: 'POST', path: '/penguins' })).errors({
+        PENGUIN_NAME_BANNED: {},
+        PENGUIN_COLONY_FULL: {},
+      }),
+    }, {
+      version,
+      errorStatusMap: { PENGUIN_NAME_BANNED: 400, PENGUIN_COLONY_FULL: 400 },
+    })
+
+    const response = doc.paths?.['/penguins']?.post?.responses?.['400']
+    expect(response).toMatchObject({
+      content: {
+        'application/json': {
+          schema: {
+            oneOf: [
+              { $ref: '#/components/schemas/PenguinNameBanned' },
+              { $ref: '#/components/schemas/PenguinColonyFull' },
+              { $ref: '#/components/schemas/UndefinedError' },
+            ],
+          },
+        },
+      },
+    })
+    expect(doc.components?.schemas).toMatchObject({
+      PenguinNameBanned: { title: 'PENGUIN_NAME_BANNED' },
+      PenguinColonyFull: { title: 'PENGUIN_COLONY_FULL' },
+      UndefinedError: { title: 'UndefinedError' },
+    })
+  })
+
   it('serializes non-JSON values after downgrading', async () => {
     const doc = await generator.generate({}, {
       version: '3.0.4',

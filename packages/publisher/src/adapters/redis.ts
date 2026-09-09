@@ -1,14 +1,8 @@
-import type { RPCJsonSerialization } from '@orpc/client'
-import type { Public, ThrowableError } from '@orpc/shared'
-import type { EventMeta } from '@standard-server/core'
 import type { RedisClientType } from 'redis'
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
-import { RPCJsonSerializer } from '@orpc/client'
-import { once, parseEmptyableJSON, stringifyJSON } from '@orpc/shared'
-import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
-import { Publisher } from '../publisher'
+import type { BaseRedisPublisherOptions, RedisStreamEntry, RedisStreamTrimOptions } from './base-redis'
+import { BaseRedisPublisher } from './base-redis'
 
-export interface RedisPublisherOptions extends PublisherOptions {
+export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
   /**
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
@@ -17,50 +11,6 @@ export interface RedisPublisherOptions extends PublisherOptions {
    * @default redis.duplicate()
    */
   subscriber?: undefined | RedisClientType<any, any, any, any, any>
-
-  /**
-   * The prefix to use for Redis keys.
-   *
-   * @default ''
-   */
-  prefix?: string
-
-  /**
-   * Serializer for serialize and deserialize payloads.
-   *
-   * @default RPCJsonSerializer
-   */
-  serializer?: undefined | Public<RPCJsonSerializer>
-
-  /**
-   * Configuration for event resume support.
-   *
-   * When enabled, published events are temporarily stored so new
-   * subscribers can resume from a previous position using `lastEventId`.
-   *
-   * @default { enabled: false }
-   */
-  resume?: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * How long (in seconds) to retain events for resume.
-     *
-     * Expired events are cleaned up lazily for performance reasons, so
-     * some events may remain available slightly longer than this period.
-     *
-     * @default 300 (5 min)
-     */
-    seconds?: number
-  }
 }
 
 /**
@@ -69,169 +19,61 @@ export interface RedisPublisherOptions extends PublisherOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
-export class RedisPublisher<T extends Record<string, object>> extends Publisher<T> {
+export class RedisPublisher<T extends Record<string, object>> extends BaseRedisPublisher<T> {
   private readonly subscriber: Exclude<RedisPublisherOptions['subscriber'], undefined>
-  private readonly prefix: Exclude<RedisPublisherOptions['prefix'], undefined>
-  private readonly serializer: Exclude<RedisPublisherOptions['serializer'], undefined>
-  private readonly resumeEnabled: boolean
-  private readonly resumeSeconds: number
-
-  /**
-   * The exactness of the `XTRIM` command.
-   * Used for testing purpose.
-   */
-  private readonly xTrimExactness: '~' | '=' = '~'
 
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
-    options: RedisPublisherOptions = {},
+    { subscriber, ...options }: RedisPublisherOptions = {},
   ) {
     super(options)
 
-    this.prefix = options.prefix ?? ''
-    this.serializer = options.serializer ?? new RPCJsonSerializer()
-    this.resumeEnabled = options.resume?.enabled ?? false
-    this.resumeSeconds = options.resume?.seconds ?? 300
-    this.subscriber = options.subscriber ?? redis.duplicate()
+    this.subscriber = subscriber ?? redis.duplicate()
   }
 
-  private readonly firstPublishTimeMap: Map<string, number> = new Map()
-  async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
-    const redisKey = `${this.prefix}${event}`
-    const data = this.serializePayload(payload)
-    let id: string | undefined
-
-    if (!this.redis.isOpen) {
-      await this.redis.connect()
-    }
-
-    if (this.resumeEnabled) {
-      const now = Date.now()
-
-      // Remove expired resume windows.
-      // The next publish for a stale event will perform trimming again.
-      for (const [event, firstPublishTime] of this.firstPublishTimeMap) {
-        if (firstPublishTime + this.resumeSeconds * 1000 < now) {
-          this.firstPublishTimeMap.delete(event)
-        }
-      }
-
-      if (!this.firstPublishTimeMap.has(event)) {
-        this.firstPublishTimeMap.set(event, now)
-
-        const result = await this.redis.multi()
-          .xAdd(redisKey, '*', { data: stringifyJSON(data) })
-          .xTrim(redisKey, 'MINID', `${now - this.resumeSeconds * 1000}-0`, { strategyModifier: this.xTrimExactness })
-          // Use a 2x TTL so events published near the end of the resume window
-          // are not expired before the next window updates the key expiration.
-          .expire(redisKey, this.resumeSeconds * 2)
-          .exec()
-
-        id = result[0] as unknown as string
-      }
-      else {
-        id = await this.redis.xAdd(redisKey, '*', { data: stringifyJSON(data) }) as string
-      }
-    }
-
-    await this.redis.publish(redisKey, stringifyJSON({ data, id }))
+  protected async publishMessage(channel: string, message: string): Promise<void> {
+    await connectIfNeeded(this.redis)
+    await this.redis.publish(channel, message)
   }
 
-  protected async subscribeListener<K extends keyof T & string>(
-    event: K,
-    originalListener: (payload: T[K]) => void,
-    { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
-  ): Promise<() => Promise<void>> {
-    const redisKey = `${this.prefix}${event}`
+  protected async subscribeChannel(channel: string, listener: (message: unknown) => void): Promise<() => Promise<void>> {
+    await connectIfNeeded(this.subscriber)
+    await this.subscriber.subscribe(channel, listener)
 
-    if (!this.subscriber.isOpen) {
-      await this.subscriber.connect()
+    return async () => {
+      await this.subscriber.unsubscribe(channel, listener)
     }
-
-    let pendingPayloads: T[K][] | undefined = []
-    const resumedIds = new Set<string>()
-
-    const deduplicatingListener = (payload: T[K]) => {
-      if (pendingPayloads) {
-        pendingPayloads.push(payload)
-        return
-      }
-
-      const id = getEventMeta(payload)?.id
-      if (id !== undefined && resumedIds.has(id)) { // Already delivered during resume.
-        return
-      }
-
-      originalListener(payload)
-    }
-
-    const redisListener = (message: string) => {
-      try {
-        const { id, data } = parseEmptyableJSON(message) as any
-        const payload = this.deserializePayload(id, data)
-        deduplicatingListener(payload as any)
-      }
-      catch (error) {
-        // Can happen if the published message has an unexpected format.
-        onError?.(error as ThrowableError)
-      }
-    }
-
-    try {
-      const subscribePromise = this.subscriber.subscribe(redisKey, redisListener)
-
-      try {
-        if (this.resumeEnabled && lastEventId !== undefined) {
-          if (!this.redis.isOpen) {
-            await this.redis.connect()
-          }
-
-          const results = await this.redis.xRead({ key: redisKey, id: lastEventId })
-
-          if (results && results[0]) {
-            const { messages } = results[0]
-
-            for (const { id, message } of messages) {
-              const rawData = message.data
-              const data = parseEmptyableJSON(rawData as string)
-              const payload = this.deserializePayload(id, data as any)
-              resumedIds.add(id)
-              originalListener(payload as T[K])
-            }
-          }
-        }
-      }
-      finally {
-        const pending = pendingPayloads
-        pendingPayloads = undefined
-
-        for (const payload of pending) {
-          deduplicatingListener(payload)
-        }
-      }
-
-      await subscribePromise
-    }
-    catch (error) {
-      await this.subscriber.unsubscribe(redisKey, redisListener)
-      throw error
-    }
-
-    return once(async () => {
-      await this.subscriber.unsubscribe(redisKey, redisListener)
-    })
   }
 
-  private serializePayload(payload: object): { payload: RPCJsonSerialization, meta?: undefined | EventMeta } {
-    const [original, meta] = unwrapEvent(payload)
-    const { json, meta: jsonMeta } = this.serializer.serialize(original)
-    return { payload: { json, meta: jsonMeta }, meta }
+  protected async addStreamEntry(key: string, data: string, trim?: RedisStreamTrimOptions): Promise<string> {
+    await connectIfNeeded(this.redis)
+
+    if (!trim) {
+      return await this.redis.xAdd(key, '*', { data }) as string
+    }
+
+    const [id] = await this.redis.multi()
+      .xAdd(key, '*', { data })
+      .xTrim(key, 'MINID', trim.minId, { strategyModifier: trim.exactness })
+      .expire(key, trim.expireSeconds)
+      .exec()
+
+    return id as unknown as string
   }
 
-  private deserializePayload(id: string | undefined, { payload, meta }: { payload: RPCJsonSerialization, meta?: undefined | EventMeta }): object {
-    return withEventMeta(
-      this.serializer.deserialize(payload) as object,
-      id === undefined ? { ...meta } : { ...meta, id },
-    )
+  protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
+    await connectIfNeeded(this.redis)
+
+    const results = await this.redis.xRead({ key, id: lastId })
+
+    const entries: Array<{ id: string, message: Record<string, string> }> = results?.[0]?.messages ?? []
+
+    return entries.map(({ id, message }) => ({ id, data: message.data! }))
+  }
+}
+
+async function connectIfNeeded(client: RedisClientType<any, any, any, any, any>): Promise<void> {
+  if (!client.isOpen) {
+    await client.connect()
   }
 }
