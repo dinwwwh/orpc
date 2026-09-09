@@ -193,6 +193,15 @@ export default [
     "tierLevel": 2
   },
   {
+    "name": "Stefan Smiljkovic",
+    "login": "shtefcs",
+    "avatar": "https://avatars.githubusercontent.com/u/1984909?u=b7bf5bc40ed49df3c22f69d2da7b8d78709c49ed&v=4",
+    "link": "https://automatio.ai/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Sponsor",
+    "tierLevel": 2
+  },
+  {
     "name": "David Walsh",
     "login": "rhinodavid",
     "avatar": "https://avatars.githubusercontent.com/u/5778036?u=b5521f07d2f88c3db2a0dae62b5f2f8357214af0&v=4",
