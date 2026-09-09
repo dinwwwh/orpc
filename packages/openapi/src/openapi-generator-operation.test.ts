@@ -699,6 +699,7 @@ describe('openAPIGenerator operation builders', () => {
       })
 
       expect(doc.components?.schemas?.BadRequest).toEqual({
+        title: 'BAD_REQUEST',
         type: 'object',
         properties: {
           defined: { const: true },
@@ -710,6 +711,7 @@ describe('openAPIGenerator operation builders', () => {
         required: ['defined', 'code', 'status', 'message', 'data'],
       })
       expect(doc.components?.schemas?.BadRequest2).toEqual({
+        title: 'BAD_REQUEST_2',
         type: 'object',
         properties: {
           defined: { const: true },
@@ -721,6 +723,7 @@ describe('openAPIGenerator operation builders', () => {
         required: ['defined', 'code', 'status', 'message'],
       })
       expect(doc.components?.schemas?.UndefinedError).toEqual({
+        title: 'UndefinedError',
         type: 'object',
         properties: {
           defined: { const: false },
@@ -812,6 +815,7 @@ describe('openAPIGenerator operation builders', () => {
       })
 
       expect(doc.components?.schemas?.Forbidden).toEqual({
+        title: 'FORBIDDEN',
         type: 'object',
         properties: {
           defined: { const: true },

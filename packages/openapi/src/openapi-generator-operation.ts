@@ -475,6 +475,7 @@ export function buildErrorResponse(
   }
 
   const undefinedErrorSchema = ctx.registry.register('UndefinedError', {
+    title: 'UndefinedError',
     type: 'object',
     properties: {
       defined: { const: false },
@@ -495,14 +496,17 @@ export function buildErrorResponse(
     )
     const responseSchema = customBodySchema ?? combineJsonSchemasWithComposition('oneOf', [
       ...definitions.map(({ code, dataJsonSchema, dataOptional }) => {
-        return ctx.registry.register(toErrorComponentName(code), combineJsonObjectSchemaEntries([
-          ['defined', { const: true }, false],
-          ['code', { const: code }, false],
-          ['status', { const: status }, false],
-          // avoid using the defaultMessage here to improve component reusability
-          ['message', { type: 'string' }, false],
-          ['data', ctx.registry.hoistDefs(dataJsonSchema, 'output'), dataOptional],
-        ]))
+        return ctx.registry.register(toErrorComponentName(code), {
+          title: code,
+          ...combineJsonObjectSchemaEntries([
+            ['defined', { const: true }, false],
+            ['code', { const: code }, false],
+            ['status', { const: status }, false],
+            // avoid using the defaultMessage here to improve component reusability
+            ['message', { type: 'string' }, false],
+            ['data', ctx.registry.hoistDefs(dataJsonSchema, 'output'), dataOptional],
+          ]),
+        })
       }),
       undefinedErrorSchema,
     ])

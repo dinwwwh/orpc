@@ -77,6 +77,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
     const doc = await generator.generate(router)
 
     expect(doc.components?.schemas?.Conflict).toEqual({
+      title: 'CONFLICT',
       type: 'object',
       properties: {
         defined: { const: true },
@@ -95,6 +96,7 @@ describe('openAPIGenerator e2e: typed errors', () => {
     })
 
     expect(doc.components?.schemas?.UndefinedError).toEqual({
+      title: 'UndefinedError',
       type: 'object',
       properties: {
         defined: { const: false },
@@ -104,6 +106,41 @@ describe('openAPIGenerator e2e: typed errors', () => {
         data: {},
       },
       required: ['defined', 'code', 'status', 'message'],
+    })
+  })
+
+  it.each(['3.2.0', '3.1.0', '3.0.3'] as const)('titles error components after their codes so oneOf branches sharing a status stay distinguishable in OpenAPI %s', async (version) => {
+    const doc = await generator.generate({
+      createPlanet: oc
+        .meta(openapi({ method: 'POST', path: '/planets' }))
+        .errors({
+          PLANET_NAME_TAKEN: { data: z.object({ existingId: z.string() }) },
+          PLANET_QUOTA_EXCEEDED: {},
+        })
+        .input(z.object({ name: z.string() })),
+    }, {
+      version,
+      errorStatusMap: { PLANET_NAME_TAKEN: 409, PLANET_QUOTA_EXCEEDED: 409 },
+    })
+
+    expect(doc.paths?.['/planets']?.post?.responses?.['409']).toEqual(expect.objectContaining({
+      content: {
+        'application/json': {
+          schema: {
+            oneOf: [
+              { $ref: '#/components/schemas/PlanetNameTaken' },
+              { $ref: '#/components/schemas/PlanetQuotaExceeded' },
+              { $ref: '#/components/schemas/UndefinedError' },
+            ],
+          },
+        },
+      },
+    }))
+
+    expect(doc.components?.schemas).toEqual({
+      PlanetNameTaken: expect.objectContaining({ title: 'PLANET_NAME_TAKEN' }),
+      PlanetQuotaExceeded: expect.objectContaining({ title: 'PLANET_QUOTA_EXCEEDED' }),
+      UndefinedError: expect.objectContaining({ title: 'UndefinedError' }),
     })
   })
 
