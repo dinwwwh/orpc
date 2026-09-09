@@ -14,6 +14,13 @@ export interface CacheEntry {
    * `undefined` means the entry never becomes stale.
    */
   expiresAt?: number | undefined
+
+  /**
+   * The time (unix timestamp in seconds) after which the entry is no longer
+   * served, once its stale-while-revalidate window has passed. `undefined`
+   * means the entry never expires.
+   */
+  evictAt?: number | undefined
 }
 
 export interface CacheFetchOptions {

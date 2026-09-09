@@ -194,6 +194,16 @@ describe('cacheHandlerPlugin', () => {
       expect(response.headers.get('cache-control')).toBe('public, max-age=31536000')
     })
 
+    it('sets its headers over ones already on the response', async () => {
+      const { record, handle } = createTestingHandler(headers, { 'cache-control': 'private, no-store', 'cache-tag': 'stale' })
+      record({ caches: [{ tags: ['planets'], ttl: 2 }] })
+
+      const response = await handle()
+
+      expect(response.headers.get('cache-control')).toBe('public, max-age=2')
+      expect(response.headers.get('cache-tag')).toBe('planets')
+    })
+
     it('reflects the root check whatever the request method', async () => {
       const { record, handle } = createTestingHandler(headers)
       record({ caches: [{ tags: ['planets'], ttl: 2 }] })

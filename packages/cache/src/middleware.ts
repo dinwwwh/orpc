@@ -84,12 +84,16 @@ export function cache<
       waitUntil: middlewareOptions.context['cache/waitUntil'],
     })
 
+    const now = nowInSeconds()
+
     pluginContext?.caches.push({
       procedure: middlewareOptions.procedure,
       path: middlewareOptions.path,
       tags: entry.tags,
-      ttl: entry.expiresAt !== undefined ? Math.max(0, entry.expiresAt - nowInSeconds()) : undefined,
-      swr,
+      ttl: entry.expiresAt === undefined ? undefined : Math.max(0, entry.expiresAt - now),
+      swr: entry.expiresAt === undefined || entry.evictAt === undefined
+        ? undefined
+        : Math.max(0, entry.evictAt - Math.max(now, entry.expiresAt)),
     })
 
     return done({ output: entry.output })

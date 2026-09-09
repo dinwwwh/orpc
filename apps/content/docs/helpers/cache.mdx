@@ -104,7 +104,7 @@ The promise it receives rejects when a refresh fails, so `cache/waitUntil` is al
 
 ## Revalidate Middleware
 
-The `revalidate` helper creates middleware that revalidates tags after the procedure succeeds, typically on mutations. The required `tags` option accepts a non-empty list or a function of the middleware options and input. When the procedure throws, or `tags` resolves to `null` or `undefined`, nothing is revalidated.
+The `revalidate` helper creates middleware that revalidates tags after the procedure succeeds, typically on mutations. The required `tags` option accepts a non-empty list or a function of the middleware options and input. When the procedure throws, or `tags` resolves to `null` or `undefined`, nothing is revalidated. When the store fails to revalidate, the request fails even though the mutation already ran, so the failure is visible; retrying such a request repeats the mutation.
 
 ```ts
 import { revalidate } from '@orpc/experimental-cache'

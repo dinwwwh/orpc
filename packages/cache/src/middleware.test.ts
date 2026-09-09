@@ -15,6 +15,7 @@ function createStore(entry?: CacheEntry) {
       output: await fill(),
       tags: options?.tags,
       expiresAt: options?.ttl !== undefined ? nowInSeconds() + options.ttl : undefined,
+      evictAt: options?.ttl !== undefined ? nowInSeconds() + options.ttl + (options.swr ?? 0) : undefined,
     }),
     revalidate: vi.fn<CacheStore['revalidate']>().mockResolvedValue(undefined),
   }
@@ -152,22 +153,28 @@ describe('cache', () => {
     expect(store.fetch).toHaveBeenCalledWith('k', expect.any(Function), expect.objectContaining({ waitUntil }))
   })
 
-  it('records the entry into the handler plugin context with its remaining ttl', async () => {
-    const stale = createStore({ output: 'stale', tags: ['stored'], expiresAt: nowInSeconds() - 1 })
-    const pluginContext = { caches: [], revalidations: [] }
+  it('records the entry into the handler plugin context with its remaining ttl and swr', async () => {
+    const now = nowInSeconds()
+    const stale = createStore({ output: 'stale', tags: ['stored'], expiresAt: now - 10, evictAt: now + 20 })
+    const fresh = createStore({ output: 'fresh', tags: ['stored'], expiresAt: now + 60, evictAt: now + 90 })
+    const pluginContext: Exclude<CacheHandlerPluginContext[typeof CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL], undefined> = { caches: [], revalidations: [] }
     const procedure = os
       .$context<CacheContext & CacheHandlerPluginContext>()
       .use(cache({ key: 'k', tags: ['t'], swr: 30 }))
-      .handler(() => 'fresh')
+      .handler(() => 'filled')
     const context = { [CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]: pluginContext }
 
     await call(procedure, undefined, { context: { 'cache/store': stale, ...context }, path: ['__path__'] })
+    await call(procedure, undefined, { context: { 'cache/store': fresh, ...context }, path: ['__path__'] })
     await call(procedure, undefined, { context: { 'cache/store': createStore(), ...context }, path: ['__path__'] })
 
-    expect(pluginContext.caches).toEqual([
-      { procedure, path: ['__path__'], tags: ['stored'], ttl: 0, swr: 30 }, // the stale entry
-      { procedure, path: ['__path__'], tags: ['t'], ttl: undefined, swr: 30 }, // the never expiring fill
+    // Only what is left of each window is reflected, so headers never outlive the entry.
+    expect(pluginContext.caches.map(({ ttl, swr }) => ({ ttl, swr }))).toEqual([
+      { ttl: 0, swr: expect.closeTo(20, -1) },
+      { ttl: expect.closeTo(60, -1), swr: 30 },
+      { ttl: undefined, swr: undefined },
     ])
+    expect(pluginContext.caches.map(({ tags }) => tags)).toEqual([['stored'], ['stored'], ['t']])
   })
 
   it('propagates store failures and records no check', async () => {
@@ -319,7 +326,7 @@ describe('revalidate', () => {
 })
 
 describe('cache + revalidate combined', () => {
-  it('revalidates before filling on miss, and skips the revalidation on hit', async () => {
+  it('never serves an entry whose own fill revalidated one of its tags', async () => {
     const store = new MemoryCacheStore()
     const revalidateSpy = vi.spyOn(store, 'revalidate')
     const handlerFn = vi.fn(() => 'fresh')
@@ -330,12 +337,11 @@ describe('cache + revalidate combined', () => {
       .handler(handlerFn)
     const run = () => call(procedure, undefined, { context: { 'cache/store': store } })
 
-    // The revalidation runs inside the fill, so the stored entry snapshots the bumped tag and survives.
+    // The tag was captured before the fill and bumped during it, so the entry is invalid on arrival.
     await expect(run()).resolves.toBe('fresh')
-    expect(revalidateSpy).toHaveBeenCalledTimes(1)
+    await expect(run()).resolves.toBe('fresh')
 
-    await expect(run()).resolves.toBe('fresh')
-    expect(handlerFn).toHaveBeenCalledTimes(1)
-    expect(revalidateSpy).toHaveBeenCalledTimes(1)
+    expect(handlerFn).toHaveBeenCalledTimes(2)
+    expect(revalidateSpy).toHaveBeenCalledTimes(2)
   })
 })

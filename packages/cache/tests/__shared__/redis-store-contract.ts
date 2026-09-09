@@ -99,6 +99,28 @@ export function describeRedisCacheStoreContract(
     await expect(store.fetch('broken', async () => 'v')).rejects.toThrow()
   })
 
+  it('drops output computed before a revalidation that landed during its fill', async () => {
+    const { store } = createStore()
+    let finish!: (output: string) => void
+    let started!: () => void
+    const filling = new Promise<void>((resolve) => {
+      started = resolve
+    })
+
+    const first = store.fetch('k', () => {
+      started()
+      return new Promise<string>((resolve) => {
+        finish = resolve
+      })
+    }, { tags: ['t'] })
+    await filling
+    await store.revalidate({ tags: ['t'] })
+    finish('outdated')
+
+    await expect(first).resolves.toMatchObject({ output: 'outdated' })
+    await expect(store.fetch('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
+  })
+
   it('stays consistent under concurrent fetches and a revalidation on a shared tag', async () => {
     const { store } = createStore()
     const keys = Array.from({ length: 20 }, (_, index) => `k${index}`)

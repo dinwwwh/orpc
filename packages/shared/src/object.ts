@@ -163,27 +163,6 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
   return result
 }
 
-/**
- * Recursively rebuilds plain objects with their keys in sorted order, so two
- * structurally equal values produce the same serialized form. Arrays are
- * mapped, anything else is returned as-is.
- */
-export function deepSortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(deepSortKeys)
-  }
-
-  if (isPlainObject(value)) {
-    const sorted: Record<PropertyKey, unknown> = {}
-    for (const key of Object.keys(value).sort()) {
-      sorted[key] = deepSortKeys(value[key])
-    }
-    return sorted
-  }
-
-  return value
-}
-
 export function omit<T extends object, K extends keyof T>(
   obj: T,
   keys: readonly K[],
@@ -302,4 +281,20 @@ export function bindMethods<T extends object>(
   }
 
   return methods as any
+}
+
+export function deepSortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(deepSortKeys)
+  }
+
+  if (isPlainObject(value)) {
+    const sorted: Record<PropertyKey, unknown> = new NullProtoObj()
+    for (const key of Object.keys(value).sort()) {
+      sorted[key] = deepSortKeys(value[key])
+    }
+    return sorted
+  }
+
+  return value
 }

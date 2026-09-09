@@ -28,7 +28,8 @@ export interface VercelCacheStoreOptions extends BaseKeyValueCacheStoreOptions {
  * natively via `expireTag`, and entries are retained for `ttl + swr`.
  * Outside Vercel, the default `getCache()` falls back to an in-memory
  * cache. Concurrent callers of one key are coalesced within the process,
- * since the Runtime Cache has no atomic primitive.
+ * since the Runtime Cache has no atomic primitive; for the same reason, a
+ * revalidation landing while a fill runs is not detected.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
@@ -60,7 +61,12 @@ export class VercelCacheStore extends BaseKeyValueCacheStore {
       output: this.serializer.deserialize(envelope.output),
       tags: envelope.tags,
       expiresAt: envelope.expiresAt,
+      evictAt: envelope.evictAt,
     }
+  }
+
+  protected snapshot(): undefined {
+    return undefined
   }
 
   protected async write(encodedKey: string, output: unknown, options: CacheFetchOptions): Promise<CacheEntry> {
@@ -80,6 +86,6 @@ export class VercelCacheStore extends BaseKeyValueCacheStore {
       ...(retention !== undefined ? { ttl: retention } : {}),
     })
 
-    return { output, tags, expiresAt }
+    return { output, tags, expiresAt, evictAt }
   }
 }

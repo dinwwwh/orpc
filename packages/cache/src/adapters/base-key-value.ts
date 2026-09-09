@@ -20,7 +20,7 @@ export interface BaseKeyValueCacheStoreOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export abstract class BaseKeyValueCacheStore implements CacheStore {
+export abstract class BaseKeyValueCacheStore<TSnapshot = undefined> implements CacheStore {
   private readonly pending = new Map<string, Promise<unknown>>()
   protected readonly serializer: Public<RPCJsonSerializer>
 
@@ -35,7 +35,13 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
     if (entry === undefined) {
       return this.coalesce(encodedKey, async (waited) => {
         const current = waited ? await this.read(encodedKey) : undefined
-        return current ?? this.write(encodedKey, await fill(), options)
+
+        if (current !== undefined) {
+          return current
+        }
+
+        const snapshot = await this.snapshot(options)
+        return this.write(encodedKey, await fill(), options, snapshot)
       })
     }
 
@@ -44,7 +50,8 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
         const current = waited ? await this.read(encodedKey) : undefined
 
         if (current === undefined || isCacheEntryStale(current)) {
-          await this.write(encodedKey, await fill(), options)
+          const snapshot = await this.snapshot(options)
+          await this.write(encodedKey, await fill(), options, snapshot)
         }
       })
 
@@ -58,7 +65,13 @@ export abstract class BaseKeyValueCacheStore implements CacheStore {
 
   protected abstract read(encodedKey: string): Promisable<CacheEntry | undefined>
 
-  protected abstract write(encodedKey: string, output: unknown, options: CacheFetchOptions): Promisable<CacheEntry>
+  /**
+   * Captures the tag state a fill starts from, so a revalidation that lands
+   * while the fill runs still invalidates what it stores.
+   */
+  protected abstract snapshot(options: CacheFetchOptions): Promisable<TSnapshot>
+
+  protected abstract write(encodedKey: string, output: unknown, options: CacheFetchOptions, snapshot: TSnapshot): Promisable<CacheEntry>
 
   /**
    * Runs `fn` once the key is free, in call order. `waited` is `true` when

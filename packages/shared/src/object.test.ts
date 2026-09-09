@@ -656,6 +656,13 @@ describe('deepSortKeys', () => {
     expect(Object.keys(deepSortKeys({ b: 2, a: 1 }) as object)).toEqual(['a', 'b'])
   })
 
+  it('keeps an own __proto__ key as data', () => {
+    const sorted = deepSortKeys(JSON.parse('{"b": 1, "__proto__": {"x": 1}}')) as Record<string, unknown>
+
+    expect(Object.keys(sorted)).toEqual(['__proto__', 'b'])
+    expect(JSON.stringify(sorted)).toBe('{"__proto__":{"x":1},"b":1}')
+  })
+
   it('returns non-plain values as-is', () => {
     const date = new Date()
     const map = new Map([['b', 2], ['a', 1]])

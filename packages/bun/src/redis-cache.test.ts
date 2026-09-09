@@ -179,6 +179,28 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
     await expect(second).resolves.toMatchObject({ output: 'fresh' })
   }, { timeout: 20_000 })
 
+  it('drops output computed before a revalidation that landed during its fill', async () => {
+    const { store } = createTestingStore()
+    let finish!: (output: string) => void
+    let started!: () => void
+    const filling = new Promise<void>((resolve) => {
+      started = resolve
+    })
+
+    const first = store.fetch('k', () => {
+      started()
+      return new Promise<string>((resolve) => {
+        finish = resolve
+      })
+    }, { tags: ['t'] })
+    await filling
+    await store.revalidate({ tags: ['t'] })
+    finish('outdated')
+
+    await expect(first).resolves.toMatchObject({ output: 'outdated' })
+    await expect(store.fetch('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
+  }, { timeout: 20_000 })
+
   it('frees waiters after lockTtl and leaves a lock taken over that way alone', async () => {
     const { store: holderStore, prefix } = createTestingStore({ lockTtl: 1 })
     const waiterStore = new BunRedisCacheStore(redis, { prefix })

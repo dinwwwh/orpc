@@ -88,7 +88,7 @@ describe('vercelCacheStore', () => {
       const waitUntil = vi.fn()
       await expect(store.fetch('k', async () => {
         throw new Error('handler down')
-      }, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+      }, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
       await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handler down')
 
       vi.setSystemTime(2000) // past ttl + swr, backend has not evicted yet

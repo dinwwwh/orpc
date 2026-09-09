@@ -25,7 +25,7 @@ interface MemoryCacheStoreEntry {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class MemoryCacheStore extends BaseKeyValueCacheStore {
+export class MemoryCacheStore extends BaseKeyValueCacheStore<readonly number[] | undefined> {
   private readonly entries = new Map<string, MemoryCacheStoreEntry>()
   private readonly tagVersions = new Map<string, number>()
 
@@ -64,21 +64,20 @@ export class MemoryCacheStore extends BaseKeyValueCacheStore {
       output: entry.output,
       tags: entry.tags,
       expiresAt: entry.expiresAt,
+      evictAt: entry.evictAt,
     }
   }
 
-  protected write(encodedKey: string, output: unknown, options: CacheFetchOptions): CacheEntry {
+  protected snapshot({ tags }: CacheFetchOptions): readonly number[] | undefined {
+    return tags?.map(tag => this.tagVersions.get(tag) ?? 0)
+  }
+
+  protected write(encodedKey: string, output: unknown, options: CacheFetchOptions, tagVersions: readonly number[] | undefined): CacheEntry {
     const tags = options.tags
     const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
-    this.entries.set(encodedKey, {
-      output,
-      tags,
-      tagVersions: tags?.map(tag => this.tagVersions.get(tag) ?? 0),
-      expiresAt,
-      evictAt,
-    })
+    this.entries.set(encodedKey, { output, tags, tagVersions, expiresAt, evictAt })
 
-    return { output, tags, expiresAt }
+    return { output, tags, expiresAt, evictAt }
   }
 }

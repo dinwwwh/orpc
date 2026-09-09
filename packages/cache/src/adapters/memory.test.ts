@@ -49,13 +49,13 @@ describe('memoryCacheStore', () => {
   it('returns fresh entries with a future expiresAt, then fills again at ttl without swr', async () => {
     const store = new MemoryCacheStore()
 
-    await expect(store.fetch('k', async () => 'v', { ttl: 1 })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+    await expect(store.fetch('k', async () => 'v', { ttl: 1 })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 1 })
 
     vi.setSystemTime(999)
     await expect(store.fetch('k', async () => 'other', { ttl: 1 })).resolves.toMatchObject({ output: 'v' })
 
     vi.setSystemTime(1000)
-    await expect(store.fetch('k', async () => 'other', { ttl: 1 })).resolves.toEqual({ output: 'other', tags: undefined, expiresAt: 2 })
+    await expect(store.fetch('k', async () => 'other', { ttl: 1 })).resolves.toEqual({ output: 'other', tags: undefined, expiresAt: 2, evictAt: 2 })
   })
 
   it('serves stale entries within swr while one caller refreshes them in the background', async () => {
@@ -69,15 +69,15 @@ describe('memoryCacheStore', () => {
     }))
     const waitUntil = vi.fn()
 
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1 })
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1, waitUntil })).resolves.toEqual({ output: 'v', tags: undefined, expiresAt: 1, evictAt: 2 })
     expect(waitUntil).toHaveBeenCalledTimes(2)
 
     finish('fresh')
     await Promise.all(waitUntil.mock.calls.map(([refresh]) => refresh))
     expect(fill).toHaveBeenCalledTimes(1) // the second stale hit found the refreshed entry
 
-    await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toEqual({ output: 'fresh', tags: undefined, expiresAt: 2 })
+    await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toEqual({ output: 'fresh', tags: undefined, expiresAt: 2, evictAt: 3 })
   })
 
   it('leaves a failed refresh to waitUntil and keeps serving the stale entry', async () => {
@@ -120,6 +120,46 @@ describe('memoryCacheStore', () => {
     expect(fill).toHaveBeenCalledTimes(2)
 
     await expect(store.fetch('k', fill, { ttl: 1, swr: 1 })).resolves.toMatchObject({ output: 'fresh' })
+  })
+
+  it('drops output computed before a revalidation that landed during its fill', async () => {
+    const store = new MemoryCacheStore()
+    let finish!: (output: string) => void
+    let started!: () => void
+    const filling = new Promise<void>((resolve) => {
+      started = resolve
+    })
+
+    const first = store.fetch('k', () => {
+      started()
+      return new Promise<string>((resolve) => {
+        finish = resolve
+      })
+    }, { tags: ['t'] })
+    await filling
+    await store.revalidate({ tags: ['t'] })
+    finish('outdated')
+
+    await expect(first).resolves.toMatchObject({ output: 'outdated' })
+    await expect(store.fetch('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
+  })
+
+  it('drops a refresh computed before a revalidation that landed during it', async () => {
+    const store = new MemoryCacheStore()
+    await store.fetch('k', async () => 'v', { tags: ['t'], ttl: 1, swr: 10 })
+
+    vi.setSystemTime(1500)
+    let finish!: (output: string) => void
+    const waitUntil = vi.fn()
+
+    await store.fetch('k', () => new Promise<string>((resolve) => {
+      finish = resolve
+    }), { tags: ['t'], ttl: 1, swr: 10, waitUntil })
+    await store.revalidate({ tags: ['t'] })
+    finish('outdated')
+    await waitUntil.mock.calls[0]![0]
+
+    await expect(store.fetch('k', async () => 'fresh', { tags: ['t'] })).resolves.toMatchObject({ output: 'fresh' })
   })
 
   it('evicts past ttl + swr, and revalidation drops stale entries too', async () => {

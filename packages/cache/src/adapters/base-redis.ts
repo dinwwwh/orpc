@@ -6,14 +6,16 @@ import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
 import { encodeCacheKey, resolveCacheExpiry } from '../utils'
 
 /**
- * Reads the entry as `[output, tags, expiresAt, shouldFill]`, dropping it when
- * a tag was revalidated since it was stored. A missing or stale entry also
- * takes the lock, and `shouldFill` reports whether this caller got it.
+ * Reads the entry as `[output, tags, expiresAt, evictAt, shouldFill, snapshot]`,
+ * dropping it when a tag was revalidated since it was stored. A missing or
+ * stale entry also takes the lock; `shouldFill` reports whether this caller
+ * got it, and `snapshot` then carries the versions of the tags it will fill
+ * with, captured before the fill so a revalidation during it still counts.
  */
 const FETCH_SCRIPT = `
-local token, lockPx, tagPrefix, now = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
-local fields = redis.call('HMGET', KEYS[1], 'output', 'tags', 'tagVersions', 'expiresAt')
-local output, tags, versions, expiresAt = fields[1], fields[2], fields[3], fields[4]
+local token, lockPx, tagPrefix, now, fillTags = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5]
+local fields = redis.call('HMGET', KEYS[1], 'output', 'tags', 'tagVersions', 'expiresAt', 'evictAt')
+local output, tags, versions, expiresAt, evictAt = fields[1], fields[2], fields[3], fields[4], fields[5]
 
 if output and tags then
   local names = cjson.decode(tags)
@@ -34,48 +36,54 @@ end
 
 local stale = output and expiresAt and tonumber(expiresAt) <= tonumber(now)
 local acquired = false
+local snapshot = false
 if not output or stale then
   acquired = redis.call('SET', KEYS[2], token, 'NX', 'PX', lockPx) and true or false
+  if acquired and fillTags ~= '' then
+    local names = cjson.decode(fillTags)
+    local keys = {}
+    for i, name in ipairs(names) do
+      keys[i] = tagPrefix .. name
+    end
+    local live = redis.call('MGET', unpack(keys))
+    local captured = {}
+    for i, name in ipairs(names) do
+      captured[name] = tonumber(live[i] or 0)
+    end
+    snapshot = cjson.encode(captured)
+  end
 end
 
-return { output or false, tags or false, expiresAt or false, acquired }
+return { output or false, tags or false, expiresAt or false, evictAt or false, acquired, snapshot }
 `
 
 /**
- * Stores the entry with its tag versions snapshotted in the same step, then
- * releases the caller's lock.
+ * Stores the entry with the tag versions captured when its fill started,
+ * then releases the caller's lock.
  */
 const STORE_SCRIPT = `
-local token, output, tags, expiresAt, retentionPx, tagPrefix = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6]
+local token, output, tags, tagVersions, expiresAt, evictAt = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6]
 local fields = { 'output', output }
 
 if tags ~= '' then
-  local names = cjson.decode(tags)
-  local keys = {}
-  for i, name in ipairs(names) do
-    keys[i] = tagPrefix .. name
-  end
-  local live = redis.call('MGET', unpack(keys))
-  local snapshot = {}
-  for i, name in ipairs(names) do
-    snapshot[name] = tonumber(live[i] or 0)
-  end
   fields[#fields + 1] = 'tags'
   fields[#fields + 1] = tags
   fields[#fields + 1] = 'tagVersions'
-  fields[#fields + 1] = cjson.encode(snapshot)
+  fields[#fields + 1] = tagVersions
 end
 
 if expiresAt ~= '' then
   fields[#fields + 1] = 'expiresAt'
   fields[#fields + 1] = expiresAt
+  fields[#fields + 1] = 'evictAt'
+  fields[#fields + 1] = evictAt
 end
 
 redis.call('DEL', KEYS[1])
 redis.call('HSET', KEYS[1], unpack(fields))
 
-if retentionPx ~= '' then
-  redis.call('PEXPIRE', KEYS[1], retentionPx)
+if evictAt ~= '' then
+  redis.call('PEXPIREAT', KEYS[1], tonumber(evictAt) * 1000)
 end
 
 if redis.call('GET', KEYS[2]) == token then
@@ -162,23 +170,25 @@ export abstract class BaseRedisCacheStore implements CacheStore {
     const entryKey = this.entryPrefix + encodedKey
     const lockKey = this.lockPrefix + encodedKey
     const token = crypto.randomUUID()
+    const fillTags = options.tags?.length ? stringifyJSON(options.tags) : ''
 
     while (true) {
-      const [output, tags, expiresAt, shouldFill] = await this.run(
+      const [output, tags, expiresAt, evictAt, shouldFill, snapshot] = await this.run(
         FETCH_SCRIPT,
         [entryKey, lockKey],
-        [token, this.lockPx, this.tagPrefix, String(nowInSeconds())],
-      ) as [unknown, unknown, unknown, unknown]
+        [token, this.lockPx, this.tagPrefix, String(nowInSeconds()), fillTags],
+      ) as [unknown, unknown, unknown, unknown, unknown, unknown]
 
       if (output !== null) {
         const entry: CacheEntry = {
           output: this.serializer.deserialize(parseReply(output) as RPCJsonSerialization),
           tags: tags === null ? undefined : parseReply(tags) as string[],
           expiresAt: expiresAt === null ? undefined : Number(expiresAt),
+          evictAt: evictAt === null ? undefined : Number(evictAt),
         }
 
         if (shouldFill) {
-          const refresh = this.store(entryKey, lockKey, token, fill, options)
+          const refresh = this.store(entryKey, lockKey, token, fill, options, snapshot)
           options.waitUntil?.(refresh)
         }
 
@@ -186,7 +196,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
       }
 
       if (shouldFill) {
-        return this.store(entryKey, lockKey, token, fill, options)
+        return this.store(entryKey, lockKey, token, fill, options, snapshot)
       }
 
       await sleep(50)
@@ -203,7 +213,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
    */
   protected abstract run(script: string, keys: string[], args: string[]): Promise<unknown>
 
-  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheFetchOptions): Promise<CacheEntry> {
+  private async store(entryKey: string, lockKey: string, token: string, fill: () => Promise<unknown>, options: CacheFetchOptions, snapshot: unknown): Promise<CacheEntry> {
     let output: unknown
     let serialized: string
 
@@ -218,17 +228,17 @@ export abstract class BaseRedisCacheStore implements CacheStore {
     }
 
     const tags = options.tags?.length ? options.tags : undefined
-    const { expiresAt, retention } = resolveCacheExpiry(options)
+    const { expiresAt, evictAt } = resolveCacheExpiry(options)
 
     await this.run(STORE_SCRIPT, [entryKey, lockKey], [
       token,
       serialized,
       tags !== undefined ? stringifyJSON(tags) : '',
+      snapshot === null ? '' : typeof snapshot === 'string' ? snapshot : stringifyJSON(snapshot as object),
       expiresAt !== undefined ? String(expiresAt) : '',
-      retention !== undefined ? String(Math.ceil(retention * 1000)) : '',
-      this.tagPrefix,
+      evictAt !== undefined ? String(evictAt) : '',
     ])
 
-    return { output, tags, expiresAt }
+    return { output, tags, expiresAt, evictAt }
   }
 }
