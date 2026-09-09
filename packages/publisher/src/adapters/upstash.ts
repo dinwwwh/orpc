@@ -87,7 +87,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
 
   private async subscribeIfNeeded(channel: string): Promise<void> {
     while (this.pendingSubscriptionsMap.has(channel)) {
-      await this.pendingSubscriptionsMap.get(channel)!.catch(() => {})
+      await this.pendingSubscriptionsMap.get(channel)!.catch(() => {}) // a failed attempt is reported to its owner; waiters retry
     }
 
     if (this.subscriptionMap.has(channel)) {
@@ -114,7 +114,7 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
       this.subscriptionMap.set(channel, subscription)
     }
     catch (error) {
-      subscription.unsubscribe().catch(() => {})
+      await subscription.unsubscribe()
       throw error
     }
     finally {

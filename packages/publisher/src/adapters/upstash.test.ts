@@ -618,7 +618,6 @@ describe.concurrent(
 
     it('tears down a subscription that fails before it is established', async () => {
       const subscription = createFakeSubscription()
-      subscription.unsubscribe.mockRejectedValueOnce(new Error('abort failed'))
       const publisher = createTestingPublisher({}, {
         useRedis: withFakeSubscribe(redis, () => {
           queueMicrotask(() => subscription.emit('error', new Error('connection refused')))

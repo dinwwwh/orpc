@@ -254,4 +254,24 @@ describe('baseRedisPublisher', () => {
 
     await unsubscribe()
   })
+
+  it('releases the subscription when a listener throws while flushing queued events', async () => {
+    const publisher = new FakeRedisPublisher(redis)
+    const subscribeGate = promiseWithResolvers<void>()
+    vi.spyOn(publisher as any, 'subscribeChannel').mockImplementationOnce(async (channel: any, listener: any) => {
+      const unsubscribe = redis.subscribe(channel, listener)
+      await subscribeGate.promise
+      return async () => unsubscribe()
+    })
+    const listener = vi.fn(() => {
+      throw new Error('listener failed')
+    })
+
+    const subscribing = publisher.subscribe('orders', listener)
+    await publisher.publish('orders', { order: 1 })
+    subscribeGate.resolve()
+
+    await expect(subscribing).rejects.toThrow('listener failed')
+    expect(redis.channels.size).toBe(0)
+  })
 })
