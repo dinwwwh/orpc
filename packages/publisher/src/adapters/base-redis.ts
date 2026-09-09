@@ -231,29 +231,27 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
       }
     }
 
-    const subscribePromise = this.subscribeChannel(channel, messageListener, onError)
+    // Subscribe first so no event can slip between the stream read and live delivery.
+    const unsubscribe = await this.subscribeChannel(channel, messageListener, onError)
 
-    try {
+    if (this.resumeEnabled && lastEventId !== undefined) {
       try {
-        if (this.resumeEnabled && lastEventId !== undefined) {
-          for (const { id, data } of await this.readStreamEntries(channel, lastEventId)) {
-            resumedIds.add(id)
-            listener(this.deserializePayload(id, parseIfText(data) as SerializedEvent) as T[K])
-          }
+        for (const { id, data } of await this.readStreamEntries(channel, lastEventId)) {
+          resumedIds.add(id)
+          listener(this.deserializePayload(id, parseIfText(data) as SerializedEvent) as T[K])
         }
       }
-      finally {
-        const pending = pendingPayloads
-        pendingPayloads = undefined
-        pending.forEach(deduplicatingListener)
+      catch (error) {
+        await unsubscribe()
+        throw error
       }
+    }
 
-      return once(await subscribePromise)
-    }
-    catch (error) {
-      await subscribePromise.then(unsubscribe => unsubscribe(), () => {})
-      throw error
-    }
+    const pending = pendingPayloads
+    pendingPayloads = undefined
+    pending.forEach(deduplicatingListener)
+
+    return once(unsubscribe)
   }
 
   private serializePayload(payload: object): SerializedEvent {

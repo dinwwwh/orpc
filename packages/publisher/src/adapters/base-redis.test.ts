@@ -231,4 +231,27 @@ describe('baseRedisPublisher', () => {
 
     await unsubscribe()
   })
+
+  it('does not lose events published while the subscription is being established', async () => {
+    // Reading the stream before Pub/Sub is live opens a window: an event published
+    // after the read but before the subscription is neither replayed nor delivered.
+    const publisher = new FakeRedisPublisher(redis, { resume: { enabled: true } })
+    const subscribeGate = promiseWithResolvers<void>()
+    vi.spyOn(publisher as any, 'subscribeChannel').mockImplementationOnce(async (channel: any, listener: any) => {
+      await subscribeGate.promise
+      const unsubscribe = redis.subscribe(channel, listener)
+      return async () => unsubscribe()
+    })
+    const listener = vi.fn()
+
+    await publisher.publish('orders', { order: 1 })
+    const subscribing = publisher.subscribe('orders', listener, { lastEventId: redis.streams.get('orders')![0]!.id })
+    await publisher.publish('orders', { order: 2 })
+    subscribeGate.resolve()
+    const unsubscribe = await subscribing
+
+    expect(listener.mock.calls.map(call => call[0])).toEqual([{ order: 2 }])
+
+    await unsubscribe()
+  })
 })

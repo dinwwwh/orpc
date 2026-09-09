@@ -590,27 +590,13 @@ describe.concurrent(
     })
 
     it('fan-outs subscription errors to every registered onError handler', async () => {
-      const handlers = new Map<string, Array<(event: unknown) => void>>()
-      const emit = (type: string, event: unknown) => handlers.get(type)?.forEach(handler => handler(event))
-      const fakeSubscription = {
-        on: (type: string, handler: (event: unknown) => void) => {
-          handlers.set(type, [...handlers.get(type) ?? [], handler])
-        },
-        unsubscribe: vi.fn(async () => {}),
-      }
-      const fakeRedis = new Proxy(redis, {
-        get(target, p) {
-          if (p === 'subscribe') {
-            return () => {
-              queueMicrotask(() => emit('subscribe', 1))
-              return fakeSubscription
-            }
-          }
-
-          return getOrBind(target, p)
-        },
+      const subscription = createFakeSubscription()
+      const publisher = createTestingPublisher({}, {
+        useRedis: withFakeSubscribe(redis, () => {
+          queueMicrotask(() => subscription.emit('subscribe', 1))
+          return subscription
+        }),
       })
-      const publisher = createTestingPublisher({}, { useRedis: fakeRedis })
       const event = 'connection-lost'
       const onError1 = vi.fn()
       const onError2 = vi.fn()
@@ -619,7 +605,7 @@ describe.concurrent(
       const unsubscribe2 = await publisher.subscribe(event, vi.fn(), { onError: onError2 })
 
       const error = new Error('connection lost')
-      emit('error', error)
+      subscription.emit('error', error)
 
       expect(onError1).toHaveBeenCalledExactlyOnceWith(error)
       expect(onError2).toHaveBeenCalledExactlyOnceWith(error)
@@ -627,7 +613,64 @@ describe.concurrent(
       await unsubscribe1()
       await unsubscribe2()
 
-      expect(fakeSubscription.unsubscribe).toHaveBeenCalledTimes(1)
+      expect(subscription.unsubscribe).toHaveBeenCalledTimes(1)
+    })
+
+    it('tears down a subscription that fails before it is established', async () => {
+      const subscription = createFakeSubscription()
+      subscription.unsubscribe.mockRejectedValueOnce(new Error('abort failed'))
+      const publisher = createTestingPublisher({}, {
+        useRedis: withFakeSubscribe(redis, () => {
+          queueMicrotask(() => subscription.emit('error', new Error('connection refused')))
+          return subscription
+        }),
+      })
+
+      await expect(publisher.subscribe('unreachable', vi.fn())).rejects.toThrow('connection refused')
+
+      expect(subscription.unsubscribe).toHaveBeenCalledTimes(1)
+    })
+
+    it('opens a fresh subscription when subscribing while the previous one is being torn down', async () => {
+      const dedicatedRedis = new Redis({ url: UPSTASH_REDIS_REST_URL, token: UPSTASH_REDIS_REST_TOKEN })
+      const subscribeSpy = vi.spyOn(dedicatedRedis, 'subscribe')
+      const publisher = createTestingPublisher({}, { useRedis: dedicatedRedis })
+      const event = 'resubscribe'
+      const first = vi.fn()
+      const second = vi.fn()
+
+      const unsubscribeFirst = await publisher.subscribe(event, first)
+      const [, unsubscribeSecond] = await Promise.all([unsubscribeFirst(), publisher.subscribe(event, second)])
+      await publisher.publish(event, { order: 1 })
+
+      await vi.waitFor(() => {
+        expect(second).toHaveBeenCalledTimes(1)
+      })
+
+      expect(first).not.toHaveBeenCalled()
+      expect(subscribeSpy).toHaveBeenCalledTimes(2)
+
+      await unsubscribeSecond()
     })
   },
 )
+
+function createFakeSubscription() {
+  const handlers = new Map<string, Array<(event: unknown) => void>>()
+
+  return {
+    on: (type: string, handler: (event: unknown) => void) => {
+      handlers.set(type, [...handlers.get(type) ?? [], handler])
+    },
+    emit: (type: string, event: unknown) => handlers.get(type)?.forEach(handler => handler(event)),
+    unsubscribe: vi.fn(async () => {}),
+  }
+}
+
+function withFakeSubscribe(redis: Redis, subscribe: () => unknown): Redis {
+  return new Proxy(redis, {
+    get(target, p) {
+      return p === 'subscribe' ? subscribe : getOrBind(target, p)
+    },
+  })
+}

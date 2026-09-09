@@ -113,6 +113,10 @@ export class UpstashPublisher<T extends Record<string, object>> extends BaseRedi
       await promise
       this.subscriptionMap.set(channel, subscription)
     }
+    catch (error) {
+      subscription.unsubscribe().catch(() => {})
+      throw error
+    }
     finally {
       this.pendingSubscriptionsMap.delete(channel)
     }
