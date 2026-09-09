@@ -45,7 +45,7 @@ Every duration is in seconds, matching what the underlying caches accept.
 
 Keys may be any serializable value. Strings are used verbatim, while anything else is encoded with `encodeCacheKey`: serialized first, so complex values like Date, Map, or Set become plain JSON, then canonicalized, so structurally equal keys resolve the same entry regardless of property order. Reuse it when implementing your own store.
 
-Every adapter coalesces concurrent callers of one key. The Redis, Upstash, and Bun stores take a lock in Redis within the same script that reads the entry, so a miss costs one round trip to read and lock and one to store and release, and the lock spans processes; it is released when the fill finishes, or after `lockTtl` if it never does. They share `BaseRedisCacheStore` from `@orpc/experimental-cache/redis`, which holds the scripts and the flow, so a store for another Redis-compatible client only has to run a script. The memory and Vercel stores coalesce within the process through `MemoryLock` from `@orpc/shared`, which suits stores of your own too.
+Every adapter coalesces concurrent callers of one key. The Redis, Upstash, and Bun stores take a lock in Redis within the same script that reads the entry, so a miss costs one round trip to read and lock and one to store and release, and the lock spans processes; it is released when the fill finishes, or after `lockTtl` if it never does. They share `BaseRedisCacheStore` from `@orpc/experimental-cache/base-redis`, which holds the scripts and the flow, so a store for another Redis-compatible client only has to run a script. The memory and Vercel stores coalesce within the process through `MemoryLock` from `@orpc/shared`, which suits stores of your own too.
 
 <CodeGroup>
 

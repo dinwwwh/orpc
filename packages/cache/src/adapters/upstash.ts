@@ -1,6 +1,6 @@
 import type { Redis } from '@upstash/redis'
-import type { BaseRedisCacheStoreOptions } from './redis'
-import { BaseRedisCacheStore } from './redis'
+import type { BaseRedisCacheStoreOptions } from './base-redis'
+import { BaseRedisCacheStore } from './base-redis'
 
 export type UpstashCacheStoreOptions = BaseRedisCacheStoreOptions
 
