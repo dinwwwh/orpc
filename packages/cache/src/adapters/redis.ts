@@ -6,7 +6,7 @@ export type RedisCacheStoreOptions = BaseRedisCacheStoreOptions
 
 /**
  * Cache store adapter for Redis. Connects the client lazily when needed and
- * runs the scripts by sha, loading each once per client and again whenever
+ * runs the scripts by sha, loading each once per client and once more when
  * the server dropped it.
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
@@ -26,24 +26,27 @@ export class RedisCacheStore extends BaseRedisCacheStore {
       await this.redis.connect()
     }
 
-    while (true) {
-      let sha = this.scriptShas.get(script)
-
-      if (sha === undefined) {
-        sha = String(await this.redis.scriptLoad(script))
-        this.scriptShas.set(script, sha)
-      }
-
-      try {
-        return await this.redis.evalSha(sha, { keys, arguments: args })
-      }
-      catch (error) {
-        if (!(error instanceof Error && error.message.startsWith('NOSCRIPT'))) {
-          throw error
-        }
-
-        this.scriptShas.delete(script)
-      }
+    try {
+      return await this.evalSha(script, keys, args)
     }
+    catch (error) {
+      if (error instanceof Error && error.message.startsWith('NOSCRIPT')) {
+        this.scriptShas.delete(script)
+        return this.evalSha(script, keys, args)
+      }
+
+      throw error
+    }
+  }
+
+  private async evalSha(script: string, keys: string[], args: string[]): Promise<unknown> {
+    let sha = this.scriptShas.get(script)
+
+    if (sha === undefined) {
+      sha = String(await this.redis.scriptLoad(script))
+      this.scriptShas.set(script, sha)
+    }
+
+    return this.redis.evalSha(sha, { keys, arguments: args })
   }
 }
