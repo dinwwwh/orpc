@@ -468,17 +468,166 @@ describe.concurrent(
       const onError = vi.fn()
 
       const unsubscribe = await publisher.subscribe(event, listener, { onError })
-      const subscription = (publisher as any).subscriptionMap.get(event)
+      const channel = `${(publisher as any).prefix}${event}`
+      const subscription = (publisher as any).subscriptionMap.get(channel)
 
       if (!subscription) {
         throw new Error('No active subscription found')
       }
 
-      ;(publisher as any).onErrorsMap.delete(event)
-      ;(publisher as any).subscriptionMap.delete(event)
+      ;(publisher as any).onErrorsMap.delete(channel)
+      ;(publisher as any).subscriptionMap.delete(channel)
 
       await expect(unsubscribe()).resolves.toBeUndefined()
       await subscription.unsubscribe()
+    })
+
+    it('works with clients that disable automatic deserialization', async () => {
+      const publisher = createTestingPublisher({ resume: { enabled: true, seconds: 10 } }, {
+        useRedis: new Redis({
+          url: UPSTASH_REDIS_REST_URL,
+          token: UPSTASH_REDIS_REST_TOKEN,
+          automaticDeserialization: false,
+        }),
+      })
+      const event = 'orders'
+      const listener = vi.fn()
+
+      const unsubscribe = await publisher.subscribe(event, listener)
+      await publisher.publish(event, withEventMeta({ order: 1 }, { comments: ['audit'] }))
+
+      await vi.waitFor(() => {
+        expect(listener).toHaveBeenCalledTimes(1)
+      })
+
+      expect(listener.mock.calls[0]![0]).toEqual({ order: 1 })
+      expect(getEventMeta(listener.mock.calls[0]![0])).toEqual({ id: expect.any(String), comments: ['audit'] })
+
+      await unsubscribe()
+
+      const resumed = vi.fn()
+      const unsubscribeResume = await publisher.subscribe(event, resumed, { lastEventId: '0' })
+
+      await vi.waitFor(() => {
+        expect(resumed).toHaveBeenCalledTimes(1)
+      })
+
+      expect(resumed.mock.calls[0]![0]).toEqual(listener.mock.calls[0]![0])
+
+      await unsubscribeResume()
+    })
+
+    it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
+      const publisher = createTestingPublisher()
+      const event = 'self-unsubscribe'
+      let unsubscribeFirst: () => Promise<void>
+      const first = vi.fn(() => {
+        void unsubscribeFirst()
+      })
+      const second = vi.fn()
+
+      unsubscribeFirst = await publisher.subscribe(event, first)
+      const unsubscribeSecond = await publisher.subscribe(event, second)
+
+      await publisher.publish(event, { order: 1 })
+
+      await vi.waitFor(() => {
+        expect(first).toHaveBeenCalledTimes(1)
+        expect(second).toHaveBeenCalledTimes(1)
+      })
+
+      await unsubscribeSecond()
+    })
+
+    it('establishes a single subscription when waiters retry after a failed attempt', async () => {
+      const invalidRedis = new Redis({ url: 'http://invalid:6379', token: 'invalid' })
+      let failNext = true
+      let subscribes = 0
+      const flakyRedis = new Proxy(redis, {
+        get(target, p) {
+          if (p === 'subscribe') {
+            return (...args: [string]) => {
+              if (failNext) {
+                failNext = false
+                return invalidRedis.subscribe(...args)
+              }
+
+              subscribes++
+              return getOrBind(target, p)(...args)
+            }
+          }
+
+          return getOrBind(target, p)
+        },
+      })
+      const publisher = createTestingPublisher({}, { useRedis: flakyRedis })
+      const event = 'retry'
+      const listener1 = vi.fn()
+      const listener2 = vi.fn()
+      const listener3 = vi.fn()
+
+      const results = await Promise.allSettled([
+        publisher.subscribe(event, listener1),
+        publisher.subscribe(event, listener2),
+        publisher.subscribe(event, listener3),
+      ])
+
+      expect(results.map(result => result.status)).toEqual(['rejected', 'fulfilled', 'fulfilled'])
+      expect(subscribes).toBe(1)
+
+      await publisher.publish(event, { order: 1 })
+      await sleep(1000)
+
+      expect(listener1).not.toHaveBeenCalled()
+      expect(listener2).toHaveBeenCalledTimes(1)
+      expect(listener3).toHaveBeenCalledTimes(1)
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          await result.value()
+        }
+      }
+    })
+
+    it('fan-outs subscription errors to every registered onError handler', async () => {
+      const handlers = new Map<string, Array<(event: unknown) => void>>()
+      const emit = (type: string, event: unknown) => handlers.get(type)?.forEach(handler => handler(event))
+      const fakeSubscription = {
+        on: (type: string, handler: (event: unknown) => void) => {
+          handlers.set(type, [...handlers.get(type) ?? [], handler])
+        },
+        unsubscribe: vi.fn(async () => {}),
+      }
+      const fakeRedis = new Proxy(redis, {
+        get(target, p) {
+          if (p === 'subscribe') {
+            return () => {
+              queueMicrotask(() => emit('subscribe', 1))
+              return fakeSubscription
+            }
+          }
+
+          return getOrBind(target, p)
+        },
+      })
+      const publisher = createTestingPublisher({}, { useRedis: fakeRedis })
+      const event = 'connection-lost'
+      const onError1 = vi.fn()
+      const onError2 = vi.fn()
+
+      const unsubscribe1 = await publisher.subscribe(event, vi.fn(), { onError: onError1 })
+      const unsubscribe2 = await publisher.subscribe(event, vi.fn(), { onError: onError2 })
+
+      const error = new Error('connection lost')
+      emit('error', error)
+
+      expect(onError1).toHaveBeenCalledExactlyOnceWith(error)
+      expect(onError2).toHaveBeenCalledExactlyOnceWith(error)
+
+      await unsubscribe1()
+      await unsubscribe2()
+
+      expect(fakeSubscription.unsubscribe).toHaveBeenCalledTimes(1)
     })
   },
 )

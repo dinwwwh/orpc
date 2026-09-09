@@ -1,58 +1,10 @@
-import type { RPCJsonSerialization } from '@orpc/client'
-import type { Public, ThrowableError } from '@orpc/shared'
-import type { EventMeta } from '@standard-server/core'
+import type { ThrowableError } from '@orpc/shared'
 import type { Redis } from '@upstash/redis'
-import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
-import { RPCJsonSerializer } from '@orpc/client'
-import { once } from '@orpc/shared'
-import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
-import { Publisher } from '../publisher'
+import type { BaseRedisPublisherOptions, RedisStreamEntry, RedisStreamTrimOptions } from './base-redis'
+import { promiseWithResolvers } from '@orpc/shared'
+import { BaseRedisPublisher } from './base-redis'
 
-export interface UpstashPublisherOptions extends PublisherOptions {
-  /**
-   * The prefix to use for Redis keys.
-   *
-   * @default ''
-   */
-  prefix?: string
-
-  /**
-   * Serializer for serialize and deserialize payloads.
-   *
-   * @default RPCJsonSerializer
-   */
-  serializer?: undefined | Public<RPCJsonSerializer>
-
-  /**
-   * Configuration for event resume support.
-   *
-   * When enabled, published events are temporarily stored so new
-   * subscribers can resume from a previous position using `lastEventId`.
-   *
-   * @default { enabled: false }
-   */
-  resume?: {
-    /**
-     * Whether event resume support is enabled.
-     *
-     * When enabled, published events are temporarily stored so new
-     * subscribers can resume from a previous position using `lastEventId`.
-     *
-     * @default false
-     */
-    enabled: boolean
-
-    /**
-     * How long (in seconds) to retain events for resume.
-     *
-     * Expired events are cleaned up lazily for performance reasons, so
-     * some events may remain available slightly longer than this period.
-     *
-     * @default 300 (5 min)
-     */
-    seconds?: number
-  }
-}
+export interface UpstashPublisherOptions extends BaseRedisPublisherOptions {}
 
 /**
  * Publisher adapter for Upstash Redis. Distributes events across processes via
@@ -60,274 +12,142 @@ export interface UpstashPublisherOptions extends PublisherOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/publisher#adapters | Publisher Helpers - Adapters}
  */
-export class UpstashPublisher<T extends Record<string, object>> extends Publisher<T> {
-  private readonly prefix: string
-  private readonly serializer: Public<RPCJsonSerializer>
-  private readonly listenersMap = new Map<keyof T, Array<(payload: any) => void>>()
-  private readonly onErrorsMap = new Map<keyof T, Array<(error: ThrowableError) => void>>()
-  private readonly subscriptionMap = new Map<keyof T, ReturnType<typeof this.redis.subscribe>>() // Upstash subscription objects
-  private readonly resumeEnabled: boolean
-  private readonly resumeSeconds: number
-
-  /**
-   * The exactness of the `XTRIM` command.
-   * Used for testing purpose.
-   */
-  private readonly xTrimExactness: '~' | '=' = '~'
+export class UpstashPublisher<T extends Record<string, object>> extends BaseRedisPublisher<T> {
+  private readonly listenersMap = new Map<string, Array<(message: unknown) => void>>()
+  private readonly onErrorsMap = new Map<string, Array<(error: ThrowableError) => void>>()
+  private readonly subscriptionMap = new Map<string, ReturnType<Redis['subscribe']>>()
+  private readonly pendingSubscriptionsMap = new Map<string, Promise<void>>()
 
   constructor(
     private readonly redis: Redis,
-    { resume, prefix, serializer, ...options }: UpstashPublisherOptions = {},
+    options: UpstashPublisherOptions = {},
   ) {
     super(options)
-    this.prefix = prefix ?? ''
-    this.resumeEnabled = resume?.enabled ?? false
-    this.resumeSeconds = resume?.seconds ?? 300
-    this.serializer = serializer ?? new RPCJsonSerializer()
   }
 
-  private readonly firstPublishTimeMap: Map<string, number> = new Map()
-  async publish<K extends keyof T & string>(event: K, payload: T[K]): Promise<void> {
-    const redisKey = `${this.prefix}${event}`
-    const data = this.serializePayload(payload)
-    let id: string | undefined
-
-    if (this.resumeEnabled) {
-      const now = Date.now()
-
-      // Remove expired resume windows.
-      // The next publish for a stale event will perform trimming again.
-      for (const [event, firstPublishTime] of this.firstPublishTimeMap) {
-        if (firstPublishTime + this.resumeSeconds * 1000 < now) {
-          this.firstPublishTimeMap.delete(event)
-        }
-      }
-
-      if (!this.firstPublishTimeMap.has(event)) {
-        this.firstPublishTimeMap.set(event, now)
-
-        const results = await this.redis.multi()
-          .xadd(redisKey, '*', { data })
-          .xtrim(redisKey, { strategy: 'MINID', exactness: this.xTrimExactness, threshold: `${now - this.resumeSeconds * 1000}-0` })
-          // Use a 2x TTL so events published near the end of the resume window
-          // are not expired before the next window updates the key expiration.
-          .expire(redisKey, this.resumeSeconds * 2)
-          .exec()
-
-        id = results[0]
-      }
-      else {
-        id = await this.redis.xadd(redisKey, '*', { data })
-      }
-    }
-
-    await this.redis.publish(redisKey, { id, data })
+  protected async publishMessage(channel: string, message: string): Promise<void> {
+    await this.redis.publish(channel, message)
   }
 
-  protected async subscribeListener<K extends keyof T & string>(
-    event: K,
-    originalListener: (payload: T[K]) => void,
-    { lastEventId, onError }: PublisherSubscribeListenerOptions = {},
+  protected async subscribeChannel(
+    channel: string,
+    listener: (message: unknown) => void,
+    onError?: (error: ThrowableError) => void,
   ): Promise<() => Promise<void>> {
-    const redisKey = `${this.prefix}${event}`
-
-    let pendingPayloads: T[K][] | undefined = []
-    const resumedIds = new Set<string>()
-
-    const deduplicatingListener = (payload: T[K]) => {
-      // queue payload while resuming missed events
-      if (pendingPayloads) {
-        pendingPayloads.push(payload)
-        return
-      }
-
-      const id = getEventMeta(payload)?.id
-      if (id !== undefined && resumedIds.has(id)) { // Already delivered during resume.
-        return
-      }
-
-      originalListener(payload)
-    }
-
-    // Register locally before subscribing to Redis.
-    // Messages may arrive while the subscription is being established.
-    // and prevent unsubscribe while existing listener for event
-    let listeners = this.listenersMap.get(event)
-    if (!listeners) {
-      this.listenersMap.set(event, listeners = [])
-    }
-    listeners.push(deduplicatingListener)
+    // Registered before subscribing so messages that arrive meanwhile are not lost.
+    push(this.listenersMap, channel, listener)
 
     try {
-      const subscribeEventPromise = this.subscribeEvent(event)
-
-      try {
-        if (this.resumeEnabled && lastEventId !== undefined) {
-          const results = await this.redis.xread(redisKey, lastEventId)
-          if (results && results[0]) {
-            const [_, items] = results[0] as any
-
-            for (const [id, fields] of items) {
-              const data = fields[1]! // [key: 'data', value, ...]
-              const payload = this.deserializePayload(id, data)
-              resumedIds.add(id)
-              originalListener(payload as T[K])
-            }
-          }
-        }
-      }
-      finally {
-        const pending = pendingPayloads
-        pendingPayloads = undefined
-
-        for (const payload of pending) {
-          deduplicatingListener(payload)
-        }
-      }
-
-      await subscribeEventPromise
+      await this.subscribeIfNeeded(channel)
     }
     catch (error) {
-      listeners.splice(listeners.indexOf(deduplicatingListener), 1)
-      if (listeners.length === 0) {
-        this.listenersMap.delete(event)
-      }
-
-      await this.unsubscribeEvent(event)
+      remove(this.listenersMap, channel, listener)
+      await this.unsubscribeIfUnused(channel)
       throw error
     }
 
-    // Register error listeners only after subscription and resume succeeds.
-    // Subscription or resume failures are reported directly via the rejected promise.
+    // Registered after subscribing because a failed subscription rejects instead.
     if (onError) {
-      let onErrors = this.onErrorsMap.get(event)
-      if (!onErrors) {
-        this.onErrorsMap.set(event, onErrors = [])
-      }
-      onErrors.push(onError)
+      push(this.onErrorsMap, channel, onError)
     }
 
-    // once allows unsub safely execute multiple times
-    return once(async () => {
-      listeners.splice(listeners.indexOf(deduplicatingListener), 1)
+    return async () => {
+      remove(this.listenersMap, channel, listener)
 
       if (onError) {
-        const onErrors = this.onErrorsMap.get(event)
-        if (onErrors) {
-          onErrors.splice(onErrors.indexOf(onError), 1)
-        }
+        remove(this.onErrorsMap, channel, onError)
       }
 
-      // no need to check onErrors here, it always has lower length than listeners
-      if (listeners.length === 0) {
-        this.listenersMap.delete(event)
-        this.onErrorsMap.delete(event)
-      }
-
-      await this.unsubscribeEvent(event)
-    })
+      await this.unsubscribeIfUnused(channel)
+    }
   }
 
-  private readonly pendingSubscriptionsMap = new Map<keyof T, Promise<void>>()
-  private async subscribeEvent(event: keyof T & string): Promise<void> {
-    const redisKey = `${this.prefix}${event}`
-
-    // Another caller is currently establishing the subscription.
-    // Wait for it to finish before checking whether a new subscription is still needed.
-    const pending = this.pendingSubscriptionsMap.get(event)
-    if (pending) {
-      try {
-        await pending
-      }
-      catch {
-        // The previous subscription attempt failed.
-        // Continue and attempt to establish a new subscription.
-      }
+  protected async addStreamEntry(key: string, data: string, trim?: RedisStreamTrimOptions): Promise<string> {
+    if (!trim) {
+      return this.redis.xadd(key, '*', { data })
     }
 
-    if (this.subscriptionMap.has(event)) {
+    const [id] = await this.redis.multi()
+      .xadd(key, '*', { data })
+      .xtrim(key, { strategy: 'MINID', exactness: trim.exactness, threshold: trim.minId })
+      .expire(key, trim.expireSeconds)
+      .exec()
+
+    return id
+  }
+
+  protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
+    const results = await this.redis.xread(key, lastId) as null | Array<[
+      key: string,
+      entries: Array<[id: string, fields: [name: string, value: unknown]]>,
+    ]>
+
+    return results?.[0]?.[1].map(([id, fields]) => ({ id, data: fields[1] })) ?? []
+  }
+
+  private async subscribeIfNeeded(channel: string): Promise<void> {
+    while (this.pendingSubscriptionsMap.has(channel)) {
+      await this.pendingSubscriptionsMap.get(channel)!.catch(() => {})
+    }
+
+    if (this.subscriptionMap.has(channel)) {
       return
     }
 
-    const dispatchErrorForEvent = (error: ThrowableError) => {
-      const onErrors = this.onErrorsMap.get(event)
-      onErrors?.forEach(onError => onError(error))
-    }
+    const { promise, resolve, reject } = promiseWithResolvers<void>()
+    const subscription = this.redis.subscribe(channel)
 
-    const subscription = this.redis.subscribe(redisKey)
-    subscription.on('message', (message) => {
-      try {
-        const listeners = this.listenersMap.get(event)
-
-        if (listeners) {
-          const { id, data } = message.message as any
-          const payload = this.deserializePayload(id, data)
-          listeners.forEach(listener => listener(payload))
-        }
-      }
-      catch (error) {
-        // Can happen if the published message has an unexpected format.
-        dispatchErrorForEvent(error as ThrowableError)
-      }
-    })
-
-    let resolvePromise: () => void
-    let rejectPromise: (error: Error) => void
-    const promise = new Promise<void>((resolve, reject) => {
-      resolvePromise = resolve
-      rejectPromise = reject
-    })
-
+    subscription.on('subscribe', () => resolve())
     subscription.on('error', (error) => {
-      rejectPromise(error)
-      dispatchErrorForEvent(error)
+      reject(error)
+      this.onErrorsMap.get(channel)?.slice().forEach(onError => onError(error))
+    })
+    subscription.on('message', ({ message }) => {
+      // Snapshot, since a listener may unsubscribe itself mid-dispatch.
+      this.listenersMap.get(channel)?.slice().forEach(listener => listener(message))
     })
 
-    subscription.on('subscribe', () => {
-      resolvePromise()
-    })
+    this.pendingSubscriptionsMap.set(channel, promise)
 
     try {
-      this.pendingSubscriptionsMap.set(event, promise)
       await promise
-      this.subscriptionMap.set(event, subscription) // set after subscription is ready
+      this.subscriptionMap.set(channel, subscription)
     }
     finally {
-      this.pendingSubscriptionsMap.delete(event)
+      this.pendingSubscriptionsMap.delete(channel)
     }
   }
 
-  private async unsubscribeEvent(event: keyof T & string): Promise<void> {
-    // Another caller is currently establishing the subscription.
-    // Wait for it to finish before checking whether a subscription is existed.
-    const pending = this.pendingSubscriptionsMap.get(event)
-    if (pending) {
-      try {
-        await pending
-      }
-      catch {}
-    }
+  private async unsubscribeIfUnused(channel: string): Promise<void> {
+    // No need to await a pending attempt: its owner still holds a listener, which blocks teardown below.
+    const subscription = this.subscriptionMap.get(channel)
 
-    const subscription = this.subscriptionMap.get(event)
-
-    // no need to check onErrors here, it always has lower length than listeners
-    if (!this.listenersMap.has(event) && subscription) {
-      // Remove before awaiting to prevent race conditions.
-      this.subscriptionMap.delete(event)
+    if (subscription && !this.listenersMap.has(channel)) {
+      this.subscriptionMap.delete(channel) // before awaiting, so concurrent callers skip it
       await subscription.unsubscribe()
     }
   }
+}
 
-  private serializePayload(payload: object): { payload: RPCJsonSerialization, meta?: undefined | EventMeta } {
-    const [original, meta] = unwrapEvent(payload)
-    const { json, meta: jsonMeta } = this.serializer.serialize(original)
-    return { payload: { json, meta: jsonMeta }, meta }
+function push<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  let values = map.get(key)
+
+  if (!values) {
+    map.set(key, values = [])
   }
 
-  private deserializePayload(id: string | undefined, { payload, meta }: { payload: RPCJsonSerialization, meta?: undefined | EventMeta }): object {
-    return withEventMeta(
-      this.serializer.deserialize(payload) as object,
-      id === undefined ? { ...meta } : { ...meta, id },
-    )
+  values.push(value)
+}
+
+function remove<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const values = map.get(key)
+  const index = values?.indexOf(value) ?? -1
+
+  if (index !== -1) {
+    values!.splice(index, 1)
+  }
+
+  if (values?.length === 0) {
+    map.delete(key)
   }
 }
