@@ -1,4 +1,4 @@
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { nowInSeconds, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { beforeAll, describe, expect, it, mock, spyOn } from 'bun:test'
@@ -63,7 +63,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
   }, { timeout: 20_000 })
 
   it('supports a custom serializer', async () => {
-    const serializer = new RPCSerializer()
+    const serializer = new RPCJsonSerializer()
     const serializeSpy = spyOn(serializer, 'serialize')
     const deserializeSpy = spyOn(serializer, 'deserialize')
     const { store } = createTestingStore({ serializer })
@@ -120,7 +120,7 @@ describe.skipIf(!REDIS_URL)('bun redis cache store integration', () => {
   it('treats tags missing from the snapshot as version zero', async () => {
     const { store, prefix } = createTestingStore()
 
-    await redis.send('HSET', [`${prefix}e:k`, 'output', JSON.stringify({ body: { json: 'v' } }), 'tags', '["t"]', 'tagVersions', '{}'])
+    await redis.send('HSET', [`${prefix}e:k`, 'output', JSON.stringify({ json: 'v' }), 'tags', '["t"]', 'tagVersions', '{}'])
 
     await expect(store.fetch('k', async () => 'other')).resolves.toMatchObject({ output: 'v' })
   }, { timeout: 20_000 })

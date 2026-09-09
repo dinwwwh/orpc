@@ -1,8 +1,9 @@
+import type { RPCJsonSerialization } from '@orpc/client'
 import type { Public } from '@orpc/shared'
 import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '../types'
-import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { nowInSeconds, sleep, stringifyJSON } from '@orpc/shared'
-import { encodeCacheKey } from '../utils'
+import { encodeCacheKey, resolveCacheExpiry } from '../utils'
 
 /**
  * Reads the entry as `[output, tags, expiresAt, shouldFill]`, dropping it when
@@ -10,6 +11,7 @@ import { encodeCacheKey } from '../utils'
  * takes the lock, and `shouldFill` reports whether this caller got it.
  */
 const FETCH_SCRIPT = `
+local token, lockPx, tagPrefix, now = ARGV[1], ARGV[2], ARGV[3], ARGV[4]
 local fields = redis.call('HMGET', KEYS[1], 'output', 'tags', 'tagVersions', 'expiresAt')
 local output, tags, versions, expiresAt = fields[1], fields[2], fields[3], fields[4]
 
@@ -18,7 +20,7 @@ if output and tags then
   local snapshot = cjson.decode(versions)
   local keys = {}
   for i, name in ipairs(names) do
-    keys[i] = ARGV[3] .. name
+    keys[i] = tagPrefix .. name
   end
   local live = redis.call('MGET', unpack(keys))
   for i, name in ipairs(names) do
@@ -30,10 +32,10 @@ if output and tags then
   end
 end
 
-local stale = output and expiresAt and tonumber(expiresAt) <= tonumber(ARGV[4])
+local stale = output and expiresAt and tonumber(expiresAt) <= tonumber(now)
 local acquired = false
 if not output or stale then
-  acquired = redis.call('SET', KEYS[2], ARGV[1], 'NX', 'PX', ARGV[2]) and true or false
+  acquired = redis.call('SET', KEYS[2], token, 'NX', 'PX', lockPx) and true or false
 end
 
 return { output or false, tags or false, expiresAt or false, acquired }
@@ -44,32 +46,39 @@ return { output or false, tags or false, expiresAt or false, acquired }
  * releases the caller's lock.
  */
 const STORE_SCRIPT = `
-redis.call('DEL', KEYS[1])
-redis.call('HSET', KEYS[1], 'output', ARGV[2])
+local token, output, tags, expiresAt, retentionPx, tagPrefix = ARGV[1], ARGV[2], ARGV[3], ARGV[4], ARGV[5], ARGV[6]
+local fields = { 'output', output }
 
-if ARGV[3] ~= '' then
-  local names = cjson.decode(ARGV[3])
+if tags ~= '' then
+  local names = cjson.decode(tags)
   local keys = {}
   for i, name in ipairs(names) do
-    keys[i] = ARGV[6] .. name
+    keys[i] = tagPrefix .. name
   end
   local live = redis.call('MGET', unpack(keys))
   local snapshot = {}
   for i, name in ipairs(names) do
     snapshot[name] = tonumber(live[i] or 0)
   end
-  redis.call('HSET', KEYS[1], 'tags', ARGV[3], 'tagVersions', cjson.encode(snapshot))
+  fields[#fields + 1] = 'tags'
+  fields[#fields + 1] = tags
+  fields[#fields + 1] = 'tagVersions'
+  fields[#fields + 1] = cjson.encode(snapshot)
 end
 
-if ARGV[4] ~= '' then
-  redis.call('HSET', KEYS[1], 'expiresAt', ARGV[4])
+if expiresAt ~= '' then
+  fields[#fields + 1] = 'expiresAt'
+  fields[#fields + 1] = expiresAt
 end
 
-if ARGV[5] ~= '' then
-  redis.call('PEXPIRE', KEYS[1], ARGV[5])
+redis.call('DEL', KEYS[1])
+redis.call('HSET', KEYS[1], unpack(fields))
+
+if retentionPx ~= '' then
+  redis.call('PEXPIRE', KEYS[1], retentionPx)
 end
 
-if redis.call('GET', KEYS[2]) == ARGV[1] then
+if redis.call('GET', KEYS[2]) == token then
   redis.call('DEL', KEYS[2])
 end
 `
@@ -80,9 +89,8 @@ end
  */
 const RELEASE_LOCK_SCRIPT = `
 if redis.call('GET', KEYS[1]) == ARGV[1] then
-  return redis.call('DEL', KEYS[1])
+  redis.call('DEL', KEYS[1])
 end
-return 0
 `
 
 const REVALIDATE_SCRIPT = `
@@ -107,11 +115,11 @@ export interface BaseRedisCacheStoreOptions {
   prefix?: string
 
   /**
-   * Serializer for cached outputs.
+   * Serializer for keys and cached outputs.
    *
-   * @default RPCSerializer
+   * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCSerializer>
+  serializer?: undefined | Public<RPCJsonSerializer>
 
   /**
    * How long a lock may be held, in seconds, so a crashed holder frees its
@@ -134,35 +142,37 @@ export interface BaseRedisCacheStoreOptions {
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
 export abstract class BaseRedisCacheStore implements CacheStore {
-  private readonly prefix: string
+  private readonly entryPrefix: string
+  private readonly lockPrefix: string
   private readonly tagPrefix: string
-  private readonly serializer: Public<RPCSerializer>
-  private readonly lockTtl: number
-  private readonly keySerializer = new RPCJsonSerializer()
+  private readonly lockPx: string
+  private readonly serializer: Public<RPCJsonSerializer>
 
   constructor(options: BaseRedisCacheStoreOptions = {}) {
-    this.prefix = options.prefix ?? ''
-    this.tagPrefix = `${this.prefix}t:`
-    this.serializer = options.serializer ?? new RPCSerializer()
-    this.lockTtl = options.lockTtl ?? 10
+    const prefix = options.prefix ?? ''
+    this.entryPrefix = `${prefix}e:`
+    this.lockPrefix = `${prefix}l:`
+    this.tagPrefix = `${prefix}t:`
+    this.lockPx = String((options.lockTtl ?? 10) * 1000)
+    this.serializer = options.serializer ?? new RPCJsonSerializer()
   }
 
   async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
-    const encodedKey = encodeCacheKey(key, this.keySerializer)
-    const entryKey = `${this.prefix}e:${encodedKey}`
-    const lockKey = `${this.prefix}l:${encodedKey}`
+    const encodedKey = encodeCacheKey(key, this.serializer)
+    const entryKey = this.entryPrefix + encodedKey
+    const lockKey = this.lockPrefix + encodedKey
     const token = crypto.randomUUID()
 
     while (true) {
       const [output, tags, expiresAt, shouldFill] = await this.run(
         FETCH_SCRIPT,
         [entryKey, lockKey],
-        [token, String(this.lockTtl * 1000), this.tagPrefix, String(nowInSeconds())],
+        [token, this.lockPx, this.tagPrefix, String(nowInSeconds())],
       ) as [unknown, unknown, unknown, unknown]
 
       if (output !== null) {
         const entry: CacheEntry = {
-          output: this.serializer.deserialize((parseReply(output) as { body?: unknown }).body as any),
+          output: this.serializer.deserialize(parseReply(output) as RPCJsonSerialization),
           tags: tags === null ? undefined : parseReply(tags) as string[],
           expiresAt: expiresAt === null ? undefined : Number(expiresAt),
         }
@@ -184,11 +194,12 @@ export abstract class BaseRedisCacheStore implements CacheStore {
   }
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
-    await this.run(REVALIDATE_SCRIPT, tags.map(tag => `${this.tagPrefix}${tag}`), [])
+    await this.run(REVALIDATE_SCRIPT, tags.map(tag => this.tagPrefix + tag), [])
   }
 
   /**
-   * Runs a Lua script through the client, by sha where the client allows it.
+   * Runs a Lua script through the client, by sha where the client supports
+   * it, reloading the script when the server dropped it.
    */
   protected abstract run(script: string, keys: string[], args: string[]): Promise<unknown>
 
@@ -198,7 +209,8 @@ export abstract class BaseRedisCacheStore implements CacheStore {
 
     try {
       output = await fill()
-      serialized = stringifyJSON({ body: this.serializer.serialize(output) })
+      const { json, meta } = this.serializer.serialize(output)
+      serialized = stringifyJSON({ json, meta })
     }
     catch (error) {
       await this.run(RELEASE_LOCK_SCRIPT, [lockKey], [token])
@@ -206,8 +218,7 @@ export abstract class BaseRedisCacheStore implements CacheStore {
     }
 
     const tags = options.tags?.length ? options.tags : undefined
-    const expiresAt = options.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
-    const retention = options.ttl !== undefined ? options.ttl + (options.swr ?? 0) : undefined
+    const { expiresAt, retention } = resolveCacheExpiry(options)
 
     await this.run(STORE_SCRIPT, [entryKey, lockKey], [
       token,

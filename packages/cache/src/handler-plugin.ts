@@ -1,6 +1,6 @@
 import type { AnyProcedure, Context } from '@orpc/server'
 import type { StandardHandlerInterceptor, StandardHandlerOptions, StandardHandlerPlugin } from '@orpc/server/standard'
-import type { StandardHeaders } from '@standardserver/core'
+import type { StandardHeaders } from '@standard-server/core'
 import { encodeCacheTagHeader, isDeepEqual, toArray } from '@orpc/shared'
 
 export const CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL: unique symbol = Symbol.for('ORPC_CACHE_HANDLER_PLUGIN_CONTEXT')
@@ -40,8 +40,6 @@ export interface CacheHandlerPluginOptions<_T extends Context> {
    * revalidated by the request, for client-side revalidation. `cache-tag`
    * and `cache-control` are their standard HTTP counterparts for response
    * caches in front, such as CDNs or Cloudflare Workers Caching.
-   *
-   * @default []
    */
   headers: readonly CacheHandlerPluginHeader[]
 }
@@ -85,6 +83,10 @@ export class CacheHandlerPlugin<T extends Context> implements StandardHandlerPlu
 
       const rootCache = pluginContext.caches.find(isRoot)
       const rootRevalidation = pluginContext.revalidations.find(isRoot)
+
+      if (rootCache === undefined && rootRevalidation === undefined) {
+        return response
+      }
 
       const headers: StandardHeaders = {}
 

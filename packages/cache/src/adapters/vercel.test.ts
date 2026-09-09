@@ -1,5 +1,5 @@
 import type { RuntimeCache } from '@vercel/functions'
-import { RPCSerializer } from '@orpc/client'
+import { RPCJsonSerializer } from '@orpc/client'
 import { getCache } from '@vercel/functions'
 import { describeCacheStoreContract } from '../../tests/__shared__/store-contract'
 import { VercelCacheStore } from './vercel'
@@ -136,7 +136,7 @@ describe('vercelCacheStore', () => {
 
     it('supports a custom serializer', async () => {
       const cache = createMockedCache()
-      const serializer = new RPCSerializer()
+      const serializer = new RPCJsonSerializer()
       const serializeSpy = vi.spyOn(serializer, 'serialize')
       const deserializeSpy = vi.spyOn(serializer, 'deserialize')
       const store = new VercelCacheStore({ cache, serializer })

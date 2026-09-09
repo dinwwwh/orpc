@@ -11,7 +11,8 @@ export interface CacheMiddlewareOptions<
 > {
   /**
    * The key identifying the cache entry, or any serializable value to derive
-   * it from. Used as given, so procedures sharing a key share an entry.
+   * it from. Used as given, so procedures sharing a key share an entry;
+   * `undefined` falls back to the default.
    *
    * @default the procedure path and input
    */
@@ -62,19 +63,16 @@ export function cache<
   options: CacheMiddlewareOptions<TInContext, TInput> = {},
 ): Middleware<TInContext, object, TInput, any, object> {
   return async function cache(middlewareOptions, input, done) {
-    const [keyMaterial, tags, ttl, swr, enabled = true] = await Promise.all([
+    if (await value(options.enabled, middlewareOptions, input) === false) {
+      return middlewareOptions.next()
+    }
+
+    const [key = [middlewareOptions.path, input], tags, ttl, swr] = await Promise.all([
       value(options.key, middlewareOptions, input),
       value(options.tags, middlewareOptions, input),
       value(options.ttl, middlewareOptions, input),
       value(options.swr, middlewareOptions, input),
-      value(options.enabled, middlewareOptions, input),
     ])
-
-    if (!enabled) {
-      return middlewareOptions.next()
-    }
-
-    const key = 'key' in options ? keyMaterial : [middlewareOptions.path, input]
 
     const store = middlewareOptions.context['cache/store']
     const pluginContext = (middlewareOptions.context as CacheHandlerPluginContext)[CACHE_HANDLER_PLUGIN_CONTEXT_SYMBOL]

@@ -1,5 +1,6 @@
 import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '@orpc/experimental-cache'
-import { encodeCacheTag, nowInSeconds, toArray } from '@orpc/shared'
+import { resolveCacheExpiry } from '@orpc/experimental-cache'
+import { encodeCacheTag, toArray } from '@orpc/shared'
 import * as workers from 'cloudflare:workers'
 
 export interface experimental_WorkersCacheStoreOptions {
@@ -30,7 +31,7 @@ export class experimental_WorkersCacheStore implements CacheStore {
     return {
       output: await fill(),
       tags: options.tags,
-      expiresAt: options.ttl !== undefined ? nowInSeconds() + options.ttl : undefined,
+      expiresAt: resolveCacheExpiry(options).expiresAt,
     }
   }
 

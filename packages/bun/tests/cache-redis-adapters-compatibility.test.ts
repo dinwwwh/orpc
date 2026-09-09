@@ -31,7 +31,7 @@ if (REDIS_URL) {
   stores.push({ name: 'bun redis', store: new BunRedisCacheStore(bunRedis, { prefix }) })
 }
 
-describe.concurrent('cache redis adapters compatibility', () => {
+describe('cache redis adapters compatibility', () => {
   describe.skipIf(stores.length < 2)('cross-adapter compatibility', () => {
     for (const source of stores) {
       for (const target of stores) {

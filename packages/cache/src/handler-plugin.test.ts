@@ -1,6 +1,6 @@
 import type { AnyProcedure } from '@orpc/server'
 import type { StandardHandlerPlugin } from '@orpc/server/standard'
-import type { StandardHeaders } from '@standardserver/core'
+import type { StandardHeaders } from '@standard-server/core'
 import type { CacheHandlerPluginContext, CacheHandlerPluginHeader } from './handler-plugin'
 import type { CacheContext } from './types'
 import { call, ORPCError, os } from '@orpc/server'

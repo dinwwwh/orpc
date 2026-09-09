@@ -1,35 +1,26 @@
-import type { Public } from '@orpc/shared'
+import type { RPCJsonSerialization } from '@orpc/client'
 import type { RuntimeCache } from '@vercel/functions'
-import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions, CacheStore } from '../types'
-import { RPCJsonSerializer, RPCSerializer } from '@orpc/client'
-import { MemoryLock, nowInSeconds } from '@orpc/shared'
+import type { CacheEntry, CacheFetchOptions, CacheRevalidateOptions } from '../types'
+import type { BaseKeyValueCacheStoreOptions } from './base-key-value'
+import { nowInSeconds } from '@orpc/shared'
 import { getCache } from '@vercel/functions'
-import { encodeCacheKey, isCacheEntryStale } from '../utils'
+import { resolveCacheExpiry } from '../utils'
+import { BaseKeyValueCacheStore } from './base-key-value'
 
 interface VercelCacheStoreEnvelope {
-  /**
-   * The cached output, encoded with the store's serializer.
-   */
-  output: unknown
+  output: RPCJsonSerialization
   tags?: readonly string[]
   expiresAt?: number | undefined
   evictAt?: number | undefined
 }
 
-export interface VercelCacheStoreOptions {
+export interface VercelCacheStoreOptions extends BaseKeyValueCacheStoreOptions {
   /**
    * The Vercel Runtime Cache to use.
    *
    * @default getCache()
    */
   cache?: RuntimeCache
-
-  /**
-   * Serializer for cached outputs.
-   *
-   * @default RPCSerializer
-   */
-  serializer?: undefined | Public<RPCSerializer>
 }
 
 /**
@@ -41,53 +32,19 @@ export interface VercelCacheStoreOptions {
  *
  * @see {@link https://orpc.dev/docs/helpers/cache#adapters | Cache Helpers - Adapters}
  */
-export class VercelCacheStore implements CacheStore {
+export class VercelCacheStore extends BaseKeyValueCacheStore {
   private readonly cache: RuntimeCache
-  private readonly serializer: Public<RPCSerializer>
-  private readonly memoryLock = new MemoryLock()
-
-  /**
-   * Key encoding has no serializer option, so one is built here rather than
-   * per call by {@link encodeCacheKey}.
-   */
-  private readonly keySerializer = new RPCJsonSerializer()
 
   constructor(options: VercelCacheStoreOptions = {}) {
+    super(options)
     this.cache = options.cache ?? getCache()
-    this.serializer = options.serializer ?? new RPCSerializer()
-  }
-
-  async fetch(key: unknown, fill: () => Promise<unknown>, options: CacheFetchOptions = {}): Promise<CacheEntry> {
-    const encodedKey = encodeCacheKey(key, this.keySerializer)
-    const entry = await this.read(encodedKey)
-
-    if (entry === undefined) {
-      return this.memoryLock.run(encodedKey, async (waited) => {
-        const current = waited ? await this.read(encodedKey) : undefined
-        return current ?? this.write(encodedKey, await fill(), options)
-      })
-    }
-
-    if (isCacheEntryStale(entry)) {
-      const refresh = this.memoryLock.run(encodedKey, async (waited) => {
-        const current = waited ? await this.read(encodedKey) : undefined
-
-        if (current === undefined || isCacheEntryStale(current)) {
-          await this.write(encodedKey, await fill(), options)
-        }
-      })
-
-      options.waitUntil?.(refresh)
-    }
-
-    return entry
   }
 
   async revalidate({ tags }: CacheRevalidateOptions): Promise<void> {
     await this.cache.expireTag([...tags])
   }
 
-  private async read(encodedKey: string): Promise<CacheEntry | undefined> {
+  protected async read(encodedKey: string): Promise<CacheEntry | undefined> {
     const envelope = await this.cache.get(encodedKey) as VercelCacheStoreEnvelope | null | undefined
 
     if (envelope == null) {
@@ -100,22 +57,19 @@ export class VercelCacheStore implements CacheStore {
     }
 
     return {
-      output: this.serializer.deserialize(envelope.output as any),
+      output: this.serializer.deserialize(envelope.output),
       tags: envelope.tags,
       expiresAt: envelope.expiresAt,
     }
   }
 
-  private async write(encodedKey: string, output: unknown, options: CacheFetchOptions): Promise<CacheEntry> {
-    const serialized = this.serializer.serialize(output)
-
+  protected async write(encodedKey: string, output: unknown, options: CacheFetchOptions): Promise<CacheEntry> {
     const tags = options.tags
-    const retention = options.ttl !== undefined ? options.ttl + (options.swr ?? 0) : undefined
-    const expiresAt = options.ttl !== undefined ? nowInSeconds() + options.ttl : undefined
-    const evictAt = retention !== undefined ? nowInSeconds() + retention : undefined
+    const { expiresAt, evictAt, retention } = resolveCacheExpiry(options)
+    const { json, meta } = this.serializer.serialize(output)
 
     const envelope: VercelCacheStoreEnvelope = {
-      output: serialized,
+      output: { json, meta },
       tags,
       expiresAt,
       evictAt,
