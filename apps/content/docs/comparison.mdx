@@ -74,17 +74,17 @@ Coming from tRPC? Follow the [migration guide](/docs/migrations/from-trpc), or [
 Treat these numbers as reference measurements, not a reason to switch frameworks. All three are fast enough for production. The per-request difference is tiny next to your business logic, database, and network, and results vary across environments and workloads.
 :::
 
-All numbers come from [middleapi/orpc-benchmarks](https://github.com/middleapi/orpc-benchmarks) and were measured on the same machine: oRPC 2.0.0-beta.35 on 2026-09-10, and tRPC 11.18.0 and Hono 4.13.1 on 2026-08-09. The oRPC WebSocket run is the one exception and still reflects 2.0.0-beta.26 from 2026-08-09. Handlers are no-ops with pass-through validation, so the results measure framework overhead only.
+All numbers come from [middleapi/orpc-benchmarks](https://github.com/middleapi/orpc-benchmarks) and were measured on the same machine: oRPC 2.0.0-beta.35 on 2026-09-10, and tRPC 11.18.0 and Hono 4.13.1 on 2026-08-09. Handlers are no-ops with pass-through validation, so the results measure framework overhead only.
 
 ### Throughput
 
 | Scenario | oRPC | tRPC | Hono |
 | --- | --- | --- | --- |
 | RPC over HTTP (req/s avg) | 18,845 | 4,299 | n/a |
-| RPC over WebSocket (req/s avg) | 24,126 | 5,054 | n/a |
+| RPC over WebSocket (req/s avg) | 23,815 | 5,054 | n/a |
 | OpenAPI (RESTful) over HTTP (req/s avg) | 18,014 | n/a | 16,932 |
 
-oRPC handles about 4.4x as many requests as tRPC over HTTP and 4.8x over WebSocket. oRPC and Hono are close on RESTful throughput, with oRPC about 6% ahead.
+oRPC handles about 4.4x as many requests as tRPC over HTTP and 4.7x over WebSocket. oRPC and Hono are close on RESTful throughput, with oRPC about 6% ahead.
 
 ### Clinic Doctor Profiles
 
@@ -94,12 +94,12 @@ Every run also profiles the server with [Clinic.js Doctor](https://clinicjs.org/
 | --- | --- | --- | --- | --- |
 | RPC over HTTP · oRPC | ~104% | 73-91 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/rpc-orpc/.clinic/report.clinic-doctor.html) |
 | RPC over HTTP · tRPC | ~113% | 73-247 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/rpc-trpc/.clinic/report.clinic-doctor.html) |
-| RPC over WebSocket · oRPC | ~104% | 71-110 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/ws-orpc/.clinic/report.clinic-doctor.html) |
+| RPC over WebSocket · oRPC | ~104% | 71-109 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/ws-orpc/.clinic/report.clinic-doctor.html) |
 | RPC over WebSocket · tRPC | ~41% | 67-75 MB | cpu: performance | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/ws-trpc/.clinic/report.clinic-doctor.html) |
 | OpenAPI over HTTP · oRPC | ~104% | 73-92 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/openapi-orpc/.clinic/report.clinic-doctor.html) |
 | OpenAPI over HTTP · Hono | ~103% | 71-95 MB | none | [view](https://htmlpreview.github.io/?https://github.com/middleapi/orpc-benchmarks/blob/main/benchmarks/openapi-hono/.clinic/report.clinic-doctor.html) |
 
-The profiles show where the throughput gap comes from. Over HTTP, oRPC serves over 4x tRPC's requests at similar CPU usage (~104% vs ~113%), so its per-request CPU cost is several times lower, and its event loop stays responsive: 0.04 ms average delay versus tRPC's 0.70 ms. Memory stays flat between 71 and 110 MB in every oRPC run, while tRPC's HTTP run climbs to 247 MB, more than double oRPC's highest reading, a sign of per-request allocation pressure. oRPC and Hono profile nearly identically, in line with their close throughput.
+The profiles show where the throughput gap comes from. Over HTTP, oRPC serves over 4x tRPC's requests at similar CPU usage (~104% vs ~113%), so its per-request CPU cost is several times lower, and its event loop stays responsive: 0.04 ms average delay versus tRPC's 0.70 ms. Memory stays flat between 71 and 109 MB in every oRPC run, while tRPC's HTTP run climbs to 247 MB, more than double oRPC's highest reading, a sign of per-request allocation pressure. oRPC and Hono profile nearly identically, in line with their close throughput.
 
 tRPC's low WebSocket CPU is not an advantage: the `cpu: performance` issue means the server cannot keep the CPU busy, so throughput is capped elsewhere in the stack.
 
@@ -113,7 +113,7 @@ On a large, fully typed project with 3,000 procedures across 1,501 routers, oRPC
 | Memory used | 469 MB | 677 MB |
 | Instantiations | 2,198,327 | 2,719,560 |
 
-Instantiations count the generic type expansions TypeScript performs during a check, so fewer means less work in CI and in your editor. Hono is excluded: its RPC types hit [documented limits](https://hono.dev/docs/guides/rpc#known-issues) at this scale and need workarounds like pre-compiled client types, an issue oRPC avoids by design.
+Hono has no column because it does not scale to this size. Its RPC types hit [known limits](https://hono.dev/docs/guides/rpc#known-issues) well before this point and the project becomes effectively unusable, an issue oRPC avoids by design.
 
 ### Bundle Size
 
