@@ -13,6 +13,15 @@ export default [
     "tierLevel": 5
   },
   {
+    "name": "Guillermo Rauch",
+    "login": "rauchg",
+    "avatar": "https://avatars.githubusercontent.com/u/13041?u=1ee8d111657cdd02ff6d253df00978d17ee6d722&v=4",
+    "link": "http://twitter.com/rauchg?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Special Sponsor",
+    "tierLevel": 5
+  },
+  {
     "name": "Yuzu",
     "login": "yuzu-health",
     "avatar": "https://avatars.githubusercontent.com/u/102488956?v=4",
