@@ -538,7 +538,7 @@ export default [
     "name": "grim",
     "login": "ripgrim",
     "avatar": "https://avatars.githubusercontent.com/u/75869731?u=b17c42ec2309552fdb822a86b25a2f99146a4d72&v=4",
-    "link": "https://tripwire.sh/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "link": "https://github.com/ripgrim?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
     "tierLevel": 0
