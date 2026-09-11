@@ -275,8 +275,8 @@ importers:
         specifier: ^3.6.1
         version: 3.6.1(typescript@6.0.3)(vue@3.5.42(typescript@6.0.3))
       valibot:
-        specifier: ^1.4.1
-        version: 1.4.2(typescript@6.0.3)
+        specifier: ^1.5.0
+        version: 1.5.0(typescript@6.0.3)
       vite:
         specifier: ^8.2.2
         version: 8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.1)(yaml@2.9.0)
@@ -509,8 +509,8 @@ importers:
         specifier: ^2.2.1
         version: 2.2.3
       valibot:
-        specifier: ^1.4.1
-        version: 1.4.2(typescript@6.0.3)
+        specifier: ^1.5.0
+        version: 1.5.0(typescript@6.0.3)
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -950,8 +950,8 @@ importers:
         specifier: ^2.2.1
         version: 2.2.3
       valibot:
-        specifier: ^1.4.1
-        version: 1.4.2(typescript@6.0.3)
+        specifier: ^1.5.0
+        version: 1.5.0(typescript@6.0.3)
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -1047,11 +1047,11 @@ importers:
         version: link:../json-schema
       '@valibot/to-json-schema':
         specifier: ^1.5.0
-        version: 1.7.1(valibot@1.4.2(typescript@6.0.3))
+        version: 1.7.1(valibot@1.5.0(typescript@6.0.3))
     devDependencies:
       valibot:
-        specifier: ^1.4.1
-        version: 1.4.2(typescript@6.0.3)
+        specifier: ^1.5.0
+        version: 1.5.0(typescript@6.0.3)
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -1121,7 +1121,7 @@ importers:
         version: 5.102.6(react@19.2.8)
       '@types/bun':
         specifier: latest
-        version: 1.4.1
+        version: 1.4.2
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18
@@ -5823,8 +5823,8 @@ packages:
   '@types/bun@1.4.0':
     resolution: {integrity: sha512-K+lZULY23vRgK/CfTjFIV+tyifaNdSMlPh9j+6mQ/cLfpOznLyAuzgV/JQysyECpkBQLVMSyvjlr2fBUSA9wFQ==}
 
-  '@types/bun@1.4.1':
-    resolution: {integrity: sha512-0AVGiTXGajf1rgKom3N+c5L7CBxuoyyv1i44M0nX4UDK0G/fnRAMiri93nHuVPIb429KKtAgj7HatVmmOjeQLA==}
+  '@types/bun@1.4.2':
+    resolution: {integrity: sha512-GimotNn7+ZV0uVArItBbriZsR1oNf0+WTzPkdcFrzShI7k2norL0uzEaJT8T33dWr7O/c9ZDuAFQrctKCi72oQ==}
 
   '@types/bunyan@1.8.11':
     resolution: {integrity: sha512-758fRH7umIMk5qt5ELmRMff4mLDlN+xyYzC+dkPTdKwbSkJFvz6xwyScrytPU0QIBbRRwbiE8/BIg8bpajerNQ==}
@@ -6971,8 +6971,8 @@ packages:
   bun-types@1.4.0:
     resolution: {integrity: sha512-iIKw23BspnQQYd3prITOBxeUsxBHnwzX6YJfGMuNOZzeNcMmVqzIIVGRm1l69ogaPQmb4wB6BN8mA5bE9YuC5Q==}
 
-  bun-types@1.4.1:
-    resolution: {integrity: sha512-loKuVrAFZKfEv+JvWkHRS9GW5IqLuLRjVXN9p+vZvBN86O5hf/pBZQ5hSoyipsrMmWObZBDvWnlmKvjKTM0PdA==}
+  bun-types@1.4.2:
+    resolution: {integrity: sha512-bxV1FgK7yBIzjRe5zBozIM4Bem11ZJcCXSrjWRG3YWLt8yFDePu4cLjpebO8OvPeIE9trbyPF4fuj3Cia4Fj3w==}
 
   bundle-name@4.1.0:
     resolution: {integrity: sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==}
@@ -12203,8 +12203,8 @@ packages:
     resolution: {integrity: sha512-sgECfZthyaCKW10N0fm27cg8HYTFK5qMWgypqkXMQ4Wbl/zZKx7xZICgcoxIIE+WFAP/MBL2EFwC/YvLxw3Zeg==}
     engines: {node: '>=0.10.0'}
 
-  valibot@1.4.2:
-    resolution: {integrity: sha512-gjdCvJ6d3RyHAneqxMYMW9QMCwYMb3jpOO0IyHZV1bnRHFBHrX3VkIILt5XYR0WhwHiH7Mty8ovuPZ/O3gamrg==}
+  valibot@1.5.0:
+    resolution: {integrity: sha512-nil6AkP2TChWL43Z5uJ6GTxX01CUA+g8LWUM+N/rB9NBbkUMaUsi9PUNzlUPgoKASgmx9f7eGOYpJ04/fSa6FQ==}
     peerDependencies:
       typescript: '>=5'
     peerDependenciesMeta:
@@ -17585,9 +17585,9 @@ snapshots:
     dependencies:
       bun-types: 1.4.0
 
-  '@types/bun@1.4.1':
+  '@types/bun@1.4.2':
     dependencies:
-      bun-types: 1.4.1
+      bun-types: 1.4.2
 
   '@types/bunyan@1.8.11':
     dependencies:
@@ -18017,9 +18017,9 @@ snapshots:
     dependencies:
       uncrypto: 0.1.3
 
-  '@valibot/to-json-schema@1.7.1(valibot@1.4.2(typescript@6.0.3))':
+  '@valibot/to-json-schema@1.7.1(valibot@1.5.0(typescript@6.0.3))':
     dependencies:
-      valibot: 1.4.2(typescript@6.0.3)
+      valibot: 1.5.0(typescript@6.0.3)
 
   '@vercel/analytics@1.6.1(react@19.2.8)(svelte@5.56.10(@typescript-eslint/types@8.68.0))(vue@3.5.42(typescript@6.0.3))':
     optionalDependencies:
@@ -19036,7 +19036,7 @@ snapshots:
     dependencies:
       '@types/node': 26.4.0
 
-  bun-types@1.4.1:
+  bun-types@1.4.2:
     dependencies:
       '@types/node': 26.4.0
 
@@ -25231,7 +25231,7 @@ snapshots:
 
   vali-date@1.0.0: {}
 
-  valibot@1.4.2(typescript@6.0.3):
+  valibot@1.5.0(typescript@6.0.3):
     optionalDependencies:
       typescript: 6.0.3
 
