@@ -3,7 +3,13 @@
   "type": "module",
   "version": "2.0.0-beta.35",
   "private": true,
-  "packageManager": "pnpm@12.0.0",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^12.0.0",
+      "onFail": "download"
+    }
+  },
   "scripts": {
     "prepare": "simple-git-hooks",
     "type:check": "pnpm run -r type:check && tsc",
