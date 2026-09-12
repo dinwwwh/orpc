@@ -95,7 +95,10 @@ Expo never parses multipart, and the WebSocket link cannot even produce it, whic
 | Nested `File` or `Blob` download                                                    | ❌                                          | ❌                                          |
 | Nested `File` or `Blob` upload                                                      | 🟡 with the [Blob polyfill](#blob-polyfill) | ❌                                          |
 
-The WebSocket link handles nested binary worse than fetch. It runs `FormData` through the global `Response` in both directions, and Expo leaves that as React Native's implementation, which can neither read a `FormData` body as a blob nor parse a multipart one. The fetch link only has the decode half of that problem.
+Two things are worth knowing beyond the table:
+
+- **`expo/fetch` buffers streamed uploads.** It accepts a streamed request body, whether that is an `AsyncIteratorObject` or a `ReadableStream`, but drains it into one buffer before the request starts. Nothing reaches the server until the stream finishes, and the whole payload sits in memory meanwhile. Downloads stream properly. The WebSocket link has no such limit: each chunk is its own frame, sent immediately, so uploads genuinely stream. It is the one place the WebSocket link beats fetch.
+- **The WebSocket link handles nested binary worse.** It runs `FormData` through the global `Response` in both directions, and Expo leaves that as React Native's implementation, which can neither read a `FormData` body as a blob nor parse a multipart one. The fetch link only has the decode half of that problem, which is why nested uploads still work there.
 
 ### Blob Polyfill
 
