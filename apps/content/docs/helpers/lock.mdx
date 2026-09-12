@@ -1,0 +1,208 @@
+---
+title: "Lock Helpers"
+description: "Prevent the same work from running concurrently in oRPC with a unified Locker interface, storage adapters, and procedure middleware."
+sidebar:
+  label: "Lock"
+---
+
+## Installation
+
+```package-install
+npm install @orpc/lock@beta
+```
+
+## Basic Usage
+
+The core concept is the `Locker` interface, which defines a standard way to run work under a lock, so that work sharing the same key never runs concurrently. You can create your own custom locker or use one of the provided [adapters](#adapters):
+
+| Name                           | Adapter for                                       |
+| ------------------------------ | ------------------------------------------------- |
+| [`MemoryLocker`](#memory)      | In-memory storage                                 |
+| [`RedisLocker`](#redis)        | [Redis](https://github.com/redis/redis)           |
+| [`BunRedisLocker`](#bun-redis) | [Bun's Redis](https://bun.com/docs/runtime/redis) |
+
+The `lock` method runs a callback while holding the lock for a key, and releases the lock afterwards, even when the callback throws. The callback receives `waited`, which tells whether the lock was acquired immediately (`false`) or only after waiting for another holder to release it (`true`).
+
+```ts twoslash
+import { MemoryLocker } from '@orpc/lock/memory'
+declare function generateReport(id: string): Promise<{ url: string }>
+declare const cache: { get: (key: string) => Promise<{ url: string } | undefined> }
+// ---cut---
+const locker = new MemoryLocker()
+
+const report = await locker.lock('report:123', async ({ waited }) => {
+  if (waited) {
+    // Another holder just finished the same work, so its result may already be available
+    const cached = await cache.get('report:123')
+
+    if (cached) {
+      return cached
+    }
+  }
+
+  return await generateReport('123')
+}, {
+  ttl: 30_000, // Expire the lock after 30 seconds, even if it is never released
+  timeout: 5_000, // Wait up to 5 seconds for the lock
+})
+```
+
+When the lock cannot be acquired before `timeout` elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, and pass a `signal` to stop waiting early, for example when the client disconnects.
+
+:::warning
+`ttl` is a safety net for holders that never release the lock, such as a crashed process. Pick a value longer than the work takes, because another holder can acquire the lock as soon as it expires.
+:::
+
+## Lock Middleware
+
+The `lock` helper creates middleware that runs [procedures](/docs/procedure) under a lock, so that calls sharing the same key never run concurrently. When the lock cannot be acquired before the timeout elapses, the procedure rejects with a `CONFLICT` error.
+
+```ts
+import { lock, Locker } from '@orpc/lock'
+
+const procedure = os
+  .$context<{ locker: Locker }>()
+  .input(z.object({ id: z.string() }))
+  .use(
+    lock({
+      locker: ({ context }) => context.locker,
+      key: ({ context }, input) => `report:${input.id}`,
+      ttl: 30_000, // Optional, defaults to the adapter's ttl
+      timeout: 5_000, // Optional, defaults to the adapter's timeout
+    }),
+  )
+  .handler(async ({ context, input }) => {
+    if (context.lock.waited) {
+      // Another call with the same key just finished, so its result may already be available
+    }
+
+    return await generateReport(input.id)
+  })
+
+const locker = new MemoryLocker()
+
+const result = await call(
+  procedure,
+  { id: '123' },
+  { context: { locker } }
+)
+```
+
+:::info[Automatic Deduplication]
+When the same `locker` and `key` combination is used multiple times in a single request chain, the `lock` middleware acquires the lock only once, so a procedure never waits for a lock it already holds. This behavior follows the [Dedupe Middleware](/docs/recipes/dedupe-middleware) recipe. To disable deduplication, set `dedupe: false`.
+:::
+
+## Adapters
+
+### Memory
+
+Keeps locks in the memory of the current process, so they are not shared between instances. Waiters acquire the lock in order, without polling. A good fit for development, tests, and single-process servers.
+
+```ts
+import { MemoryLocker } from '@orpc/lock/memory'
+
+const locker = new MemoryLocker({
+  /**
+   * How long a lock is held before it expires automatically, in milliseconds.
+   * Can be overridden per call.
+   *
+   * @default undefined (held until released)
+   */
+  ttl: 30_000,
+
+  /**
+   * How long to wait for a lock to become available, in milliseconds.
+   * Can be overridden per call.
+   *
+   * @default 10000
+   */
+  timeout: 5_000,
+})
+```
+
+### Redis
+
+Stores locks in Redis, so every instance using the same server shares the same locks. Locks are acquired with `SET NX PX` and released atomically with a Lua script, so a holder can never release a lock that expired and was acquired by someone else. Works with both standalone and cluster clients.
+
+```ts
+import { RedisLocker } from '@orpc/lock/redis'
+import { createClient } from 'redis'
+
+// Both standalone (`createClient`) and cluster (`createCluster`) clients are supported.
+const client = createClient({ url: 'redis://localhost:6379' })
+
+// RedisLocker lazily connects to Redis when needed.
+// You can still call `client.connect()` manually, but it is optional.
+await client.connect()
+
+const locker = new RedisLocker(client, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * How long a lock is held before it expires automatically, in milliseconds.
+   * Can be overridden per call.
+   */
+  ttl: 30_000,
+
+  /**
+   * How long to wait for a lock to become available, in milliseconds.
+   * Can be overridden per call.
+   *
+   * @default 10000
+   */
+  timeout: 5_000,
+
+  /**
+   * How long to wait between acquisition attempts while the lock
+   * is held by someone else, in milliseconds.
+   *
+   * @default 100
+   */
+  retryInterval: 100,
+})
+```
+
+### Bun Redis
+
+The Redis adapter for Bun's built-in Redis client, with no extra dependency. It shares locks with `RedisLocker`.
+
+```ts
+import { BunRedisLocker } from '@orpc/bun'
+import { redis } from 'bun'
+
+const locker = new BunRedisLocker(redis, {
+  /**
+   * The prefix to use for Redis keys.
+   *
+   * @default ''
+   */
+  prefix: '',
+
+  /**
+   * How long a lock is held before it expires automatically, in milliseconds.
+   * Can be overridden per call.
+   */
+  ttl: 30_000,
+
+  /**
+   * How long to wait for a lock to become available, in milliseconds.
+   * Can be overridden per call.
+   *
+   * @default 10000
+   */
+  timeout: 5_000,
+
+  /**
+   * How long to wait between acquisition attempts while the lock
+   * is held by someone else, in milliseconds.
+   *
+   * @default 100
+   */
+  retryInterval: 100,
+})
+```

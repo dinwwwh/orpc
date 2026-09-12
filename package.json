@@ -35,6 +35,7 @@
     "@orpc/experimental-msw": "workspace:*",
     "@orpc/hibernation": "workspace:*",
     "@orpc/json-schema": "workspace:*",
+    "@orpc/lock": "workspace:*",
     "@orpc/next": "workspace:*",
     "@orpc/node": "workspace:*",
     "@orpc/openapi": "workspace:*",

@@ -1,0 +1,82 @@
+{
+  "name": "@orpc/lock",
+  "type": "module",
+  "version": "2.0.0-beta.35",
+  "description": "Locking for oRPC procedures, with memory and Redis adapters",
+  "license": "MIT",
+  "funding": [
+    "https://github.com/sponsors/dinwwwh",
+    "https://opencollective.com/middleapi"
+  ],
+  "homepage": "https://orpc.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/middleapi/orpc.git",
+    "directory": "packages/lock"
+  },
+  "keywords": [
+    "orpc",
+    "lock",
+    "locking",
+    "mutex",
+    "redis",
+    "middleware",
+    "api",
+    "typescript"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "exports": {
+      "./package.json": "./package.json",
+      ".": {
+        "types": "./dist/index.d.mts",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "./base-redis": {
+        "types": "./dist/adapters/base-redis.d.mts",
+        "import": "./dist/adapters/base-redis.mjs",
+        "default": "./dist/adapters/base-redis.mjs"
+      },
+      "./memory": {
+        "types": "./dist/adapters/memory.d.mts",
+        "import": "./dist/adapters/memory.mjs",
+        "default": "./dist/adapters/memory.mjs"
+      },
+      "./redis": {
+        "types": "./dist/adapters/redis.d.mts",
+        "import": "./dist/adapters/redis.mjs",
+        "default": "./dist/adapters/redis.mjs"
+      }
+    }
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": "./src/index.ts",
+    "./base-redis": "./src/adapters/base-redis.ts",
+    "./memory": "./src/adapters/memory.ts",
+    "./redis": "./src/adapters/redis.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "unbuild",
+    "type:check": "tsc -b"
+  },
+  "peerDependencies": {
+    "redis": ">=6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "redis": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@orpc/server": "workspace:*",
+    "@orpc/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "redis": "^6.2.1"
+  }
+}

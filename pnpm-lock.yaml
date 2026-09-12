@@ -202,6 +202,9 @@ importers:
       '@orpc/json-schema':
         specifier: workspace:*
         version: link:packages/json-schema
+      '@orpc/lock':
+        specifier: workspace:*
+        version: link:packages/lock
       '@orpc/next':
         specifier: workspace:*
         version: link:packages/next
@@ -373,6 +376,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:../../packages/evlog
+      '@orpc/lock':
+        specifier: workspace:*
+        version: link:../../packages/lock
       '@orpc/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
@@ -477,6 +483,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/lock':
+        specifier: workspace:*
+        version: link:../lock
       '@orpc/publisher':
         specifier: workspace:*
         version: link:../publisher
@@ -655,6 +664,19 @@ importers:
       zod:
         specifier: ^4.5.4
         version: 4.5.4
+
+  packages/lock:
+    dependencies:
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      redis:
+        specifier: ^6.2.1
+        version: 6.2.1(@opentelemetry/api@1.9.1)
 
   packages/msw:
     dependencies:
