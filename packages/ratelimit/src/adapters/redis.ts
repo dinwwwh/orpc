@@ -1,4 +1,4 @@
-import type { RedisClientType } from 'redis'
+import type { RedisClientType, RedisClusterType } from 'redis'
 import type { RateLimiter, RateLimitOptions, RateLimitResult } from '../types'
 import { sleep } from '@orpc/shared'
 
@@ -63,7 +63,7 @@ export interface RedisRateLimiterOptions {
  * @see {@link https://orpc.dev/docs/helpers/ratelimit#adapters | Rate Limit Helpers - Adapters}
  */
 export class RedisRateLimiter implements RateLimiter {
-  private readonly redis: RedisClientType<any, any, any, any, any>
+  private readonly redis: RedisClientType<any, any, any, any, any> | RedisClusterType<any, any, any, any, any>
   private readonly prefix: string
   private readonly maxRequests: number
   private readonly window: number
@@ -72,7 +72,7 @@ export class RedisRateLimiter implements RateLimiter {
   private scriptSha: undefined | Awaited<ReturnType<typeof this.redis.scriptLoad>>
 
   constructor(
-    redis: RedisClientType<any, any, any, any, any>,
+    redis: RedisClientType<any, any, any, any, any> | RedisClusterType<any, any, any, any, any>,
     options: RedisRateLimiterOptions,
   ) {
     this.redis = redis
