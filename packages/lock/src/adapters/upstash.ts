@@ -17,8 +17,8 @@ export class UpstashLocker extends BaseRedisLocker {
     super(options)
   }
 
-  protected async acquire(key: string, token: string, ttlMs: number): Promise<boolean> {
-    const result = await this.redis.set(key, token, { nx: true, px: ttlMs })
+  protected async acquire(key: string, token: string, ttl: number): Promise<boolean> {
+    const result = await this.redis.set(key, token, { nx: true, px: ttl })
 
     return result === 'OK'
   }

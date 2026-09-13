@@ -16,8 +16,8 @@ export class experimental_BunRedisLocker extends BaseRedisLocker {
     super(options)
   }
 
-  protected async acquire(key: string, token: string, ttlMs: number): Promise<boolean> {
-    const result = await this.redis.send('SET', [key, token, 'NX', 'PX', String(ttlMs)])
+  protected async acquire(key: string, token: string, ttl: number): Promise<boolean> {
+    const result = await this.redis.send('SET', [key, token, 'NX', 'PX', String(ttl)])
 
     return result === 'OK'
   }

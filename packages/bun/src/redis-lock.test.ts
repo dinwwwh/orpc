@@ -27,8 +27,8 @@ describe.skipIf(!REDIS_URL)('bun redis locker integration', async () => {
       prefix,
       locker: new BunRedisLocker(redis, {
         prefix,
-        ttl: 10,
-        retryInterval: 0.01,
+        ttl: 10_000,
+        retryInterval: 10,
         ...options,
       }),
     }
@@ -88,7 +88,7 @@ describe.skipIf(!REDIS_URL)('bun redis locker integration', async () => {
   }, { timeout: 20_000 })
 
   it('rejects with LockTimeoutError when the lock is not released in time', async () => {
-    const { locker } = createTestingLocker({ timeout: 0.2 })
+    const { locker } = createTestingLocker({ timeout: 200 })
     const { promise: release, resolve } = promiseWithResolvers<void>()
     const holder = locker.lock('key', () => release)
 
@@ -111,7 +111,7 @@ describe.skipIf(!REDIS_URL)('bun redis locker integration', async () => {
   }, { timeout: 20_000 })
 
   it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
-    const { prefix, locker } = createTestingLocker({ ttl: 0.2 })
+    const { prefix, locker } = createTestingLocker({ ttl: 200 })
     const { promise: release1, resolve: resolve1 } = promiseWithResolvers<void>()
     const { promise: release2, resolve: resolve2 } = promiseWithResolvers<void>()
     const holder1 = locker.lock('key', () => release1)
@@ -120,7 +120,7 @@ describe.skipIf(!REDIS_URL)('bun redis locker integration', async () => {
 
     const start = Date.now()
     const fn = vi.fn(() => release2.then(() => 'ok'))
-    const holder2 = locker.lock('key', fn, { ttl: 10 })
+    const holder2 = locker.lock('key', fn, { ttl: 10_000 })
 
     await waitFor(() => expect(fn).toHaveBeenCalledWith({ waited: true }), { timeout: 2000, interval: 10 })
     expect(Date.now() - start).toBeGreaterThanOrEqual(100)

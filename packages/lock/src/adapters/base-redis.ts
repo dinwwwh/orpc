@@ -25,25 +25,25 @@ export interface BaseRedisLockerOptions {
   prefix?: string
 
   /**
-   * How long a lock is held before it expires automatically, in seconds.
+   * How long a lock is held before it expires automatically, in milliseconds.
    * Guards against holders that never release the lock, such as a crashed process.
    * Can be overridden per call.
    */
   ttl: number
 
   /**
-   * How long to wait for a lock to become available, in seconds.
+   * How long to wait for a lock to become available, in milliseconds.
    * Can be overridden per call.
    *
-   * @default 10
+   * @default 10000
    */
   timeout?: number
 
   /**
    * How long to wait between acquisition attempts while the lock
-   * is held by someone else, in seconds.
+   * is held by someone else, in milliseconds.
    *
-   * @default 0.1
+   * @default 100
    */
   retryInterval?: number
 }
@@ -66,16 +66,16 @@ export abstract class BaseRedisLocker implements Locker {
   constructor(options: BaseRedisLockerOptions) {
     this.prefix = options.prefix ?? ''
     this.ttl = options.ttl
-    this.timeout = options.timeout ?? 10
-    this.retryInterval = options.retryInterval ?? 0.1
+    this.timeout = options.timeout ?? 10_000
+    this.retryInterval = options.retryInterval ?? 100
   }
 
   /**
    * Sets `key` to `token` only when it does not exist yet, with an expiry
-   * of `ttlMs` milliseconds (`SET key token NX PX ttlMs`), and resolves with
+   * of `ttl` milliseconds (`SET key token NX PX ttl`), and resolves with
    * whether the key was set.
    */
-  protected abstract acquire(key: string, token: string, ttlMs: number): Promise<boolean>
+  protected abstract acquire(key: string, token: string, ttl: number): Promise<boolean>
 
   /**
    * Runs a Lua script (`EVAL script numkeys key [key ...] arg [arg ...]`).
@@ -84,14 +84,14 @@ export abstract class BaseRedisLocker implements Locker {
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
     const prefixedKey = `${this.prefix}${key}`
-    const ttlMs = Math.round((options.ttl ?? this.ttl) * 1000)
-    const deadline = Date.now() + (options.timeout ?? this.timeout) * 1000
+    const ttl = options.ttl ?? this.ttl
+    const deadline = Date.now() + (options.timeout ?? this.timeout)
     const token = crypto.randomUUID()
     let waited = false
 
     options.signal?.throwIfAborted()
 
-    while (!(await this.acquire(prefixedKey, token, ttlMs))) {
+    while (!(await this.acquire(prefixedKey, token, ttl))) {
       const remaining = deadline - Date.now()
 
       if (remaining <= 0) {
@@ -99,7 +99,7 @@ export abstract class BaseRedisLocker implements Locker {
       }
 
       waited = true
-      await sleep(Math.min(this.retryInterval * 1000, remaining), { signal: options.signal })
+      await sleep(Math.min(this.retryInterval, remaining), { signal: options.signal })
     }
 
     try {

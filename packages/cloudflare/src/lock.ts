@@ -12,17 +12,17 @@ export interface experimental_DurableLockerOptions {
   prefix?: string
 
   /**
-   * How long a lock is held before it expires automatically, in seconds.
+   * How long a lock is held before it expires automatically, in milliseconds.
    * Guards against holders that never release the lock. A crashed holder releases
    * the lock right away, since its socket drops. Can be overridden per call.
    */
   ttl: number
 
   /**
-   * How long to wait for a lock to become available, in seconds.
+   * How long to wait for a lock to become available, in milliseconds.
    * Can be overridden per call.
    *
-   * @default 10
+   * @default 10000
    */
   timeout?: number
 
@@ -55,7 +55,7 @@ export class experimental_DurableLocker implements Locker {
   ) {
     this.prefix = options.prefix ?? ''
     this.ttl = options.ttl
-    this.timeout = options.timeout ?? 10
+    this.timeout = options.timeout ?? 10_000
     this.getStubByName = options.getStubByName ?? ((namespace, key) => namespace.getByName(key))
   }
 
@@ -63,11 +63,11 @@ export class experimental_DurableLocker implements Locker {
     options.signal?.throwIfAborted()
 
     const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`)
-    const ttlMs = (options.ttl ?? this.ttl) * 1000
-    const timeoutMs = (options.timeout ?? this.timeout) * 1000
+    const ttl = options.ttl ?? this.ttl
+    const timeout = options.timeout ?? this.timeout
 
     const headers = new Headers({ upgrade: 'websocket' })
-    if (timeoutMs > 0) {
+    if (timeout > 0) {
       headers.set('x-orpc-lock-wait', 'true')
     }
 
@@ -96,7 +96,7 @@ export class experimental_DurableLocker implements Locker {
 
     if (waited) {
       const granted = promiseWithResolvers<void>()
-      const timer = setTimeout(() => granted.reject(new LockTimeoutError(key)), timeoutMs)
+      const timer = setTimeout(() => granted.reject(new LockTimeoutError(key)), timeout)
 
       websocket.addEventListener('message', () => granted.resolve())
       closed.promise.then(() => granted.reject(new Error('The lock durable object closed the socket before handing the lock over')))
@@ -109,7 +109,7 @@ export class experimental_DurableLocker implements Locker {
         .finally(() => clearTimeout(timer))
     }
 
-    const expiry = setTimeout(close, ttlMs)
+    const expiry = setTimeout(close, ttl)
 
     try {
       return await fn({ waited })

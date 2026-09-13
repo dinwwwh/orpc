@@ -17,12 +17,12 @@ export class RedisLocker extends BaseRedisLocker {
     super(options)
   }
 
-  protected async acquire(key: string, token: string, ttlMs: number): Promise<boolean> {
+  protected async acquire(key: string, token: string, ttl: number): Promise<boolean> {
     await this.connectIfNeeded()
 
     const result = await this.redis.set(key, token, {
       condition: 'NX',
-      expiration: { type: 'PX', value: ttlMs },
+      expiration: { type: 'PX', value: ttl },
     })
 
     return result === 'OK'

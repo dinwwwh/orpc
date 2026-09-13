@@ -18,7 +18,7 @@ it('works', async () => {
         lock({
           locker: ({ context }) => context.locker,
           key: (_, input) => `report:${input.id}`,
-          timeout: 0.1,
+          timeout: 100,
         }),
       )
       .handler(async ({ context }) => {

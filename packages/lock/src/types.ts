@@ -2,7 +2,7 @@ import type { Promisable } from '@orpc/shared'
 
 export interface LockOptions {
   /**
-   * How long the lock is held before it expires automatically, in seconds.
+   * How long the lock is held before it expires automatically, in milliseconds.
    * Guards against holders that never release the lock, such as a crashed process.
    *
    * @default the adapter default
@@ -10,7 +10,7 @@ export interface LockOptions {
   ttl?: number
 
   /**
-   * How long to wait for the lock to become available, in seconds.
+   * How long to wait for the lock to become available, in milliseconds.
    * Use `0` to give up immediately when the lock is held by someone else.
    *
    * @default the adapter default

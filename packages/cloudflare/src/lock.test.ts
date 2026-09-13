@@ -13,7 +13,7 @@ describe('durableLocker', () => {
     return {
       prefix,
       locker: new DurableLocker(env.LOCK_DON, {
-        ttl: 10,
+        ttl: 10_000,
         ...options,
         prefix,
       }),
@@ -106,7 +106,7 @@ describe('durableLocker', () => {
   })
 
   it('rejects with LockTimeoutError when the lock is not released in time', async () => {
-    const { locker } = createTestingLocker({ timeout: 0.2 })
+    const { locker } = createTestingLocker({ timeout: 200 })
     const { promise: release, resolve } = promiseWithResolvers<void>()
     const holder = locker.lock('key', () => release)
 
@@ -129,7 +129,7 @@ describe('durableLocker', () => {
   })
 
   it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
-    const { locker } = createTestingLocker({ ttl: 0.2 })
+    const { locker } = createTestingLocker({ ttl: 200 })
     const { promise: release1, resolve: resolve1 } = promiseWithResolvers<void>()
     const { promise: release2, resolve: resolve2 } = promiseWithResolvers<void>()
     const holder1 = locker.lock('key', () => release1)
@@ -137,7 +137,7 @@ describe('durableLocker', () => {
     await sleep(50)
 
     const fn = vi.fn(() => release2.then(() => 'ok'))
-    const holder2 = locker.lock('key', fn, { ttl: 10 })
+    const holder2 = locker.lock('key', fn, { ttl: 10_000 })
 
     await vi.waitFor(() => expect(fn).toHaveBeenCalledWith({ waited: true }), { timeout: 2000 })
 
