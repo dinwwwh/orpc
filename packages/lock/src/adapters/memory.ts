@@ -30,7 +30,7 @@ interface MemoryLockWaiter {
 interface MemoryLockEntry {
   holder: object
   expiry?: ReturnType<typeof setTimeout>
-  waiters: MemoryLockWaiter[]
+  waiters: Set<MemoryLockWaiter>
 }
 
 /**
@@ -64,7 +64,7 @@ export class MemoryLocker implements Locker {
       await this.wait(key, entry, token, timeout, options.signal)
     }
     else {
-      entry = { holder: token, waiters: [] }
+      entry = { holder: token, waiters: new Set() }
       this.entries.set(key, entry)
     }
 
@@ -87,14 +87,10 @@ export class MemoryLocker implements Locker {
 
     const { promise, resolve, reject } = promiseWithResolvers<void>()
     const waiter: MemoryLockWaiter = { token, resolve }
-    entry.waiters.push(waiter)
+    entry.waiters.add(waiter)
 
     const fail = (reason: unknown) => {
-      const index = entry.waiters.indexOf(waiter)
-      if (index !== -1) {
-        entry.waiters.splice(index, 1)
-      }
-
+      entry.waiters.delete(waiter)
       reject(reason)
     }
 
@@ -117,13 +113,14 @@ export class MemoryLocker implements Locker {
 
     clearTimeout(entry.expiry)
 
-    const next = entry.waiters.shift()
+    const [next] = entry.waiters
 
     if (!next) {
       this.entries.delete(key)
       return
     }
 
+    entry.waiters.delete(next)
     entry.holder = next.token
     next.resolve()
   }
