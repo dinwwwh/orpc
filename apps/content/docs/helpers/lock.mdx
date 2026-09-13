@@ -46,27 +46,17 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 })
 ```
 
-### TTL
+### Options
 
-The `ttl` option sets how long the lock is held before it expires automatically, in milliseconds. It guards against holders that never release the lock, such as a crashed process. Each adapter has its own default:
+`ttl` sets how long the lock is held before it expires automatically, in milliseconds. It guards against holders that never release the lock, such as a crashed process. Each adapter has its own default:
 
-```ts twoslash
-import { MemoryLocker } from '@orpc/experimental-lock/memory'
-declare function generateReport(id: string): Promise<{ url: string }>
-const locker = new MemoryLocker()
-// ---cut---
+```ts
 await locker.lock('report:123', () => generateReport('123'), { ttl: 30_000 })
 ```
 
-### Timeout
+`timeout` sets how long to wait for the lock to become available, in milliseconds. When it elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, which turns the lock into a "skip if already running" guard:
 
-When the lock cannot be acquired before `timeout` elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, which turns the lock into a "skip if already running" guard:
-
-```ts twoslash
-import { MemoryLocker } from '@orpc/experimental-lock/memory'
-declare function syncInventory(): Promise<void>
-const locker = new MemoryLocker()
-// ---cut---
+```ts
 import { LockTimeoutError } from '@orpc/experimental-lock'
 
 try {
@@ -81,16 +71,9 @@ catch (error) {
 }
 ```
 
-### Signal
+`signal` stops waiting early. It rejects with the abort reason and has no effect once the lock is acquired:
 
-Pass a `signal` to stop waiting early. It rejects with the abort reason and has no effect once the lock is acquired:
-
-```ts twoslash
-import { MemoryLocker } from '@orpc/experimental-lock/memory'
-declare function generateReport(id: string): Promise<{ url: string }>
-declare const request: Request
-const locker = new MemoryLocker()
-// ---cut---
+```ts
 await locker.lock('report:123', () => generateReport('123'), { signal: request.signal })
 ```
 
