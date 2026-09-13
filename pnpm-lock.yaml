@@ -674,6 +674,9 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@upstash/redis':
+        specifier: ^1.38.2
+        version: 1.38.3
       redis:
         specifier: ^6.2.1
         version: 6.2.1(@opentelemetry/api@1.9.1)

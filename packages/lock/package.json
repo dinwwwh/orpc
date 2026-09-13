@@ -2,7 +2,7 @@
   "name": "@orpc/lock",
   "type": "module",
   "version": "2.0.0-beta.35",
-  "description": "Locking for oRPC procedures, with memory and Redis adapters",
+  "description": "Locking for oRPC procedures, with memory, Redis, and Upstash adapters",
   "license": "MIT",
   "funding": [
     "https://github.com/sponsors/dinwwwh",
@@ -20,6 +20,7 @@
     "locking",
     "mutex",
     "redis",
+    "upstash",
     "middleware",
     "api",
     "typescript"
@@ -47,6 +48,11 @@
         "types": "./dist/adapters/redis.d.mts",
         "import": "./dist/adapters/redis.mjs",
         "default": "./dist/adapters/redis.mjs"
+      },
+      "./upstash": {
+        "types": "./dist/adapters/upstash.d.mts",
+        "import": "./dist/adapters/upstash.mjs",
+        "default": "./dist/adapters/upstash.mjs"
       }
     }
   },
@@ -55,7 +61,8 @@
     ".": "./src/index.ts",
     "./base-redis": "./src/adapters/base-redis.ts",
     "./memory": "./src/adapters/memory.ts",
-    "./redis": "./src/adapters/redis.ts"
+    "./redis": "./src/adapters/redis.ts",
+    "./upstash": "./src/adapters/upstash.ts"
   },
   "files": [
     "dist"
@@ -65,9 +72,13 @@
     "type:check": "tsc -b"
   },
   "peerDependencies": {
+    "@upstash/redis": ">=1.35.6",
     "redis": ">=6.0.0"
   },
   "peerDependenciesMeta": {
+    "@upstash/redis": {
+      "optional": true
+    },
     "redis": {
       "optional": true
     }
@@ -77,6 +88,7 @@
     "@orpc/shared": "workspace:*"
   },
   "devDependencies": {
+    "@upstash/redis": "^1.38.2",
     "redis": "^6.2.1"
   }
 }
