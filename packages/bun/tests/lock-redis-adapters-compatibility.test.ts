@@ -76,12 +76,12 @@ describe.concurrent('lock redis adapters compatibility', async () => {
         it(`shares lock state: ${source.name} → ${target.name}`, async () => {
           const key = `shared:${crypto.randomUUID()}`
           const holder = await hold(source.locker, key)
+          const waiter = target.locker.lock(key, ({ waited }) => waited)
 
+          // Commands on one client run in order, so the waiter's first attempt was rejected as well
           await expect(
             target.locker.lock(key, () => 'never', { timeout: 0 }),
           ).rejects.toMatchObject({ name: 'LockTimeoutError', key })
-
-          const waiter = target.locker.lock(key, ({ waited }) => waited)
 
           await holder.release()
           await expect(waiter).resolves.toBe(true)

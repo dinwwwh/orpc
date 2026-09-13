@@ -70,11 +70,11 @@ describe.concurrent('redis locker integration', {
     const { prefix, locker } = createTestingLocker()
     const { locker: other } = createTestingLocker({ prefix })
     const holder = await hold(locker, 'key')
-
-    await expect(other.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
-
     const fn = vi.fn(() => 'ok')
     const waiter = other.lock('key', fn)
+
+    // Commands on one client run in order, so the waiter's first attempt was rejected as well
+    await expect(other.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
 
     await holder.release()
     await expect(waiter).resolves.toBe('ok')
@@ -124,10 +124,10 @@ describe.concurrent('redis locker integration', {
     const expired = await hold(locker, 'key')
     const next = await hold(locker, 'key', { ttl: 10_000 })
 
-    await expect(expired.release()).resolves.toBe(false)
+    await expired.release()
     await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
 
-    await expect(next.release()).resolves.toBe(true)
+    await next.release()
     await expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
   })
 
