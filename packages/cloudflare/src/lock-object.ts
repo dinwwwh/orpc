@@ -32,6 +32,6 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   private getOpenWebSockets(): WebSocket[] {
-    return this.ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.READY_STATE_OPEN)
+    return this.ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN)
   }
 }
