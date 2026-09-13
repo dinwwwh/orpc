@@ -29,9 +29,7 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   override webSocketError(ws: WebSocket, _error: unknown): void {
-    if (ws.deserializeAttachment().holder) {
-      this.handover(ws)
-    }
+    ws.close(1011)
   }
 
   private isHeld(): boolean {
