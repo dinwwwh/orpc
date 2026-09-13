@@ -9,7 +9,7 @@ import { DurableObject } from 'cloudflare:workers'
  */
 export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
   override fetch(): Response {
-    const held = this.isHeld()
+    const held = this.getOpenWebSockets().length > 0
     const { '0': client, '1': server } = new WebSocketPair()
 
     server.serializeAttachment({ holder: !held })
@@ -22,43 +22,16 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     })
   }
 
-  override webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {
-    if (ws.deserializeAttachment().holder) {
-      this.handover(ws)
+  override webSocketClose(): void {
+    const next = this.getOpenWebSockets().at(-1) // oldest
+
+    if (next && !next.deserializeAttachment().holder) {
+      next.send('acquired')
+      next.serializeAttachment({ holder: true })
     }
   }
 
-  private isHeld(): boolean {
-    const sockets = this.ctx.getWebSockets() // newest first
-
-    for (let i = sockets.length - 1; i >= 0; i--) {
-      if (sockets[i]!.deserializeAttachment().holder) {
-        return true
-      }
-    }
-
-    return false
-  }
-
-  private handover(previous: WebSocket): void {
-    const sockets = this.ctx.getWebSockets() // newest first
-
-    for (let i = sockets.length - 1; i >= 0; i--) {
-      const ws = sockets[i]!
-
-      if (ws === previous) {
-        continue
-      }
-
-      try {
-        ws.send('acquired')
-      }
-      catch {
-        continue
-      }
-
-      ws.serializeAttachment({ holder: true })
-      return
-    }
+  private getOpenWebSockets(): WebSocket[] {
+    return this.ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.READY_STATE_OPEN)
   }
 }
