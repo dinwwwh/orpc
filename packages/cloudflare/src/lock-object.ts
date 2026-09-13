@@ -28,10 +28,6 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     }
   }
 
-  override webSocketError(ws: WebSocket, _error: unknown): void {
-    ws.close(1011)
-  }
-
   private isHeld(): boolean {
     const sockets = this.ctx.getWebSockets() // newest first
 
