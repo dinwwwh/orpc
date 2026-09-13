@@ -1,5 +1,6 @@
 import type { Promisable } from '@orpc/shared'
 import type { LockCallbackOptions, Locker, LockOptions } from '../types'
+import { promiseWithResolvers } from '@orpc/shared'
 import { LockTimeoutError } from '../error'
 
 export interface MemoryLockerOptions {
@@ -28,7 +29,7 @@ interface MemoryLockWaiter {
 
 interface MemoryLockEntry {
   holder: object
-  expiry: ReturnType<typeof setTimeout> | undefined
+  expiry?: ReturnType<typeof setTimeout>
   waiters: MemoryLockWaiter[]
 }
 
@@ -63,7 +64,7 @@ export class MemoryLocker implements Locker {
       await this.wait(key, entry, token, timeout, options.signal)
     }
     else {
-      entry = { holder: token, expiry: undefined, waiters: [] }
+      entry = { holder: token, waiters: [] }
       this.entries.set(key, entry)
     }
 
@@ -84,36 +85,26 @@ export class MemoryLocker implements Locker {
       return Promise.reject(new LockTimeoutError(key))
     }
 
-    return new Promise<void>((resolve, reject) => {
-      const waiter: MemoryLockWaiter = {
-        token,
-        resolve: () => {
-          cleanup()
-          resolve()
-        },
+    const { promise, resolve, reject } = promiseWithResolvers<void>()
+    const waiter: MemoryLockWaiter = { token, resolve }
+    entry.waiters.push(waiter)
+
+    const fail = (reason: unknown) => {
+      const index = entry.waiters.indexOf(waiter)
+      if (index !== -1) {
+        entry.waiters.splice(index, 1)
       }
 
-      const timer = setTimeout(() => fail(new LockTimeoutError(key)), timeout * 1000)
-      const abortListener = () => fail(signal?.reason)
+      reject(reason)
+    }
 
-      signal?.addEventListener('abort', abortListener, { once: true })
-      entry.waiters.push(waiter)
+    const timer = setTimeout(() => fail(new LockTimeoutError(key)), timeout * 1000)
+    const abortListener = () => fail(signal?.reason)
+    signal?.addEventListener('abort', abortListener, { once: true })
 
-      function cleanup(): void {
-        clearTimeout(timer)
-        signal?.removeEventListener('abort', abortListener)
-      }
-
-      function fail(reason: unknown): void {
-        cleanup()
-
-        const index = entry.waiters.indexOf(waiter)
-        if (index !== -1) {
-          entry.waiters.splice(index, 1)
-        }
-
-        reject(reason)
-      }
+    return promise.finally(() => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', abortListener)
     })
   }
 
@@ -134,7 +125,6 @@ export class MemoryLocker implements Locker {
     }
 
     entry.holder = next.token
-    entry.expiry = undefined
     next.resolve()
   }
 }

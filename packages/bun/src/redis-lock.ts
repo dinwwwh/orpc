@@ -16,8 +16,8 @@ export class experimental_BunRedisLocker extends BaseRedisLocker {
     super(options)
   }
 
-  protected async setIfNotExists(key: string, value: string, ttl: number): Promise<boolean> {
-    const result = await this.redis.send('SET', [key, value, 'NX', 'PX', String(ttl)])
+  protected async acquire(key: string, token: string, ttlMs: number): Promise<boolean> {
+    const result = await this.redis.send('SET', [key, token, 'NX', 'PX', String(ttlMs)])
 
     return result === 'OK'
   }

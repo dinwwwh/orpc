@@ -2,6 +2,7 @@ import { LockTimeoutError } from '@orpc/experimental-lock'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'bun:test'
+import { waitFor } from '../tests/__shared__/utils'
 import { experimental_BunRedisLocker as BunRedisLocker } from './redis-lock'
 
 const REDIS_URL = Bun.env.REDIS_URL
@@ -121,11 +122,7 @@ describe.skipIf(!REDIS_URL)('bun redis locker integration', async () => {
     const fn = vi.fn(() => release2.then(() => 'ok'))
     const holder2 = locker.lock('key', fn, { ttl: 10 })
 
-    while (fn.mock.calls.length === 0) {
-      await sleep(10)
-    }
-
-    expect(fn).toHaveBeenCalledWith({ waited: true })
+    await waitFor(() => expect(fn).toHaveBeenCalledWith({ waited: true }), { timeout: 2000, interval: 10 })
     expect(Date.now() - start).toBeGreaterThanOrEqual(100)
 
     resolve1()

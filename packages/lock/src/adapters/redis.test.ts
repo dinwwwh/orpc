@@ -18,17 +18,17 @@ describe.concurrent('redis locker integration', {
   })
 
   function createTestingLocker(
-    options: Partial<ConstructorParameters<typeof RedisLocker>[1]> = {},
+    { useRedis = redis, ...options }: Partial<ConstructorParameters<typeof RedisLocker>[1]> & { useRedis?: typeof redis } = {},
   ) {
-    const prefix = `orpc-redis-locker-${crypto.randomUUID()}:`
+    const prefix = options.prefix ?? `orpc-redis-locker-${crypto.randomUUID()}:`
 
     return {
       prefix,
-      locker: new RedisLocker(redis, {
-        prefix,
+      locker: new RedisLocker(useRedis, {
         ttl: 10,
         retryInterval: 0.01,
         ...options,
+        prefix,
       }),
     }
   }
@@ -77,7 +77,7 @@ describe.concurrent('redis locker integration', {
 
   it('shares locks across instances using the same prefix', async () => {
     const { prefix, locker } = createTestingLocker()
-    const other = new RedisLocker(redis, { prefix, ttl: 10, retryInterval: 0.01 })
+    const { locker: other } = createTestingLocker({ prefix })
     const { promise: release, resolve } = promiseWithResolvers<void>()
     const holder = locker.lock('key', () => release)
 
@@ -257,11 +257,7 @@ describe.concurrent('redis locker integration', {
       url: REDIS_URL,
     })
 
-    const locker = new RedisLocker(redis, {
-      prefix: `orpc-redis-locker-${crypto.randomUUID()}:`,
-      ttl: 10,
-      retryInterval: 0.01,
-    })
+    const { locker } = createTestingLocker({ useRedis: redis })
 
     expect(redis.isOpen).toBe(false)
 

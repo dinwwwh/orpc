@@ -9,8 +9,8 @@ export class LockTimeoutError extends Error {
    */
   readonly key: string
 
-  constructor(key: string, options?: ErrorOptions) {
-    super(`Timed out waiting for the lock of key "${key}"`, options)
+  constructor(key: string) {
+    super(`Timed out waiting for the lock of key "${key}"`)
 
     this.name = 'LockTimeoutError'
     this.key = key
