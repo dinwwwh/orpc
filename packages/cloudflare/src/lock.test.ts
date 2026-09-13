@@ -1,4 +1,3 @@
-import type { LockDO } from '../tests/__shared__/main'
 import { LockTimeoutError } from '@orpc/experimental-lock'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { env } from 'cloudflare:workers'
@@ -172,18 +171,16 @@ describe('durableLocker', () => {
     await holder
   })
 
-  it('parks waiters on a websocket instead of polling', async () => {
-    const acquire = vi.fn()
+  it('parks waiters on a websocket instead of polling, in one request each', async () => {
+    const fetch = vi.fn()
     const getStubByName = vi.fn((namespace, key) => {
-      const stub = namespace.getByName(key) as DurableObjectStub<LockDO>
+      const stub = namespace.getByName(key)
 
       return {
-        fetch: (input: RequestInfo | URL, init?: RequestInit) => stub.fetch(input, init),
-        acquire: (token: string, ttlMs: number) => {
-          acquire()
-          return stub.acquire(token, ttlMs)
+        fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+          fetch(init?.method ?? 'GET')
+          return stub.fetch(input, init)
         },
-        release: (token: string) => stub.release(token),
       } as unknown as DurableObjectStub
     })
     const { locker } = createTestingLocker({ getStubByName })
@@ -195,13 +192,13 @@ describe('durableLocker', () => {
     const waiter = locker.lock('key', ({ waited }) => waited)
 
     await sleep(300)
-    expect(acquire).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls).toEqual([['GET'], ['GET']])
 
     resolve()
     await holder
 
     await expect(waiter).resolves.toBe(true)
-    expect(acquire).toHaveBeenCalledTimes(2)
+    expect(fetch.mock.calls).toEqual([['GET'], ['GET'], ['DELETE'], ['DELETE']])
   })
 
   it('names the Durable Object after the prefixed key', async () => {

@@ -35,52 +35,44 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   /**
-   * Stores `token` as the holder unless another holder has not expired yet,
-   * and resolves with whether the lock was acquired.
-   */
-  async acquire(token: string, ttlMs: number): Promise<boolean> {
-    if (await this.isHeld()) {
-      return false
-    }
-
-    await this.grant({ token, ttlMs })
-
-    return true
-  }
-
-  /**
-   * Removes the holder only while it is still `token`, and hands the lock over
-   * to the waiter that has been parked the longest, if any.
-   */
-  async release(token: string): Promise<void> {
-    const holder = await this.ctx.storage.get<LockHolder>(HOLDER_KEY)
-
-    if (holder?.token !== token) {
-      return
-    }
-
-    await this.ctx.storage.delete(HOLDER_KEY)
-    await this.handover()
-  }
-
-  /**
-   * Parks a waiter on a hibernatable WebSocket (`Upgrade: websocket` with the
-   * `x-orpc-lock-token` and `x-orpc-lock-ttl` headers) until the lock is handed over to it,
-   * which is signaled by a message before the socket is closed.
+   * Every request identifies its caller with the `x-orpc-lock-token` header.
+   *
+   * - `DELETE` releases the lock if the caller holds it, and responds with `204`.
+   * - Anything else acquires the lock for `x-orpc-lock-ttl` milliseconds: `204` when
+   *   acquired right away, `409` when held and the caller sent no `Upgrade: websocket`
+   *   header, otherwise `101` with a hibernatable WebSocket that receives a message once
+   *   the lock is handed over to the caller and is then closed.
    */
   override async fetch(request: Request): Promise<Response> {
     const token = request.headers.get('x-orpc-lock-token')
+
+    if (!token) {
+      return new Response('Expected the x-orpc-lock-token header', { status: 400 })
+    }
+
+    if (request.method === 'DELETE') {
+      await this.release(token)
+      return new Response(null, { status: 204 })
+    }
+
     const ttlMs = Number(request.headers.get('x-orpc-lock-ttl'))
 
-    if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket' || !token || !(ttlMs > 0)) {
-      return new Response('Expected a websocket upgrade with x-orpc-lock-token and x-orpc-lock-ttl headers', { status: 400 })
+    if (!(ttlMs > 0)) {
+      return new Response('Expected the x-orpc-lock-ttl header to be a positive number', { status: 400 })
+    }
+
+    if (!(await this.isHeld())) {
+      await this.grant({ token, ttlMs })
+      return new Response(null, { status: 204 })
+    }
+
+    if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+      return new Response(null, { status: 409 })
     }
 
     const { '0': client, '1': server } = new WebSocketPair()
     server.serializeAttachment({ token, ttlMs, seq: ++this.seq } satisfies LockWaiter)
     this.ctx.acceptWebSocket(server)
-
-    await this.handover()
 
     return new Response(null, { status: 101, webSocket: client })
   }
@@ -89,6 +81,21 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   override async alarm(): Promise<void> {
+    await this.handover()
+  }
+
+  /**
+   * Removes the holder only while it is still `token`, and hands the lock over
+   * to the waiter that has been parked the longest, if any.
+   */
+  private async release(token: string): Promise<void> {
+    const holder = await this.ctx.storage.get<LockHolder>(HOLDER_KEY)
+
+    if (holder?.token !== token) {
+      return
+    }
+
+    await this.ctx.storage.delete(HOLDER_KEY)
     await this.handover()
   }
 

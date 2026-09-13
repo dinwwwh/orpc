@@ -1,6 +1,5 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
-import type { experimental_DurableLockObject } from './lock-object'
 import { LockTimeoutError } from '@orpc/experimental-lock'
 import { promiseWithResolvers, tryOrUndefined } from '@orpc/shared'
 
@@ -60,55 +59,60 @@ export class experimental_DurableLocker implements Locker {
   }
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
-    const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`) as DurableObjectStub<experimental_DurableLockObject>
+    const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`)
     const ttlMs = Math.round((options.ttl ?? this.ttl) * 1000)
     const timeoutMs = (options.timeout ?? this.timeout) * 1000
     const token = crypto.randomUUID()
-    let waited = false
 
     options.signal?.throwIfAborted()
 
-    if (!(await stub.acquire(token, ttlMs))) {
-      if (timeoutMs <= 0) {
-        throw new LockTimeoutError(key)
-      }
-
-      waited = true
-      await this.wait(stub, key, token, ttlMs, timeoutMs, options.signal)
-    }
+    const waited = await this.acquire(stub, key, token, ttlMs, timeoutMs, options.signal)
 
     try {
       return await fn({ waited })
     }
     finally {
-      await stub.release(token)
+      await this.release(stub, token)
     }
   }
 
   /**
-   * Parks on a WebSocket until the object hands the lock over, so the object can
-   * hibernate meanwhile instead of being polled.
+   * Acquires the lock in one request, and resolves with whether it had to wait.
+   * When the lock is held and waiting is allowed, the object upgrades the request
+   * to a WebSocket and parks the caller on it until the lock is handed over, so the
+   * object can hibernate meanwhile instead of being polled.
    */
-  private async wait(
-    stub: DurableObjectStub<experimental_DurableLockObject>,
+  private async acquire(
+    stub: DurableObjectStub,
     key: string,
     token: string,
     ttlMs: number,
     timeoutMs: number,
     signal: AbortSignal | undefined,
-  ): Promise<void> {
-    const response = await stub.fetch('http://localhost/wait', {
-      headers: {
-        'upgrade': 'websocket',
-        'x-orpc-lock-token': token,
-        'x-orpc-lock-ttl': String(ttlMs),
-      },
-    })
+  ): Promise<boolean> {
+    const headers: Record<string, string> = {
+      'x-orpc-lock-token': token,
+      'x-orpc-lock-ttl': String(ttlMs),
+    }
+
+    if (timeoutMs > 0) {
+      headers.upgrade = 'websocket'
+    }
+
+    const response = await stub.fetch('http://localhost/acquire', { headers })
+
+    if (response.ok) {
+      return false
+    }
+
+    if (response.status === 409) {
+      throw new LockTimeoutError(key)
+    }
 
     const websocket = response.webSocket
 
     if (!websocket) {
-      throw new Error('Failed to open the waiting websocket to the lock durable object', {
+      throw new Error(`Failed to acquire the lock: ${response.status} ${response.statusText}`, {
         cause: response,
       })
     }
@@ -127,13 +131,28 @@ export class experimental_DurableLocker implements Locker {
       await promise
     }
     catch (error) {
-      await stub.release(token) // the lock may have been handed over meanwhile
+      await this.release(stub, token) // the lock may have been handed over meanwhile
       throw error
     }
     finally {
       clearTimeout(timer)
       signal?.removeEventListener('abort', abortListener)
       tryOrUndefined(() => websocket.close())
+    }
+
+    return true
+  }
+
+  private async release(stub: DurableObjectStub, token: string): Promise<void> {
+    const response = await stub.fetch('http://localhost/release', {
+      method: 'DELETE',
+      headers: { 'x-orpc-lock-token': token },
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to release the lock: ${response.status} ${response.statusText}`, {
+        cause: response,
+      })
     }
   }
 }
