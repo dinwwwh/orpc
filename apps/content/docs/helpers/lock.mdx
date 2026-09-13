@@ -280,7 +280,7 @@ const locker = new BunRedisLocker(redis, {
 
 ### Cloudflare
 
-Keeps each lock in a Durable Object named after its key, so every Worker instance shares the same locks. A caller holds a hibernatable WebSocket while it holds or waits for the lock, so the object keeps no storage and is not billed meanwhile. Closing the socket releases the lock, so a crashed Worker releases it right away and the next caller is served the moment the previous one finishes. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
+Keeps each lock in a Durable Object, named after the key by default, so every Worker instance shares the same locks. A caller holds a hibernatable WebSocket while it holds or waits for the lock, so the object keeps no storage and is not billed meanwhile. Closing the socket releases the lock, so a crashed Worker releases it right away and the next caller is served the moment the previous one finishes. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
 
 ```jsonc title="wrangler.jsonc"
 {
@@ -300,7 +300,7 @@ export default {
   async fetch(request, env) {
     const locker = new DurableLocker(env.LOCK_DON, {
       /**
-       * The prefix to use for Durable Object names.
+       * The prefix to use for lock keys, which also name the Durable Objects by default.
        *
        * @default ''
        */
@@ -332,10 +332,10 @@ export default {
 ```
 
 :::tip[Fewer Durable Objects]
-By default every key gets its own Durable Object. To bound how many objects exist, use `getStubByName` to map keys onto a fixed set of them. Keys that land on the same object share one lock, so pick enough stripes to keep unrelated work from waiting on each other.
+By default every key gets its own Durable Object. An object serves any number of keys independently, each tracked as a WebSocket tag, so to bound how many objects exist you can map keys onto a fixed set of them with `getStubByName` without changing how the locks behave. Keys are limited to 256 characters.
 
 ```ts
-const STRIPES = 64
+const STRIPES = 16
 
 function stripe(key: string): number {
   let hash = 2166136261

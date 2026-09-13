@@ -1,11 +1,11 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
 import { LockTimeoutError } from '@orpc/experimental-lock'
-import { promiseWithResolvers, runWithSignal, tryOrUndefined } from '@orpc/shared'
+import { promiseWithResolvers, runWithSignal, safeEncodeURIComponent, tryOrUndefined } from '@orpc/shared'
 
 export interface experimental_DurableLockerOptions {
   /**
-   * The prefix to use for Durable Object names.
+   * The prefix to use for lock keys, which also name the Durable Objects by default.
    *
    * @default ''
    */
@@ -36,9 +36,9 @@ export interface experimental_DurableLockerOptions {
 
 /**
  * Locker adapter for Cloudflare Durable Objects. Keeps each lock in an
- * `experimental_DurableLockObject` named after its key, so every Worker instance
- * shares the same locks. A caller holds a hibernatable WebSocket while it holds or
- * waits for the lock, so the object is not billed meanwhile, and closing the socket
+ * `experimental_DurableLockObject`, named after the key by default, so every Worker
+ * instance shares the same locks. A caller holds a hibernatable WebSocket while it holds
+ * or waits for the lock, so the object is not billed meanwhile, and closing the socket
  * releases the lock.
  *
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
@@ -62,11 +62,12 @@ export class experimental_DurableLocker implements Locker {
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
     options.signal?.throwIfAborted()
 
-    const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`)
+    const prefixedKey = `${this.prefix}${key}`
+    const stub = this.getStubByName(this.namespace, prefixedKey)
     const ttl = options.ttl ?? this.ttl
     const timeout = options.timeout ?? this.timeout
 
-    const headers = new Headers({ upgrade: 'websocket' })
+    const headers = new Headers({ 'upgrade': 'websocket', 'x-orpc-lock-key': safeEncodeURIComponent(prefixedKey) })
     if (timeout > 0) {
       headers.set('x-orpc-lock-wait', 'true')
     }
