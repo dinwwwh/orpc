@@ -50,8 +50,12 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   override webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean): void {
-    this.handover({ closing: ws })
-    tryOrUndefined(() => ws.close(code, reason)) // completes the closing handshake
+    try {
+      this.handover({ closing: ws })
+    }
+    finally {
+      tryOrUndefined(() => ws.close(code, reason)) // completes the closing handshake the caller awaits
+    }
   }
 
   override webSocketError(ws: WebSocket, _error: unknown): void {
@@ -78,7 +82,7 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
         return
       }
       catch {
-        continue // the caller is gone, so hand over to the next one
+        // the caller is gone, so hand over to the next one
       }
     }
   }

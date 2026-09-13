@@ -8,17 +8,26 @@ describe('durableLockObject', () => {
     return env.LOCK_DON.getByName(crypto.randomUUID())
   }
 
-  async function connect(stub: DurableObjectStub, { wait = true } = {}) {
+  /**
+   * Tries to acquire without waiting, and resolves with the response status.
+   */
+  async function tryAcquire(stub: DurableObjectStub) {
+    const response = await stub.fetch('https://example.com/acquire', {
+      headers: { upgrade: 'websocket' },
+    })
+
+    return response.status
+  }
+
+  async function connect(stub: DurableObjectStub) {
     const response = await stub.fetch('https://example.com/acquire', {
       headers: {
-        upgrade: 'websocket',
-        ...(wait ? { 'x-orpc-lock-wait': 'true' } : {}),
+        'upgrade': 'websocket',
+        'x-orpc-lock-wait': 'true',
       },
     })
 
-    if (response.status !== 101) {
-      return { status: response.status }
-    }
+    expect(response.status).toBe(101)
 
     const socket = response.webSocket!
     const granted = vi.fn()
@@ -29,7 +38,6 @@ describe('durableLockObject', () => {
     socket.accept()
 
     return {
-      status: response.status,
       granted,
       release: async () => {
         socket.close(1000)
@@ -51,14 +59,14 @@ describe('durableLockObject', () => {
     expect(second.granted).not.toHaveBeenCalled()
     expect(third.granted).not.toHaveBeenCalled()
 
-    await first.release!()
+    await first.release()
     await vi.waitFor(() => expect(second.granted).toHaveBeenCalledWith({ waited: true }))
     expect(third.granted).not.toHaveBeenCalled()
 
-    await second.release!()
+    await second.release()
     await vi.waitFor(() => expect(third.granted).toHaveBeenCalledWith({ waited: true }))
 
-    await third.release!()
+    await third.release()
     const fourth = await connect(stub)
     await vi.waitFor(() => expect(fourth.granted).toHaveBeenCalledWith({ waited: false }))
   })
@@ -69,12 +77,13 @@ describe('durableLockObject', () => {
     const holder = await connect(stub)
     await vi.waitFor(() => expect(holder.granted).toHaveBeenCalledWith({ waited: false }))
 
-    expect(await connect(stub, { wait: false })).toEqual({ status: 409 })
+    expect(await tryAcquire(stub)).toBe(409)
 
-    await holder.release!()
+    await holder.release()
 
-    const next = await connect(stub, { wait: false })
+    const next = await connect(stub)
     await vi.waitFor(() => expect(next.granted).toHaveBeenCalledWith({ waited: false }))
+    await next.release()
   })
 
   it('skips sockets that left before their turn', async () => {
@@ -85,9 +94,9 @@ describe('durableLockObject', () => {
 
     const first = await connect(stub)
     const second = await connect(stub)
-    await first.release!()
+    await first.release()
 
-    await holder.release!()
+    await holder.release()
     await vi.waitFor(() => expect(second.granted).toHaveBeenCalledWith({ waited: true }))
   })
 
@@ -100,10 +109,10 @@ describe('durableLockObject', () => {
 
     await evictDurableObject(stub)
 
-    expect(await connect(stub, { wait: false })).toEqual({ status: 409 })
+    expect(await tryAcquire(stub)).toBe(409)
     expect(waiter.granted).not.toHaveBeenCalled()
 
-    await holder.release!()
+    await holder.release()
     await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalledWith({ waited: true }))
   })
 

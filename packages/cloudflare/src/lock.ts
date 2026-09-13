@@ -1,7 +1,7 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
 import { LockTimeoutError } from '@orpc/experimental-lock'
-import { promiseWithResolvers, tryOrUndefined } from '@orpc/shared'
+import { promiseWithResolvers, runWithSignal, tryOrUndefined } from '@orpc/shared'
 
 export interface experimental_DurableLockerOptions {
   /**
@@ -60,15 +60,15 @@ export class experimental_DurableLocker implements Locker {
   }
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
-    const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`)
-    const ttlMs = Math.round((options.ttl ?? this.ttl) * 1000)
-    const timeoutMs = (options.timeout ?? this.timeout) * 1000
-    const headers: Record<string, string> = { upgrade: 'websocket' }
-
     options.signal?.throwIfAborted()
 
+    const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`)
+    const ttlMs = (options.ttl ?? this.ttl) * 1000
+    const timeoutMs = (options.timeout ?? this.timeout) * 1000
+
+    const headers = new Headers({ upgrade: 'websocket' })
     if (timeoutMs > 0) {
-      headers['x-orpc-lock-wait'] = 'true'
+      headers.set('x-orpc-lock-wait', 'true') // otherwise the object answers 409 instead of parking us
     }
 
     const response = await stub.fetch('http://localhost/acquire', { headers })
@@ -85,51 +85,43 @@ export class experimental_DurableLocker implements Locker {
       })
     }
 
+    const granted = promiseWithResolvers<LockCallbackOptions>()
     const closed = promiseWithResolvers<void>()
-    websocket.addEventListener('close', () => closed.resolve())
-    websocket.addEventListener('error', () => closed.resolve())
+    const close = () => tryOrUndefined(() => websocket.close(1000))
 
-    let waited: boolean
+    websocket.addEventListener('message', event => granted.resolve(JSON.parse(event.data as string)))
+    websocket.addEventListener('close', () => {
+      granted.reject(new Error('The lock durable object closed the socket before handing the lock over'))
+      closed.resolve()
+    })
+    websocket.addEventListener('error', (event) => {
+      granted.reject(new Error('Lock websocket error', { cause: event }))
+      closed.resolve()
+    })
+    websocket.accept()
 
-    try {
-      ({ waited } = await this.acquired(websocket, key, timeoutMs, options.signal))
-    }
-    catch (error) {
-      tryOrUndefined(() => websocket.close(1000))
-      throw error
-    }
+    // With `timeout: 0` the object never parks us (see the header above), so no timer is needed.
+    const timer = timeoutMs > 0 ? setTimeout(() => granted.reject(new LockTimeoutError(key)), timeoutMs) : undefined
+
+    // The object hands the lock over right away or once the previous holder's socket
+    // closes, hibernating meanwhile, so it is never polled.
+    const callbackOptions = await runWithSignal(options.signal, () => granted.promise)
+      .catch((error) => {
+        close()
+        throw error
+      })
+      .finally(() => clearTimeout(timer))
 
     // The lock lapses when the ttl elapses, even while `fn` is still running.
-    const expiry = setTimeout(() => tryOrUndefined(() => websocket.close(1000)), ttlMs)
+    const expiry = setTimeout(close, ttlMs)
 
     try {
-      return await fn({ waited })
+      return await fn(callbackOptions)
     }
     finally {
       clearTimeout(expiry)
-      tryOrUndefined(() => websocket.close(1000))
+      close()
       await closed.promise // the object hands the lock over before we return
     }
-  }
-
-  /**
-   * Resolves once the object hands the lock over to this socket, right away or after
-   * parking on it while the object hibernates, so the object is never polled.
-   */
-  private acquired(websocket: WebSocket, key: string, timeoutMs: number, signal: AbortSignal | undefined): Promise<LockCallbackOptions> {
-    const { promise, resolve, reject } = promiseWithResolvers<LockCallbackOptions>()
-    const timer = timeoutMs > 0 ? setTimeout(() => reject(new LockTimeoutError(key)), timeoutMs) : undefined
-    const abortListener = () => reject(signal?.reason)
-
-    websocket.addEventListener('message', event => resolve(JSON.parse(event.data as string)))
-    websocket.addEventListener('close', () => reject(new Error('The lock durable object closed the socket before handing the lock over')))
-    websocket.addEventListener('error', event => reject(new Error('Lock websocket error', { cause: event })))
-    signal?.addEventListener('abort', abortListener, { once: true })
-    websocket.accept()
-
-    return promise.finally(() => {
-      clearTimeout(timer)
-      signal?.removeEventListener('abort', abortListener)
-    })
   }
 }
