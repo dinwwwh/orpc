@@ -349,7 +349,7 @@ function stripe(key: string): number {
 
 const locker = new DurableLocker(env.LOCK_DON, {
   ttl: 30,
-  getStubByName: (namespace, key) => namespace.getByName(`stripe:${stripe(key)}`),
+  getStubByName: (namespace, key) => namespace.getByName(String(stripe(key))),
 })
 ```
 
