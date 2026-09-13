@@ -43,23 +43,19 @@ const report = await locker.lock('report:123', async ({ waited }) => {
   }
 
   return await generateReport('123')
-}, {
-  /**
-   * How long the lock is held before it expires automatically, in milliseconds.
-   * Guards against holders that never release the lock, such as a crashed process.
-   *
-   * @default the adapter default
-   */
-  ttl: 30_000,
-
-  /**
-   * How long to wait for the lock to become available, in milliseconds.
-   * Throws a `LockTimeoutError` when it elapses before the lock is acquired.
-   *
-   * @default the adapter default
-   */
-  timeout: 5_000,
 })
+```
+
+### TTL
+
+The `ttl` option sets how long the lock is held before it expires automatically, in milliseconds. It guards against holders that never release the lock, such as a crashed process. Each adapter has its own default:
+
+```ts twoslash
+import { MemoryLocker } from '@orpc/experimental-lock/memory'
+declare function generateReport(id: string): Promise<{ url: string }>
+const locker = new MemoryLocker()
+// ---cut---
+await locker.lock('report:123', () => generateReport('123'), { ttl: 30_000 })
 ```
 
 ### Timeout
@@ -85,7 +81,18 @@ catch (error) {
 }
 ```
 
-Pass a `signal` to stop waiting early. It rejects with the abort reason and has no effect once the lock is acquired.
+### Signal
+
+Pass a `signal` to stop waiting early. It rejects with the abort reason and has no effect once the lock is acquired:
+
+```ts twoslash
+import { MemoryLocker } from '@orpc/experimental-lock/memory'
+declare function generateReport(id: string): Promise<{ url: string }>
+declare const request: Request
+const locker = new MemoryLocker()
+// ---cut---
+await locker.lock('report:123', () => generateReport('123'), { signal: request.signal })
+```
 
 ## Lock Middleware
 
