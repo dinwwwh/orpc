@@ -48,33 +48,16 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 
 ### Options
 
-`ttl` sets how long the lock is held before it expires automatically, in milliseconds. It guards against holders that never release the lock, such as a crashed process. Each adapter has its own default:
+- `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Each adapter has its own default.
+- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses, and `0` gives up immediately when the lock is held by someone else.
+- `signal`: stops waiting early and rejects with the abort reason. Has no effect once the lock is acquired.
 
 ```ts
-await locker.lock('report:123', () => generateReport('123'), { ttl: 30_000 })
-```
-
-`timeout` sets how long to wait for the lock to become available, in milliseconds. When it elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, which turns the lock into a "skip if already running" guard:
-
-```ts
-import { LockTimeoutError } from '@orpc/experimental-lock'
-
-try {
-  await locker.lock('sync:inventory', () => syncInventory(), { timeout: 0 })
-}
-catch (error) {
-  if (!(error instanceof LockTimeoutError)) {
-    throw error
-  }
-
-  // Another sync is already running, so skip this one
-}
-```
-
-`signal` stops waiting early. It rejects with the abort reason and has no effect once the lock is acquired:
-
-```ts
-await locker.lock('report:123', () => generateReport('123'), { signal: request.signal })
+await locker.lock('report:123', () => generateReport('123'), {
+  ttl: 30_000,
+  timeout: 5_000,
+  signal: request.signal,
+})
 ```
 
 ## Lock Middleware
