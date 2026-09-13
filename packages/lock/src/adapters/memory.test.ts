@@ -100,7 +100,7 @@ describe('memoryLocker', () => {
     })
 
     it('rejects with LockTimeoutError when the lock is not released in time', async () => {
-      const locker = new MemoryLocker({ timeout: 1000 })
+      const locker = new MemoryLocker({ timeout: 1 })
       const { promise: release, resolve } = promiseWithResolvers<void>()
       const holder = locker.lock('key', () => release)
       const fn = vi.fn()
@@ -140,10 +140,10 @@ describe('memoryLocker', () => {
     })
 
     it('per-call timeout overrides the default', async () => {
-      const locker = new MemoryLocker({ timeout: 10_000 })
+      const locker = new MemoryLocker({ timeout: 10 })
       const { promise: release, resolve } = promiseWithResolvers<void>()
       const holder = locker.lock('key', () => release)
-      const waiter = locker.lock('key', vi.fn(), { timeout: 100 })
+      const waiter = locker.lock('key', vi.fn(), { timeout: 0.1 })
       waiter.catch(() => {})
 
       await vi.advanceTimersByTimeAsync(100)
@@ -168,7 +168,7 @@ describe('memoryLocker', () => {
       const { promise: release, resolve } = promiseWithResolvers<void>()
       const holder = locker.lock('key', () => release)
       const fn = vi.fn(() => 'ok')
-      const waiter = locker.lock('key', fn, { timeout: 100_000 })
+      const waiter = locker.lock('key', fn, { timeout: 100 })
 
       await vi.advanceTimersByTimeAsync(60_000)
       expect(fn).not.toHaveBeenCalled()
@@ -180,7 +180,7 @@ describe('memoryLocker', () => {
     })
 
     it('hands the lock over when the ttl expires', async () => {
-      const locker = new MemoryLocker({ ttl: 1000 })
+      const locker = new MemoryLocker({ ttl: 1 })
       const { promise: release, resolve } = promiseWithResolvers<void>()
       const holder = locker.lock('key', () => release)
       const fn = vi.fn(() => 'ok')
@@ -201,7 +201,7 @@ describe('memoryLocker', () => {
     })
 
     it('expired holder cannot release the lock of the new holder', async () => {
-      const locker = new MemoryLocker({ ttl: 1000 })
+      const locker = new MemoryLocker({ ttl: 1 })
       const { promise: release1, resolve: resolve1 } = promiseWithResolvers<void>()
       const { promise: release2, resolve: resolve2 } = promiseWithResolvers<void>()
       const holder1 = locker.lock('key', () => release1)
@@ -226,9 +226,9 @@ describe('memoryLocker', () => {
     })
 
     it('per-call ttl overrides the default', async () => {
-      const locker = new MemoryLocker({ ttl: 10_000 })
+      const locker = new MemoryLocker({ ttl: 10 })
       const { promise: release, resolve } = promiseWithResolvers<void>()
-      const holder = locker.lock('key', () => release, { ttl: 100 })
+      const holder = locker.lock('key', () => release, { ttl: 0.1 })
       const fn = vi.fn(() => 'ok')
       const waiter = locker.lock('key', fn)
 

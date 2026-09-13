@@ -26,8 +26,8 @@ describe.concurrent('redis locker integration', {
       prefix,
       locker: new RedisLocker(redis, {
         prefix,
-        ttl: 10_000,
-        retryInterval: 10,
+        ttl: 10,
+        retryInterval: 0.01,
         ...options,
       }),
     }
@@ -77,7 +77,7 @@ describe.concurrent('redis locker integration', {
 
   it('shares locks across instances using the same prefix', async () => {
     const { prefix, locker } = createTestingLocker()
-    const other = new RedisLocker(redis, { prefix, ttl: 10_000, retryInterval: 10 })
+    const other = new RedisLocker(redis, { prefix, ttl: 10, retryInterval: 0.01 })
     const { promise: release, resolve } = promiseWithResolvers<void>()
     const holder = locker.lock('key', () => release)
 
@@ -120,7 +120,7 @@ describe.concurrent('redis locker integration', {
   })
 
   it('rejects with LockTimeoutError when the lock is not released in time', async () => {
-    const { locker } = createTestingLocker({ timeout: 200 })
+    const { locker } = createTestingLocker({ timeout: 0.2 })
     const { promise: release, resolve } = promiseWithResolvers<void>()
     const holder = locker.lock('key', () => release)
 
@@ -143,14 +143,14 @@ describe.concurrent('redis locker integration', {
   })
 
   it('per-call timeout overrides the default', async () => {
-    const { locker } = createTestingLocker({ timeout: 10_000 })
+    const { locker } = createTestingLocker({ timeout: 10 })
     const { promise: release, resolve } = promiseWithResolvers<void>()
     const holder = locker.lock('key', () => release)
 
     await sleep(50)
 
     const start = Date.now()
-    await expect(locker.lock('key', vi.fn(), { timeout: 100 })).rejects.toBeInstanceOf(LockTimeoutError)
+    await expect(locker.lock('key', vi.fn(), { timeout: 0.1 })).rejects.toBeInstanceOf(LockTimeoutError)
     expect(Date.now() - start).toBeLessThan(1000)
 
     resolve()
@@ -158,7 +158,7 @@ describe.concurrent('redis locker integration', {
   })
 
   it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
-    const { prefix, locker } = createTestingLocker({ ttl: 200 })
+    const { prefix, locker } = createTestingLocker({ ttl: 0.2 })
     const { promise: release1, resolve: resolve1 } = promiseWithResolvers<void>()
     const { promise: release2, resolve: resolve2 } = promiseWithResolvers<void>()
     const holder1 = locker.lock('key', () => release1)
@@ -167,7 +167,7 @@ describe.concurrent('redis locker integration', {
 
     const start = Date.now()
     const fn = vi.fn(() => release2.then(() => 'ok'))
-    const holder2 = locker.lock('key', fn, { ttl: 10_000 })
+    const holder2 = locker.lock('key', fn, { ttl: 10 })
 
     await vi.waitFor(() => expect(fn).toHaveBeenCalledWith({ waited: true }), { timeout: 2000 })
     expect(Date.now() - start).toBeGreaterThanOrEqual(100)
@@ -214,7 +214,7 @@ describe.concurrent('redis locker integration', {
   })
 
   it('uses an empty prefix when none is provided', async () => {
-    const locker = new RedisLocker(redis, { ttl: 10_000 })
+    const locker = new RedisLocker(redis, { ttl: 10 })
     const key = `no-prefix-${crypto.randomUUID()}`
 
     await locker.lock(key, async () => {
@@ -228,7 +228,7 @@ describe.concurrent('redis locker integration', {
     const disconnectedRedis = createClient({
       url: 'rediss://invalid',
     })
-    const locker = new RedisLocker(disconnectedRedis, { ttl: 1000 })
+    const locker = new RedisLocker(disconnectedRedis, { ttl: 1 })
 
     await expect(locker.lock('key', vi.fn())).rejects.toThrow()
   })
@@ -259,8 +259,8 @@ describe.concurrent('redis locker integration', {
 
     const locker = new RedisLocker(redis, {
       prefix: `orpc-redis-locker-${crypto.randomUUID()}:`,
-      ttl: 10_000,
-      retryInterval: 10,
+      ttl: 10,
+      retryInterval: 0.01,
     })
 
     expect(redis.isOpen).toBe(false)

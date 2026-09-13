@@ -25,25 +25,25 @@ export interface BaseRedisLockerOptions {
   prefix?: string
 
   /**
-   * How long a lock is held before it expires automatically, in milliseconds.
+   * How long a lock is held before it expires automatically, in seconds.
    * Guards against holders that never release the lock, such as a crashed process.
    * Can be overridden per call.
    */
   ttl: number
 
   /**
-   * How long to wait for a lock to become available, in milliseconds.
+   * How long to wait for a lock to become available, in seconds.
    * Can be overridden per call.
    *
-   * @default 10000
+   * @default 10
    */
   timeout?: number
 
   /**
    * How long to wait between acquisition attempts while the lock
-   * is held by someone else, in milliseconds.
+   * is held by someone else, in seconds.
    *
-   * @default 100
+   * @default 0.1
    */
   retryInterval?: number
 }
@@ -66,8 +66,8 @@ export abstract class BaseRedisLocker implements Locker {
   constructor(options: BaseRedisLockerOptions) {
     this.prefix = options.prefix ?? ''
     this.ttl = options.ttl
-    this.timeout = options.timeout ?? 10_000
-    this.retryInterval = options.retryInterval ?? 100
+    this.timeout = options.timeout ?? 10
+    this.retryInterval = options.retryInterval ?? 0.1
   }
 
   /**
@@ -86,12 +86,12 @@ export abstract class BaseRedisLocker implements Locker {
     const ttl = options.ttl ?? this.ttl
     const timeout = options.timeout ?? this.timeout
     const token = crypto.randomUUID()
-    const deadline = Date.now() + timeout
+    const deadline = Date.now() + timeout * 1000
     let waited = false
 
     options.signal?.throwIfAborted()
 
-    while (!(await this.setIfNotExists(prefixedKey, token, ttl))) {
+    while (!(await this.setIfNotExists(prefixedKey, token, Math.round(ttl * 1000)))) {
       const remaining = deadline - Date.now()
 
       if (remaining <= 0) {
@@ -99,7 +99,7 @@ export abstract class BaseRedisLocker implements Locker {
       }
 
       waited = true
-      await sleep(Math.min(this.retryInterval, remaining), { signal: options.signal })
+      await sleep(Math.min(this.retryInterval * 1000, remaining), { signal: options.signal })
     }
 
     try {

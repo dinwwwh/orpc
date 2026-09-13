@@ -30,8 +30,8 @@ describe.concurrent(
         prefix,
         locker: new UpstashLocker(redis, {
           prefix,
-          ttl: 10_000,
-          retryInterval: 50,
+          ttl: 10,
+          retryInterval: 0.05,
           ...options,
         }),
       }
@@ -91,7 +91,7 @@ describe.concurrent(
     })
 
     it('rejects with LockTimeoutError when the lock is not released in time', async () => {
-      const { locker } = createTestingLocker({ timeout: 300 })
+      const { locker } = createTestingLocker({ timeout: 0.3 })
       const { promise: release, resolve } = promiseWithResolvers<void>()
       const holder = locker.lock('key', () => release)
 
@@ -111,7 +111,7 @@ describe.concurrent(
     })
 
     it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
-      const { prefix, locker } = createTestingLocker({ ttl: 500 })
+      const { prefix, locker } = createTestingLocker({ ttl: 0.5 })
       const { promise: release1, resolve: resolve1 } = promiseWithResolvers<void>()
       const { promise: release2, resolve: resolve2 } = promiseWithResolvers<void>()
       const holder1 = locker.lock('key', () => release1)
@@ -119,7 +119,7 @@ describe.concurrent(
       await sleep(200)
 
       const fn = vi.fn(() => release2.then(() => 'ok'))
-      const holder2 = locker.lock('key', fn, { ttl: 10_000 })
+      const holder2 = locker.lock('key', fn, { ttl: 10 })
 
       await vi.waitFor(() => expect(fn).toHaveBeenCalledWith({ waited: true }), { timeout: 5000 })
 
@@ -154,7 +154,7 @@ describe.concurrent(
     })
 
     it('uses an empty prefix when none is provided', async () => {
-      const locker = new UpstashLocker(redis, { ttl: 10_000 })
+      const locker = new UpstashLocker(redis, { ttl: 10 })
       const key = `no-prefix-${crypto.randomUUID()}`
 
       await locker.lock(key, async () => {

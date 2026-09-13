@@ -33,21 +33,21 @@ describe('lock', () => {
   it('can config ttl, timeout and forwards the signal', async () => {
     const locker = createLocker()
     const controller = new AbortController()
-    const procedure = os.use(lock({ locker, key: 'key', ttl: 5000, timeout: 1000 })).handler(() => 'ok')
+    const procedure = os.use(lock({ locker, key: 'key', ttl: 5, timeout: 1 })).handler(() => 'ok')
 
     await expect(
       call(procedure, undefined, { context: {}, signal: controller.signal }),
     ).resolves.toBe('ok')
 
-    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: 5000, timeout: 1000, signal: controller.signal })
+    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: 5, timeout: 1, signal: controller.signal })
   })
 
   it('locker, key, ttl, timeout can be async functions', async () => {
     const locker = createLocker()
     const lockerFn = vi.fn().mockResolvedValueOnce(locker)
     const keyFn = vi.fn().mockResolvedValueOnce('key')
-    const ttlFn = vi.fn().mockResolvedValueOnce(5000)
-    const timeoutFn = vi.fn().mockResolvedValueOnce(1000)
+    const ttlFn = vi.fn().mockResolvedValueOnce(5)
+    const timeoutFn = vi.fn().mockResolvedValueOnce(1)
     const mw = lock({ locker: lockerFn, key: keyFn, ttl: ttlFn, timeout: timeoutFn })
     const procedure = os.input(type<any>()).use(mw).handler(() => 'ok')
 
@@ -55,7 +55,7 @@ describe('lock', () => {
       call(procedure, '__input__', { context: { __context__: true }, path: ['__path__'] }),
     ).resolves.toBe('ok')
 
-    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: 5000, timeout: 1000, signal: undefined })
+    expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: 5, timeout: 1, signal: undefined })
 
     for (const fn of [lockerFn, keyFn, ttlFn, timeoutFn]) {
       expect(fn).toHaveBeenCalledTimes(1)

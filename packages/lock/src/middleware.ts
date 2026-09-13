@@ -38,14 +38,14 @@ export interface LockMiddlewareOptions<
   key: Value<Promisable<string>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
-   * How long the lock is held before it expires automatically, in milliseconds.
+   * How long the lock is held before it expires automatically, in seconds.
    *
    * @default the adapter default
    */
   ttl?: Value<Promisable<number | undefined>, [options: MiddlewareOptions<TInContext, unknown, Record<never, never>>, input: TInput]>
 
   /**
-   * How long to wait for the lock to become available, in milliseconds.
+   * How long to wait for the lock to become available, in seconds.
    *
    * @default the adapter default
    */

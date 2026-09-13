@@ -23,8 +23,8 @@ describe.concurrent('lock redis adapters compatibility', async () => {
       name: 'redis',
       locker: new RedisLocker(redis, {
         prefix,
-        ttl: 10_000,
-        retryInterval: 10,
+        ttl: 10,
+        retryInterval: 0.01,
       }),
     })
 
@@ -38,8 +38,8 @@ describe.concurrent('lock redis adapters compatibility', async () => {
       name: 'bun redis',
       locker: new BunRedisLocker(bunRedis, {
         prefix,
-        ttl: 10_000,
-        retryInterval: 10,
+        ttl: 10,
+        retryInterval: 0.01,
       }),
     })
   }

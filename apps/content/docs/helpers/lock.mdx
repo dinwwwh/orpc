@@ -43,8 +43,8 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 
   return await generateReport('123')
 }, {
-  ttl: 30_000, // Expire the lock after 30 seconds, even if it is never released
-  timeout: 5_000, // Wait up to 5 seconds for the lock
+  ttl: 30, // Expire the lock after 30 seconds, even if it is never released
+  timeout: 5, // Wait up to 5 seconds for the lock
 })
 ```
 
@@ -68,8 +68,8 @@ const procedure = os
     lock({
       locker: ({ context }) => context.locker,
       key: ({ context }, input) => `report:${input.id}`,
-      ttl: 30_000, // Optional, defaults to the adapter's ttl
-      timeout: 5_000, // Optional, defaults to the adapter's timeout
+      ttl: 30, // Optional, defaults to the adapter's ttl
+      timeout: 5, // Optional, defaults to the adapter's timeout
     }),
   )
   .handler(async ({ context, input }) => {
@@ -104,20 +104,20 @@ import { MemoryLocker } from '@orpc/lock/memory'
 
 const locker = new MemoryLocker({
   /**
-   * How long a lock is held before it expires automatically, in milliseconds.
+   * How long a lock is held before it expires automatically, in seconds.
    * Can be overridden per call.
    *
    * @default undefined (held until released)
    */
-  ttl: 30_000,
+  ttl: 30,
 
   /**
-   * How long to wait for a lock to become available, in milliseconds.
+   * How long to wait for a lock to become available, in seconds.
    * Can be overridden per call.
    *
-   * @default 10000
+   * @default 10
    */
-  timeout: 5_000,
+  timeout: 5,
 })
 ```
 
@@ -145,26 +145,26 @@ const locker = new RedisLocker(client, {
   prefix: '',
 
   /**
-   * How long a lock is held before it expires automatically, in milliseconds.
+   * How long a lock is held before it expires automatically, in seconds.
    * Can be overridden per call.
    */
-  ttl: 30_000,
+  ttl: 30,
 
   /**
-   * How long to wait for a lock to become available, in milliseconds.
+   * How long to wait for a lock to become available, in seconds.
    * Can be overridden per call.
    *
-   * @default 10000
+   * @default 10
    */
-  timeout: 5_000,
+  timeout: 5,
 
   /**
    * How long to wait between acquisition attempts while the lock
-   * is held by someone else, in milliseconds.
+   * is held by someone else, in seconds.
    *
-   * @default 100
+   * @default 0.1
    */
-  retryInterval: 100,
+  retryInterval: 0.1,
 })
 ```
 
@@ -187,26 +187,26 @@ const locker = new UpstashLocker(redis, {
   prefix: '',
 
   /**
-   * How long a lock is held before it expires automatically, in milliseconds.
+   * How long a lock is held before it expires automatically, in seconds.
    * Can be overridden per call.
    */
-  ttl: 30_000,
+  ttl: 30,
 
   /**
-   * How long to wait for a lock to become available, in milliseconds.
+   * How long to wait for a lock to become available, in seconds.
    * Can be overridden per call.
    *
-   * @default 10000
+   * @default 10
    */
-  timeout: 5_000,
+  timeout: 5,
 
   /**
    * How long to wait between acquisition attempts while the lock
-   * is held by someone else, in milliseconds.
+   * is held by someone else, in seconds.
    *
-   * @default 100
+   * @default 0.1
    */
-  retryInterval: 100,
+  retryInterval: 0.1,
 })
 ```
 
@@ -231,25 +231,25 @@ const locker = new BunRedisLocker(redis, {
   prefix: '',
 
   /**
-   * How long a lock is held before it expires automatically, in milliseconds.
+   * How long a lock is held before it expires automatically, in seconds.
    * Can be overridden per call.
    */
-  ttl: 30_000,
+  ttl: 30,
 
   /**
-   * How long to wait for a lock to become available, in milliseconds.
+   * How long to wait for a lock to become available, in seconds.
    * Can be overridden per call.
    *
-   * @default 10000
+   * @default 10
    */
-  timeout: 5_000,
+  timeout: 5,
 
   /**
    * How long to wait between acquisition attempts while the lock
-   * is held by someone else, in milliseconds.
+   * is held by someone else, in seconds.
    *
-   * @default 100
+   * @default 0.1
    */
-  retryInterval: 100,
+  retryInterval: 0.1,
 })
 ```

@@ -4,7 +4,7 @@ import { LockTimeoutError } from '../error'
 
 export interface MemoryLockerOptions {
   /**
-   * How long a lock is held before it expires automatically, in milliseconds.
+   * How long a lock is held before it expires automatically, in seconds.
    * Guards against holders that never release the lock.
    * Can be overridden per call.
    *
@@ -13,10 +13,10 @@ export interface MemoryLockerOptions {
   ttl?: number
 
   /**
-   * How long to wait for a lock to become available, in milliseconds.
+   * How long to wait for a lock to become available, in seconds.
    * Can be overridden per call.
    *
-   * @default 10000
+   * @default 10
    */
   timeout?: number
 }
@@ -46,7 +46,7 @@ export class MemoryLocker implements Locker {
 
   constructor(options: MemoryLockerOptions = {}) {
     this.ttl = options.ttl
-    this.timeout = options.timeout ?? 10_000
+    this.timeout = options.timeout ?? 10
   }
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
@@ -68,7 +68,7 @@ export class MemoryLocker implements Locker {
     }
 
     if (ttl !== undefined) {
-      entry.expiry = setTimeout(() => this.release(key, token), ttl)
+      entry.expiry = setTimeout(() => this.release(key, token), ttl * 1000)
     }
 
     try {
@@ -93,7 +93,7 @@ export class MemoryLocker implements Locker {
         },
       }
 
-      const timer = setTimeout(() => fail(new LockTimeoutError(key)), timeout)
+      const timer = setTimeout(() => fail(new LockTimeoutError(key)), timeout * 1000)
       const abortListener = () => fail(signal?.reason)
 
       signal?.addEventListener('abort', abortListener, { once: true })
