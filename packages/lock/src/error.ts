@@ -1,7 +1,7 @@
 /**
  * Thrown when a lock cannot be acquired before the timeout elapses.
  *
- * @see {@link https://orpc.dev/docs/helpers/lock#timeout | Lock Helpers - Timeout}
+ * @see {@link https://orpc.dev/docs/helpers/lock#options | Lock Helpers - Options}
  */
 export class LockTimeoutError extends Error {
   /**
