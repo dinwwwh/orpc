@@ -68,7 +68,7 @@ export class experimental_DurableLocker implements Locker {
 
     const headers = new Headers({ upgrade: 'websocket' })
     if (timeoutMs > 0) {
-      headers.set('x-orpc-lock-wait', 'true') // otherwise the object answers 409 instead of parking us
+      headers.set('x-orpc-lock-wait', 'true')
     }
 
     const response = await stub.fetch('http://localhost/acquire', { headers })
@@ -85,43 +85,39 @@ export class experimental_DurableLocker implements Locker {
       })
     }
 
-    const granted = promiseWithResolvers<LockCallbackOptions>()
     const closed = promiseWithResolvers<void>()
     const close = () => tryOrUndefined(() => websocket.close(1000))
 
-    websocket.addEventListener('message', event => granted.resolve(JSON.parse(event.data as string)))
-    websocket.addEventListener('close', () => {
-      granted.reject(new Error('The lock durable object closed the socket before handing the lock over'))
-      closed.resolve()
-    })
-    websocket.addEventListener('error', (event) => {
-      granted.reject(new Error('Lock websocket error', { cause: event }))
-      closed.resolve()
-    })
+    websocket.addEventListener('close', () => closed.resolve())
+    websocket.addEventListener('error', () => closed.resolve())
     websocket.accept()
 
-    // With `timeout: 0` the object never parks us (see the header above), so no timer is needed.
-    const timer = timeoutMs > 0 ? setTimeout(() => granted.reject(new LockTimeoutError(key)), timeoutMs) : undefined
+    const waited = !response.headers.has('x-orpc-lock-acquired')
 
-    // The object hands the lock over right away or once the previous holder's socket
-    // closes, hibernating meanwhile, so it is never polled.
-    const callbackOptions = await runWithSignal(options.signal, () => granted.promise)
-      .catch((error) => {
-        close()
-        throw error
-      })
-      .finally(() => clearTimeout(timer))
+    if (waited) {
+      const granted = promiseWithResolvers<void>()
+      const timer = setTimeout(() => granted.reject(new LockTimeoutError(key)), timeoutMs)
 
-    // The lock lapses when the ttl elapses, even while `fn` is still running.
+      websocket.addEventListener('message', () => granted.resolve())
+      closed.promise.then(() => granted.reject(new Error('The lock durable object closed the socket before handing the lock over')))
+
+      await runWithSignal(options.signal, () => granted.promise)
+        .catch((error) => {
+          close()
+          throw error
+        })
+        .finally(() => clearTimeout(timer))
+    }
+
     const expiry = setTimeout(close, ttlMs)
 
     try {
-      return await fn(callbackOptions)
+      return await fn({ waited })
     }
     finally {
       clearTimeout(expiry)
       close()
-      await closed.promise // the object hands the lock over before we return
+      await closed.promise
     }
   }
 }

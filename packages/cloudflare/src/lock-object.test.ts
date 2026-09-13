@@ -33,11 +33,12 @@ describe('durableLockObject', () => {
     const granted = vi.fn()
     const closed = promiseWithResolvers<void>()
 
-    socket.addEventListener('message', event => granted(JSON.parse(String(event.data))))
+    socket.addEventListener('message', () => granted())
     socket.addEventListener('close', () => closed.resolve())
     socket.accept()
 
     return {
+      acquired: response.headers.has('x-orpc-lock-acquired'),
       granted,
       release: async () => {
         socket.close(1000)
@@ -50,39 +51,41 @@ describe('durableLockObject', () => {
     const stub = createStub()
 
     const first = await connect(stub)
-    await vi.waitFor(() => expect(first.granted).toHaveBeenCalledWith({ waited: false }))
+    expect(first.acquired).toBe(true)
 
     const second = await connect(stub)
     const third = await connect(stub)
 
     await sleep(50)
+    expect(second.acquired).toBe(false)
+    expect(third.acquired).toBe(false)
     expect(second.granted).not.toHaveBeenCalled()
     expect(third.granted).not.toHaveBeenCalled()
 
     await first.release()
-    await vi.waitFor(() => expect(second.granted).toHaveBeenCalledWith({ waited: true }))
+    await vi.waitFor(() => expect(second.granted).toHaveBeenCalled())
     expect(third.granted).not.toHaveBeenCalled()
 
     await second.release()
-    await vi.waitFor(() => expect(third.granted).toHaveBeenCalledWith({ waited: true }))
+    await vi.waitFor(() => expect(third.granted).toHaveBeenCalled())
 
     await third.release()
     const fourth = await connect(stub)
-    await vi.waitFor(() => expect(fourth.granted).toHaveBeenCalledWith({ waited: false }))
+    expect(fourth.acquired).toBe(true)
   })
 
   it('responds 409 instead of parking when the caller cannot wait', async () => {
     const stub = createStub()
 
     const holder = await connect(stub)
-    await vi.waitFor(() => expect(holder.granted).toHaveBeenCalledWith({ waited: false }))
+    expect(holder.acquired).toBe(true)
 
     expect(await tryAcquire(stub)).toBe(409)
 
     await holder.release()
 
     const next = await connect(stub)
-    await vi.waitFor(() => expect(next.granted).toHaveBeenCalledWith({ waited: false }))
+    expect(next.acquired).toBe(true)
     await next.release()
   })
 
@@ -90,21 +93,21 @@ describe('durableLockObject', () => {
     const stub = createStub()
 
     const holder = await connect(stub)
-    await vi.waitFor(() => expect(holder.granted).toHaveBeenCalledWith({ waited: false }))
+    expect(holder.acquired).toBe(true)
 
     const first = await connect(stub)
     const second = await connect(stub)
     await first.release()
 
     await holder.release()
-    await vi.waitFor(() => expect(second.granted).toHaveBeenCalledWith({ waited: true }))
+    await vi.waitFor(() => expect(second.granted).toHaveBeenCalled())
   })
 
   it('keeps the holder and the parked sockets across evictions', async () => {
     const stub = createStub()
 
     const holder = await connect(stub)
-    await vi.waitFor(() => expect(holder.granted).toHaveBeenCalledWith({ waited: false }))
+    expect(holder.acquired).toBe(true)
     const waiter = await connect(stub)
 
     await evictDurableObject(stub)
@@ -113,7 +116,7 @@ describe('durableLockObject', () => {
     expect(waiter.granted).not.toHaveBeenCalled()
 
     await holder.release()
-    await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalledWith({ waited: true }))
+    await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalled())
   })
 
   it('rejects requests that are not a websocket upgrade', async () => {
