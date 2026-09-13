@@ -1,189 +1,115 @@
-import type { LockDO } from '../tests/__shared__/main'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
-import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
+import { evictDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 describe('durableLockObject', () => {
   function createStub() {
-    return env.LOCK_DON.getByName(crypto.randomUUID()) as DurableObjectStub<LockDO>
+    return env.LOCK_DON.getByName(crypto.randomUUID())
   }
 
-  function acquire(stub: DurableObjectStub<LockDO>, token: string, ttlMs = 10_000) {
-    return stub.fetch('https://example.com/acquire', {
-      headers: {
-        'x-orpc-lock-token': token,
-        'x-orpc-lock-ttl': String(ttlMs),
-      },
-    })
-  }
-
-  function release(stub: DurableObjectStub<LockDO>, token: string) {
-    return stub.release(token)
-  }
-
-  async function park(stub: DurableObjectStub<LockDO>, token: string, ttlMs = 10_000) {
+  async function connect(stub: DurableObjectStub, { wait = true } = {}) {
     const response = await stub.fetch('https://example.com/acquire', {
       headers: {
-        'upgrade': 'websocket',
-        'x-orpc-lock-token': token,
-        'x-orpc-lock-ttl': String(ttlMs),
+        upgrade: 'websocket',
+        ...(wait ? { 'x-orpc-lock-wait': 'true' } : {}),
       },
     })
 
-    expect(response.status).toBe(101)
+    if (response.status !== 101) {
+      return { status: response.status }
+    }
 
     const socket = response.webSocket!
-    const { promise: acquired, resolve } = promiseWithResolvers<string>()
-    socket.addEventListener('message', event => resolve(String(event.data)))
+    const granted = vi.fn()
+    const closed = promiseWithResolvers<void>()
+
+    socket.addEventListener('message', event => granted(JSON.parse(String(event.data))))
+    socket.addEventListener('close', () => closed.resolve())
     socket.accept()
 
-    return { socket, acquired }
-  }
-
-  function getAlarm(stub: DurableObjectStub<LockDO>) {
-    return runInDurableObject(stub, async (_, state) => state.storage.getAlarm())
-  }
-
-  it('acquires only when free, and releases only for the holder', async () => {
-    const stub = createStub()
-
-    expect((await acquire(stub, 'a')).status).toBe(204)
-    expect((await acquire(stub, 'b')).status).toBe(409)
-
-    await release(stub, 'b')
-    expect((await acquire(stub, 'b')).status).toBe(409)
-
-    await release(stub, 'a')
-    expect((await acquire(stub, 'b')).status).toBe(204)
-  })
-
-  it('lets a new holder acquire an expired lock, which the old holder can no longer release', async () => {
-    const stub = createStub()
-
-    expect((await acquire(stub, 'a', 50)).status).toBe(204)
-    await sleep(60)
-    expect((await acquire(stub, 'b')).status).toBe(204)
-
-    await release(stub, 'a')
-    expect((await acquire(stub, 'c')).status).toBe(409)
-
-    await release(stub, 'b')
-    expect((await acquire(stub, 'c')).status).toBe(204)
-  })
-
-  it('keeps the holder across evictions', async () => {
-    const stub = createStub()
-
-    expect((await acquire(stub, 'a')).status).toBe(204)
-    await evictDurableObject(stub)
-    expect((await acquire(stub, 'b')).status).toBe(409)
-
-    await release(stub, 'a')
-    expect((await acquire(stub, 'b')).status).toBe(204)
-  })
-
-  it('schedules an alarm at the holder expiry, and clears it once released', async () => {
-    const stub = createStub()
-    const before = Date.now()
-
-    expect((await acquire(stub, 'a')).status).toBe(204)
-
-    const alarm = await getAlarm(stub)
-    expect(alarm).toBeGreaterThanOrEqual(before + 10_000)
-    expect(alarm).toBeLessThanOrEqual(Date.now() + 10_000)
-
-    await release(stub, 'a')
-    expect(await getAlarm(stub)).toBeNull()
-  })
-
-  it('acquires right away without upgrading when the lock is free', async () => {
-    const stub = createStub()
-
-    const response = await stub.fetch('https://example.com/acquire', {
-      headers: {
-        'upgrade': 'websocket',
-        'x-orpc-lock-token': 'a',
-        'x-orpc-lock-ttl': '10000',
+    return {
+      status: response.status,
+      granted,
+      release: async () => {
+        socket.close(1000)
+        await closed.promise
       },
-    })
+    }
+  }
 
-    expect(response.status).toBe(204)
-    expect(response.webSocket).toBeNull()
-    expect((await acquire(stub, 'b')).status).toBe(409)
-  })
-
-  it('hands the lock over to parked waiters in order', async () => {
+  it('grants the first socket right away and hands over to parked sockets in order', async () => {
     const stub = createStub()
 
-    expect((await acquire(stub, 'a')).status).toBe(204)
+    const first = await connect(stub)
+    await vi.waitFor(() => expect(first.granted).toHaveBeenCalledWith({ waited: false }))
 
-    const first = await park(stub, 'b')
-    const second = await park(stub, 'c')
+    const second = await connect(stub)
+    const third = await connect(stub)
 
     await sleep(50)
-    expect((await acquire(stub, 'd')).status).toBe(409)
+    expect(second.granted).not.toHaveBeenCalled()
+    expect(third.granted).not.toHaveBeenCalled()
 
-    await release(stub, 'a')
-    await expect(first.acquired).resolves.toBe('acquired')
-    expect((await acquire(stub, 'd')).status).toBe(409)
+    await first.release!()
+    await vi.waitFor(() => expect(second.granted).toHaveBeenCalledWith({ waited: true }))
+    expect(third.granted).not.toHaveBeenCalled()
 
-    await release(stub, 'b')
-    await expect(second.acquired).resolves.toBe('acquired')
-    expect((await acquire(stub, 'd')).status).toBe(409)
+    await second.release!()
+    await vi.waitFor(() => expect(third.granted).toHaveBeenCalledWith({ waited: true }))
 
-    await release(stub, 'c')
-    expect((await acquire(stub, 'd')).status).toBe(204)
+    await third.release!()
+    const fourth = await connect(stub)
+    await vi.waitFor(() => expect(fourth.granted).toHaveBeenCalledWith({ waited: false }))
   })
 
-  it('hands the lock over when the holder expires', async () => {
+  it('responds 409 instead of parking when the caller cannot wait', async () => {
     const stub = createStub()
 
-    expect((await acquire(stub, 'a', 50)).status).toBe(204)
-    const { acquired } = await park(stub, 'b')
+    const holder = await connect(stub)
+    await vi.waitFor(() => expect(holder.granted).toHaveBeenCalledWith({ waited: false }))
 
-    await sleep(60)
-    expect(await runDurableObjectAlarm(stub)).toBe(true)
+    expect(await connect(stub, { wait: false })).toEqual({ status: 409 })
 
-    await expect(acquired).resolves.toBe('acquired')
-    await release(stub, 'a')
-    expect((await acquire(stub, 'c')).status).toBe(409)
+    await holder.release!()
+
+    const next = await connect(stub, { wait: false })
+    await vi.waitFor(() => expect(next.granted).toHaveBeenCalledWith({ waited: false }))
   })
 
-  it('skips waiters that left before their turn', async () => {
+  it('skips sockets that left before their turn', async () => {
     const stub = createStub()
 
-    expect((await acquire(stub, 'a')).status).toBe(204)
+    const holder = await connect(stub)
+    await vi.waitFor(() => expect(holder.granted).toHaveBeenCalledWith({ waited: false }))
 
-    const first = await park(stub, 'b')
-    const second = await park(stub, 'c')
-    first.socket.close()
-    await sleep(50)
+    const first = await connect(stub)
+    const second = await connect(stub)
+    await first.release!()
 
-    await release(stub, 'a')
-    await expect(second.acquired).resolves.toBe('acquired')
+    await holder.release!()
+    await vi.waitFor(() => expect(second.granted).toHaveBeenCalledWith({ waited: true }))
   })
 
-  it('keeps parked waiters across evictions', async () => {
+  it('keeps the holder and the parked sockets across evictions', async () => {
     const stub = createStub()
 
-    expect((await acquire(stub, 'a')).status).toBe(204)
-    const { acquired } = await park(stub, 'b')
+    const holder = await connect(stub)
+    await vi.waitFor(() => expect(holder.granted).toHaveBeenCalledWith({ waited: false }))
+    const waiter = await connect(stub)
 
     await evictDurableObject(stub)
-    await release(stub, 'a')
 
-    await expect(acquired).resolves.toBe('acquired')
+    expect(await connect(stub, { wait: false })).toEqual({ status: 409 })
+    expect(waiter.granted).not.toHaveBeenCalled()
+
+    await holder.release!()
+    await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalledWith({ waited: true }))
   })
 
-  it('rejects requests without the lock headers', async () => {
+  it('rejects requests that are not a websocket upgrade', async () => {
     const stub = createStub()
 
     expect((await stub.fetch('https://example.com/acquire')).status).toBe(400)
-
-    const missingTtl = await stub.fetch('https://example.com/acquire', {
-      headers: { 'x-orpc-lock-token': 'a' },
-    })
-    expect(missingTtl.status).toBe(400)
   })
 })

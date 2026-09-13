@@ -280,7 +280,7 @@ const locker = new BunRedisLocker(redis, {
 
 ### Cloudflare
 
-Keeps each lock in a Durable Object named after its key, so every Worker instance shares the same locks. Waiting callers park on a hibernatable WebSocket instead of polling, so the object is not billed while they wait and the lock is handed over the moment it is released. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
+Keeps each lock in a Durable Object named after its key, so every Worker instance shares the same locks. A caller holds a hibernatable WebSocket while it holds or waits for the lock, so the object keeps no storage and is not billed meanwhile. Closing the socket releases the lock, so a crashed Worker releases it right away and the next caller is served the moment the previous one finishes. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
 
 ```jsonc title="wrangler.jsonc"
 {
