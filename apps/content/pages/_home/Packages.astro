@@ -52,7 +52,7 @@ const packages = [
     // "had to wait": the callback and the handler receive a `waited` flag, so
     // a call queued behind another holder can reuse that holder's result.
     body: 'Run one call per key at a time, and tell handlers when they had to wait.',
-    backends: ['In-memory', 'Redis', 'Upstash', 'Bun'],
+    backends: ['In-memory', 'Redis', 'Upstash', 'Bun', 'Cloudflare'],
     href: '/docs/helpers/lock',
   },
   {

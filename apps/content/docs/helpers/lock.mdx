@@ -15,12 +15,13 @@ npm install @orpc/experimental-lock@beta
 
 The core concept is the `Locker` interface, which defines a standard way to run work under a lock, so that work sharing the same key never runs concurrently. You can create your own custom locker or use one of the provided [adapters](#adapters):
 
-| Name                           | Adapter for                                       |
-| ------------------------------ | ------------------------------------------------- |
-| [`MemoryLocker`](#memory)      | In-memory storage                                 |
-| [`RedisLocker`](#redis)        | [Redis](https://github.com/redis/redis)           |
-| [`UpstashLocker`](#upstash)    | [Upstash Redis](https://upstash.com/docs/redis)   |
-| [`BunRedisLocker`](#bun-redis) | [Bun's Redis](https://bun.com/docs/runtime/redis) |
+| Name                           | Adapter for                                                                      |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| [`MemoryLocker`](#memory)      | In-memory storage                                                                |
+| [`RedisLocker`](#redis)        | [Redis](https://github.com/redis/redis)                                          |
+| [`UpstashLocker`](#upstash)    | [Upstash Redis](https://upstash.com/docs/redis)                                  |
+| [`BunRedisLocker`](#bun-redis) | [Bun's Redis](https://bun.com/docs/runtime/redis)                                |
+| [`DurableLocker`](#cloudflare) | [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/) |
 
 The `lock` method runs a callback while holding the lock for a key, and releases the lock afterwards, even when the callback throws. The callback receives `waited`, which tells whether the lock was acquired immediately (`false`) or only after waiting for another holder to release it (`true`).
 
@@ -275,4 +276,65 @@ const locker = new BunRedisLocker(redis, {
    */
   retryInterval: 0.1,
 })
+```
+
+### Cloudflare
+
+Keeps each lock in a Durable Object named after its key, so every Worker instance shares the same locks. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
+
+```jsonc title="wrangler.jsonc"
+{
+  "durable_objects": {
+    "bindings": [{ "name": "LOCK_DON", "class_name": "LockDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LockDO"] }]
+}
+```
+
+```ts cloudflare
+import { experimental_DurableLocker as DurableLocker, experimental_DurableLockObject as DurableLockObject } from '@orpc/cloudflare'
+
+export class LockDO extends DurableLockObject {}
+
+export default {
+  async fetch(request, env) {
+    const locker = new DurableLocker(env.LOCK_DON, {
+      /**
+       * The prefix to use for Durable Object names.
+       *
+       * @default ''
+       */
+      prefix: '',
+
+      /**
+       * How long a lock is held before it expires automatically, in seconds.
+       * Can be overridden per call.
+       */
+      ttl: 30,
+
+      /**
+       * How long to wait for a lock to become available, in seconds.
+       * Can be overridden per call.
+       *
+       * @default 10
+       */
+      timeout: 5,
+
+      /**
+       * How long to wait between acquisition attempts while the lock
+       * is held by someone else, in seconds.
+       *
+       * @default 0.1
+       */
+      retryInterval: 0.1,
+
+      /**
+       * Custom function to get the Durable Object stub for a lock key.
+       *
+       * @default ((namespace, key) => namespace.getByName(key))
+       */
+      getStubByName: (namespace, key) => namespace.getByName(key),
+    })
+  },
+}
 ```
