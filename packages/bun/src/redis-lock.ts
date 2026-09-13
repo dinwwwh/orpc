@@ -1,6 +1,6 @@
-import type { BaseRedisLockerOptions } from '@orpc/lock/base-redis'
+import type { BaseRedisLockerOptions } from '@orpc/experimental-lock/base-redis'
 import type { RedisClient } from 'bun'
-import { BaseRedisLocker } from '@orpc/lock/base-redis'
+import { BaseRedisLocker } from '@orpc/experimental-lock/base-redis'
 
 /**
  * Locker adapter for Bun's built-in Redis client. Acquires locks with `SET NX PX`
@@ -8,7 +8,7 @@ import { BaseRedisLocker } from '@orpc/lock/base-redis'
  *
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
-export class BunRedisLocker extends BaseRedisLocker {
+export class experimental_BunRedisLocker extends BaseRedisLocker {
   constructor(
     private readonly redis: RedisClient,
     options: BaseRedisLockerOptions,

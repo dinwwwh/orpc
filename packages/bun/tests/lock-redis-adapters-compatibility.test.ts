@@ -1,10 +1,10 @@
-import type { Locker } from '@orpc/lock'
-import { RedisLocker } from '@orpc/lock/redis'
+import type { Locker } from '@orpc/experimental-lock'
+import { RedisLocker } from '@orpc/experimental-lock/redis'
 import { promiseWithResolvers } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { afterAll, describe, expect, it } from 'bun:test'
 import { createClient } from 'redis'
-import { BunRedisLocker } from '../src'
+import { experimental_BunRedisLocker as BunRedisLocker } from '../src'
 
 const REDIS_URL = Bun.env.REDIS_URL
 

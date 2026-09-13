@@ -4,8 +4,8 @@
   <a href="https://codecov.io/gh/middleapi/orpc">
     <img alt="codecov" src="https://codecov.io/gh/middleapi/orpc/branch/main/graph/badge.svg">
   </a>
-  <a href="https://www.npmjs.com/package/@orpc/lock">
-    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Flock?logo=npm" />
+  <a href="https://www.npmjs.com/package/@orpc/experimental-lock">
+    <img alt="weekly downloads" src="https://img.shields.io/npm/dw/%40orpc%2Fexperimental-lock?logo=npm" />
   </a>
   <a href="https://app.codspeed.io/middleapi/orpc?utm_source=badge">
     <img alt="CodSpeed" src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" />
@@ -46,13 +46,13 @@ You can read the documentation [here](https://orpc.dev).
 
 **Built-in features**
 
-| Package                                                              | Purpose                                                                                                                                                                                      | Docs                                                           |
-| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher)     | Pub/Sub with memory, Redis, and Upstash adapters.                                                                                                                                            | [Publisher](https://orpc.dev/docs/helpers/publisher)           |
-| [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit)     | Rate limiting with memory, Redis, and Upstash adapters.                                                                                                                                      | [Rate Limit](https://orpc.dev/docs/helpers/ratelimit)          |
-| [@orpc/lock](https://www.npmjs.com/package/@orpc/lock)               | Locking with memory, Redis, and Upstash adapters.                                                                                                                                            | [Lock](https://orpc.dev/docs/helpers/lock)                     |
-| [@orpc/hibernation](https://www.npmjs.com/package/@orpc/hibernation) | Leverage Hibernation APIs like [Cloudflare's Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/#durable-objects-hibernation-websocket-api). | [Hibernation](https://orpc.dev/docs/integrations/hibernation)  |
-| [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema) | Smart coercion for OpenAPI requests.                                                                                                                                                         | [Smart Coercion](https://orpc.dev/docs/plugins/smart-coercion) |
+| Package                                                                          | Purpose                                                                                                                                                                                      | Docs                                                           |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [@orpc/publisher](https://www.npmjs.com/package/@orpc/publisher)                 | Pub/Sub with memory, Redis, and Upstash adapters.                                                                                                                                            | [Publisher](https://orpc.dev/docs/helpers/publisher)           |
+| [@orpc/ratelimit](https://www.npmjs.com/package/@orpc/ratelimit)                 | Rate limiting with memory, Redis, and Upstash adapters.                                                                                                                                      | [Rate Limit](https://orpc.dev/docs/helpers/ratelimit)          |
+| [@orpc/experimental-lock](https://www.npmjs.com/package/@orpc/experimental-lock) | Locking with memory, Redis, and Upstash adapters.                                                                                                                                            | [Lock](https://orpc.dev/docs/helpers/lock)                     |
+| [@orpc/hibernation](https://www.npmjs.com/package/@orpc/hibernation)             | Leverage Hibernation APIs like [Cloudflare's Hibernation WebSocket](https://developers.cloudflare.com/durable-objects/best-practices/websockets/#durable-objects-hibernation-websocket-api). | [Hibernation](https://orpc.dev/docs/integrations/hibernation)  |
+| [@orpc/json-schema](https://www.npmjs.com/package/@orpc/json-schema)             | Smart coercion for OpenAPI requests.                                                                                                                                                         | [Smart Coercion](https://orpc.dev/docs/plugins/smart-coercion) |
 
 **Framework & ecosystem integrations**
 

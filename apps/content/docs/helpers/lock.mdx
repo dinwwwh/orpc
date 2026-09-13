@@ -8,7 +8,7 @@ sidebar:
 ## Installation
 
 ```package-install
-npm install @orpc/lock@beta
+npm install @orpc/experimental-lock@beta
 ```
 
 ## Basic Usage
@@ -25,7 +25,7 @@ The core concept is the `Locker` interface, which defines a standard way to run 
 The `lock` method runs a callback while holding the lock for a key, and releases the lock afterwards, even when the callback throws. The callback receives `waited`, which tells whether the lock was acquired immediately (`false`) or only after waiting for another holder to release it (`true`).
 
 ```ts twoslash
-import { MemoryLocker } from '@orpc/lock/memory'
+import { MemoryLocker } from '@orpc/experimental-lock/memory'
 declare function generateReport(id: string): Promise<{ url: string }>
 declare const cache: { get: (key: string) => Promise<{ url: string } | undefined> }
 // ---cut---
@@ -57,11 +57,11 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 When the lock cannot be acquired before `timeout` elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, which turns the lock into a "skip if already running" guard:
 
 ```ts twoslash
-import { MemoryLocker } from '@orpc/lock/memory'
+import { MemoryLocker } from '@orpc/experimental-lock/memory'
 declare function syncInventory(): Promise<void>
 const locker = new MemoryLocker()
 // ---cut---
-import { LockTimeoutError } from '@orpc/lock'
+import { LockTimeoutError } from '@orpc/experimental-lock'
 
 try {
   await locker.lock('sync:inventory', () => syncInventory(), { timeout: 0 })
@@ -82,7 +82,7 @@ Pass a `signal` to stop waiting early. It rejects with the abort reason and has 
 The `lock` helper creates middleware that runs [procedures](/docs/procedure) under a lock, so that calls sharing the same key never run concurrently. When the lock cannot be acquired before the timeout elapses, the procedure rejects with a `CONFLICT` error. The request `signal` is forwarded, so a call stops waiting as soon as the client disconnects.
 
 ```ts
-import { lock, Locker } from '@orpc/lock'
+import { lock, Locker } from '@orpc/experimental-lock'
 
 const procedure = os
   .$context<{ locker: Locker }>()
@@ -123,7 +123,7 @@ When the same `locker` and `key` combination is used multiple times in a single 
 Keeps locks in the memory of the current process, so they are not shared between instances. Waiters acquire the lock in order, without polling. A good fit for development, tests, and single-process servers.
 
 ```ts
-import { MemoryLocker } from '@orpc/lock/memory'
+import { MemoryLocker } from '@orpc/experimental-lock/memory'
 
 const locker = new MemoryLocker({
   /**
@@ -149,7 +149,7 @@ const locker = new MemoryLocker({
 Stores locks in Redis, so every instance using the same server shares the same locks. Locks are acquired with `SET NX PX` and released atomically with a Lua script, so a holder can never release a lock that expired and was acquired by someone else. Works with both standalone and cluster clients.
 
 ```ts
-import { RedisLocker } from '@orpc/lock/redis'
+import { RedisLocker } from '@orpc/experimental-lock/redis'
 import { createClient } from 'redis'
 
 // Both standalone (`createClient`) and cluster (`createCluster`) clients are supported.
@@ -196,7 +196,7 @@ const locker = new RedisLocker(client, {
 Stores locks in Upstash Redis over its REST API, so it shares locks with `RedisLocker`. A good fit for serverless and edge runtimes.
 
 ```ts
-import { UpstashLocker } from '@orpc/lock/upstash'
+import { UpstashLocker } from '@orpc/experimental-lock/upstash'
 import { Redis } from '@upstash/redis'
 
 const redis = Redis.fromEnv()
@@ -242,7 +242,7 @@ Every acquisition attempt is a REST request, so waiting for a held lock costs on
 The Redis adapter for Bun's built-in Redis client, with no extra dependency. It shares locks with `RedisLocker`.
 
 ```ts
-import { BunRedisLocker } from '@orpc/bun'
+import { experimental_BunRedisLocker as BunRedisLocker } from '@orpc/bun'
 import { redis } from 'bun'
 
 const locker = new BunRedisLocker(redis, {

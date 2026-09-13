@@ -1,8 +1,8 @@
-import { LockTimeoutError } from '@orpc/lock'
+import { LockTimeoutError } from '@orpc/experimental-lock'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { RedisClient } from 'bun'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'bun:test'
-import { BunRedisLocker } from './redis-lock'
+import { experimental_BunRedisLocker as BunRedisLocker } from './redis-lock'
 
 const REDIS_URL = Bun.env.REDIS_URL
 

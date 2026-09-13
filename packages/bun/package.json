@@ -49,7 +49,7 @@
   },
   "dependencies": {
     "@orpc/client": "workspace:*",
-    "@orpc/lock": "workspace:*",
+    "@orpc/experimental-lock": "workspace:*",
     "@orpc/publisher": "workspace:*",
     "@orpc/ratelimit": "workspace:*",
     "@orpc/server": "workspace:*",

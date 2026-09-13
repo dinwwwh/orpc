@@ -1,5 +1,5 @@
 {
-  "name": "@orpc/lock",
+  "name": "@orpc/experimental-lock",
   "type": "module",
   "version": "2.0.0-beta.35",
   "description": "Locking for oRPC procedures, with memory, Redis, and Upstash adapters",
