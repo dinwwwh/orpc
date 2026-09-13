@@ -44,8 +44,21 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 
   return await generateReport('123')
 }, {
-  ttl: 30_000, // Expire the lock after 30 seconds, even if it is never released
-  timeout: 5_000, // Wait up to 5 seconds for the lock
+  /**
+   * How long the lock is held before it expires automatically, in milliseconds.
+   * Guards against holders that never release the lock, such as a crashed process.
+   *
+   * @default the adapter default
+   */
+  ttl: 30_000,
+
+  /**
+   * How long to wait for the lock to become available, in milliseconds.
+   * Throws a `LockTimeoutError` when it elapses before the lock is acquired.
+   *
+   * @default the adapter default
+   */
+  timeout: 5_000,
 })
 ```
 
@@ -92,8 +105,20 @@ const procedure = os
     lock({
       locker: ({ context }) => context.locker,
       key: ({ context }, input) => `report:${input.id}`,
-      ttl: 30_000, // Optional, defaults to the adapter's ttl
-      timeout: 5_000, // Optional, defaults to the adapter's timeout
+      /**
+       * How long the lock is held before it expires automatically, in milliseconds.
+       *
+       * @default the adapter default
+       */
+      ttl: 30_000,
+
+      /**
+       * How long to wait for the lock to become available, in milliseconds.
+       * The procedure rejects with a `CONFLICT` error when it elapses before the lock is acquired.
+       *
+       * @default the adapter default
+       */
+      timeout: 5_000,
     }),
   )
   .handler(async ({ context, input }) => {
