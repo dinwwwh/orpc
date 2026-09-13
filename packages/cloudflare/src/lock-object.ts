@@ -1,4 +1,4 @@
-import { safeDecodeURIComponent, tryOrUndefined } from '@orpc/shared'
+import { tryOrUndefined } from '@orpc/shared'
 import { DurableObject } from 'cloudflare:workers'
 
 interface LockSocket {
@@ -8,8 +8,8 @@ interface LockSocket {
 
 /**
  * Durable Object base class that backs `experimental_DurableLocker`. It keeps no storage:
- * every caller holds a hibernatable WebSocket tagged with its key while it holds or waits
- * for the lock, so closing the socket releases the lock.
+ * every caller holds a hibernatable WebSocket while it holds or waits for the lock,
+ * so closing the socket releases the lock.
  *
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
@@ -25,17 +25,15 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   override fetch(request: Request): Response {
-    const key = safeDecodeURIComponent(request.headers.get('x-orpc-lock-key') ?? '')
-
-    if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket' || !key) {
-      return new Response('Expected a websocket upgrade with the x-orpc-lock-key header', { status: 400 })
+    if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
+      return new Response('Expected a websocket upgrade', { status: 400 })
     }
 
-    const held = this.handover(key)
+    const held = this.handover()
     const { '0': client, '1': server } = new WebSocketPair()
 
     server.serializeAttachment({ seq: ++this.seq, holder: !held } satisfies LockSocket)
-    this.ctx.acceptWebSocket(server, [key])
+    this.ctx.acceptWebSocket(server)
 
     return new Response(null, {
       status: 101,
@@ -46,7 +44,7 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
 
   override webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean): void {
     try {
-      this.handover(this.ctx.getTags(ws)[0]!, [ws])
+      this.handover([ws])
     }
     finally {
       tryOrUndefined(() => ws.close(code, reason))
@@ -54,13 +52,13 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   override webSocketError(ws: WebSocket, _error: unknown): void {
-    this.handover(this.ctx.getTags(ws)[0]!, [ws])
+    this.handover([ws])
   }
 
-  private handover(key: string, excluded: WebSocket[] = []): boolean {
+  private handover(excluded: WebSocket[] = []): boolean {
     let next: { ws: WebSocket, socket: LockSocket } | undefined
 
-    for (const ws of this.ctx.getWebSockets(key)) {
+    for (const ws of this.ctx.getWebSockets()) {
       if (excluded.includes(ws)) {
         continue
       }
@@ -84,7 +82,7 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
       next.ws.send('acquired')
     }
     catch {
-      return this.handover(key, [...excluded, next.ws])
+      return this.handover([...excluded, next.ws])
     }
 
     next.ws.serializeAttachment({ ...next.socket, holder: true } satisfies LockSocket)

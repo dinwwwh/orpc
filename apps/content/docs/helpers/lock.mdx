@@ -296,7 +296,7 @@ export default {
   async fetch(request, env) {
     const locker = new DurableLocker(env.LOCK_DON, {
       /**
-       * The prefix to use for lock keys, which also name the Durable Objects by default.
+       * The prefix to use for Durable Object names.
        *
        * @default ''
        */
@@ -326,15 +326,3 @@ export default {
   },
 }
 ```
-
-:::tip[Fewer Durable Objects]
-An object serves any number of keys independently, so `getStubByName` can map keys onto a fixed set of objects.
-
-```ts
-const locker = new DurableLocker(env.LOCK_DON, {
-  ttl: 30_000,
-  getStubByName: (namespace, key) => namespace.getByName(key.slice(0, 2)),
-})
-```
-
-:::

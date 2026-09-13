@@ -1,11 +1,11 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
 import { LockTimeoutError } from '@orpc/experimental-lock'
-import { promiseWithResolvers, runWithSignal, safeEncodeURIComponent, tryOrUndefined } from '@orpc/shared'
+import { promiseWithResolvers, runWithSignal, tryOrUndefined } from '@orpc/shared'
 
 export interface experimental_DurableLockerOptions {
   /**
-   * The prefix to use for lock keys, which also name the Durable Objects by default.
+   * The prefix to use for Durable Object names.
    *
    * @default ''
    */
@@ -60,9 +60,8 @@ export class experimental_DurableLocker implements Locker {
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
     options.signal?.throwIfAborted()
 
-    const prefixedKey = `${this.prefix}${key}`
-    const response = await this.getStubByName(this.namespace, prefixedKey).fetch('http://localhost/acquire', {
-      headers: { 'upgrade': 'websocket', 'x-orpc-lock-key': safeEncodeURIComponent(prefixedKey) },
+    const response = await this.getStubByName(this.namespace, `${this.prefix}${key}`).fetch('http://localhost/acquire', {
+      headers: { upgrade: 'websocket' },
     })
 
     const websocket = response.webSocket

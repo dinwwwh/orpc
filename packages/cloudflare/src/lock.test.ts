@@ -201,21 +201,6 @@ describe('durableLocker', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('serves many keys on one object without contention', async () => {
-    const name = crypto.randomUUID()
-    const { locker } = createTestingLocker({ getStubByName: namespace => namespace.getByName(name) })
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const holder = locker.lock('alice', () => release)
-
-    await sleep(50)
-
-    await expect(locker.lock('bob', ({ waited }) => waited, { timeout: 0 })).resolves.toBe(false)
-    await expect(locker.lock('alice', vi.fn(), { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
-
-    resolve()
-    await holder
-  })
-
   it('names the Durable Object after the prefixed key', async () => {
     const getStubByName = vi.fn((namespace, key) => namespace.getByName(key))
     const { prefix, locker } = createTestingLocker({ getStubByName })

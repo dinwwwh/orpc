@@ -8,9 +8,9 @@ describe('durableLockObject', () => {
     return env.LOCK_DON.getByName(crypto.randomUUID())
   }
 
-  async function connect(stub: DurableObjectStub, key = 'key') {
+  async function connect(stub: DurableObjectStub) {
     const response = await stub.fetch('https://example.com/acquire', {
-      headers: { 'upgrade': 'websocket', 'x-orpc-lock-key': key },
+      headers: { upgrade: 'websocket' },
     })
 
     expect(response.status).toBe(101)
@@ -36,8 +36,8 @@ describe('durableLockObject', () => {
   /**
    * Connects and leaves right away, resolving with whether the lock was held.
    */
-  async function isHeld(stub: DurableObjectStub, key = 'key') {
-    const probe = await connect(stub, key)
+  async function isHeld(stub: DurableObjectStub) {
+    const probe = await connect(stub)
     await probe.release()
 
     return !probe.acquired
@@ -100,43 +100,9 @@ describe('durableLockObject', () => {
     await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalled())
   })
 
-  it('serves keys independently within one object', async () => {
+  it('rejects requests without a websocket upgrade', async () => {
     const stub = createStub()
 
-    const alice = await connect(stub, 'alice')
-    const bob = await connect(stub, 'bob')
-    expect(alice.acquired).toBe(true)
-    expect(bob.acquired).toBe(true)
-
-    const aliceWaiter = await connect(stub, 'alice')
-    const bobWaiter = await connect(stub, 'bob')
-    expect(aliceWaiter.acquired).toBe(false)
-    expect(bobWaiter.acquired).toBe(false)
-
-    await alice.release()
-    await vi.waitFor(() => expect(aliceWaiter.granted).toHaveBeenCalled())
-    expect(bobWaiter.granted).not.toHaveBeenCalled()
-    expect(await isHeld(stub, 'bob')).toBe(true)
-
-    await bob.release()
-    await vi.waitFor(() => expect(bobWaiter.granted).toHaveBeenCalled())
-  })
-
-  it('decodes percent-encoded keys', async () => {
-    const stub = createStub()
-
-    const holder = await connect(stub, encodeURIComponent('user@example.com/ü'))
-    expect(holder.acquired).toBe(true)
-    expect(await isHeld(stub, encodeURIComponent('user@example.com/ü'))).toBe(true)
-    expect(await isHeld(stub, encodeURIComponent('user@example.com/u'))).toBe(false)
-
-    await holder.release()
-  })
-
-  it('rejects requests without a websocket upgrade or a key', async () => {
-    const stub = createStub()
-
-    expect((await stub.fetch('https://example.com/acquire', { headers: { 'x-orpc-lock-key': 'key' } })).status).toBe(400)
-    expect((await stub.fetch('https://example.com/acquire', { headers: { upgrade: 'websocket' } })).status).toBe(400)
+    expect((await stub.fetch('https://example.com/acquire')).status).toBe(400)
   })
 })
