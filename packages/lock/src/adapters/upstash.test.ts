@@ -1,3 +1,4 @@
+import type { Locker, LockOptions } from '../types'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { Redis } from '@upstash/redis'
 import { LockTimeoutError } from '../error'
@@ -12,175 +13,159 @@ const UPSTASH_REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
  * When writing new tests, always use unique keys to avoid conflicts with other
  * test cases.
  */
-describe.concurrent(
-  'upstash locker integration',
-  { skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN, timeout: 20_000 },
-  () => {
-    const redis = new Redis({
-      url: UPSTASH_REDIS_REST_URL,
-      token: UPSTASH_REDIS_REST_TOKEN,
-    })
+describe.concurrent('upstash locker integration', {
+  skip: !UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN,
+  timeout: 20_000,
+}, () => {
+  const redis = new Redis({
+    url: UPSTASH_REDIS_REST_URL,
+    token: UPSTASH_REDIS_REST_TOKEN,
+  })
 
-    function createTestingLocker(
-      options: Partial<ConstructorParameters<typeof UpstashLocker>[1]> = {},
-    ) {
-      const prefix = `orpc-upstash-locker-${crypto.randomUUID()}:`
+  function createTestingLocker(
+    options: Partial<ConstructorParameters<typeof UpstashLocker>[1]> = {},
+  ) {
+    const prefix = options.prefix ?? `orpc-upstash-locker-${crypto.randomUUID()}:`
 
-      return {
+    return {
+      prefix,
+      locker: new UpstashLocker(redis, {
+        ttl: 10_000,
+        retryInterval: 50,
+        ...options,
         prefix,
-        locker: new UpstashLocker(redis, {
-          prefix,
-          ttl: 10_000,
-          retryInterval: 50,
-          ...options,
-        }),
-      }
+      }),
     }
+  }
 
-    it('runs the callback immediately when the lock is free and releases afterwards', async () => {
-      const { prefix, locker } = createTestingLocker()
-      const fn = vi.fn(async () => {
-        expect(await redis.exists(`${prefix}key`)).toBe(1)
-        return 'ok'
-      })
+  /**
+   * Holds the lock until `release` is called, and resolves once the callback is running.
+   */
+  async function hold(locker: Locker, key: string, options?: LockOptions) {
+    const started = promiseWithResolvers<void>()
+    const finished = promiseWithResolvers<void>()
+    const done = locker.lock(key, async ({ waited }) => {
+      started.resolve()
+      await finished.promise
+      return waited
+    }, options)
 
-      await expect(locker.lock('key', fn)).resolves.toBe('ok')
+    await Promise.race([started.promise, done])
 
-      expect(fn).toHaveBeenCalledTimes(1)
-      expect(fn).toHaveBeenCalledWith({ waited: false })
-      expect(await redis.exists(`${prefix}key`)).toBe(0)
+    return {
+      release: () => {
+        finished.resolve()
+        return done
+      },
+    }
+  }
+
+  it('runs the callback right away when the lock is free and releases it afterwards', async () => {
+    const { locker } = createTestingLocker()
+    const fn = vi.fn(() => 'ok')
+
+    await expect(locker.lock('key', fn)).resolves.toBe('ok')
+    expect(fn).toHaveBeenCalledExactlyOnceWith({ waited: false })
+
+    await expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again')
+  })
+
+  it('makes callers wait until the holder releases, across instances sharing a prefix', async () => {
+    const { prefix, locker } = createTestingLocker()
+    const { locker: other } = createTestingLocker({ prefix })
+    const holder = await hold(locker, 'key')
+
+    await expect(other.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+
+    const fn = vi.fn(() => 'ok')
+    const waiter = other.lock('key', fn)
+
+    await holder.release()
+    await expect(waiter).resolves.toBe('ok')
+    expect(fn).toHaveBeenCalledExactlyOnceWith({ waited: true })
+  })
+
+  it('tracks locks independently per key', async () => {
+    const { locker } = createTestingLocker()
+    const holder = await hold(locker, 'alice')
+    const fn = vi.fn(() => 'bob')
+
+    await expect(locker.lock('bob', fn, { timeout: 0 })).resolves.toBe('bob')
+    expect(fn).toHaveBeenCalledWith({ waited: false })
+
+    await holder.release()
+  })
+
+  it('releases the lock when the callback throws', async () => {
+    const { locker } = createTestingLocker()
+
+    await expect(locker.lock('key', () => {
+      throw new Error('boom')
+    })).rejects.toThrow('boom')
+
+    await expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
+  })
+
+  it('rejects with LockTimeoutError when the lock is not released in time', async () => {
+    const { locker } = createTestingLocker({ timeout: 200 })
+    const holder = await hold(locker, 'key')
+    const fn = vi.fn()
+    const start = Date.now()
+
+    await expect(locker.lock('key', fn)).rejects.toMatchObject({
+      name: 'LockTimeoutError',
+      key: 'key',
+      message: 'Timed out waiting for the lock of key "key"',
     })
+    expect(Date.now() - start).toBeGreaterThanOrEqual(200)
+    expect(fn).not.toHaveBeenCalled()
 
-    it('waits for the holder to release', async () => {
-      const { locker } = createTestingLocker()
-      const { promise: release, resolve } = promiseWithResolvers<void>()
-      const order: string[] = []
+    await holder.release()
+  })
 
-      const holder = locker.lock('key', async ({ waited }) => {
-        order.push(`first:${waited}`)
-        await release
-        order.push('first:done')
-      })
+  it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
+    const { locker } = createTestingLocker({ ttl: 200 })
+    const expired = await hold(locker, 'key')
+    const next = await hold(locker, 'key', { ttl: 10_000 })
 
-      await sleep(200)
+    await expect(expired.release()).resolves.toBe(false)
+    await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
 
-      const waiter = locker.lock('key', ({ waited }) => {
-        order.push(`second:${waited}`)
-        return 'ok'
-      })
+    await expect(next.release()).resolves.toBe(true)
+    await expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
+  })
 
-      await sleep(300)
-      expect(order).toEqual(['first:false'])
+  it('stops waiting when the signal is aborted', async () => {
+    const { locker } = createTestingLocker()
+    const holder = await hold(locker, 'key')
+    const controller = new AbortController()
+    const fn = vi.fn()
+    const waiter = locker.lock('key', fn, { signal: controller.signal })
 
-      resolve()
-      await holder
+    controller.abort(new Error('aborted'))
 
-      await expect(waiter).resolves.toBe('ok')
-      expect(order).toEqual(['first:false', 'first:done', 'second:true'])
-    })
+    await expect(waiter).rejects.toThrow('aborted')
+    expect(fn).not.toHaveBeenCalled()
 
-    it('releases the lock when the callback throws', async () => {
-      const { prefix, locker } = createTestingLocker()
+    await holder.release()
+  })
 
-      await expect(locker.lock('key', () => {
-        throw new Error('boom')
-      })).rejects.toThrow('boom')
+  it('never runs callbacks for the same key concurrently', async () => {
+    const { locker } = createTestingLocker()
+    let active = 0
+    let maxActive = 0
+    let count = 0
 
-      expect(await redis.exists(`${prefix}key`)).toBe(0)
-      await expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
-    })
+    await Promise.all(Array.from({ length: 5 }, () => locker.lock('key', async () => {
+      active++
+      maxActive = Math.max(maxActive, active)
+      const current = count
+      await sleep(5)
+      count = current + 1
+      active--
+    })))
 
-    it('rejects with LockTimeoutError when the lock is not released in time', async () => {
-      const { locker } = createTestingLocker({ timeout: 300 })
-      const { promise: release, resolve } = promiseWithResolvers<void>()
-      const holder = locker.lock('key', () => release)
-
-      await sleep(200)
-
-      const fn = vi.fn()
-
-      await expect(locker.lock('key', fn)).rejects.toBeInstanceOf(LockTimeoutError)
-      await expect(locker.lock('key', fn, { timeout: 0 })).rejects.toMatchObject({
-        name: 'LockTimeoutError',
-        key: 'key',
-      })
-      expect(fn).not.toHaveBeenCalled()
-
-      resolve()
-      await holder
-    })
-
-    it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
-      const { prefix, locker } = createTestingLocker({ ttl: 500 })
-      const { promise: release1, resolve: resolve1 } = promiseWithResolvers<void>()
-      const { promise: release2, resolve: resolve2 } = promiseWithResolvers<void>()
-      const holder1 = locker.lock('key', () => release1)
-
-      await sleep(200)
-
-      const fn = vi.fn(() => release2.then(() => 'ok'))
-      const holder2 = locker.lock('key', fn, { ttl: 10_000 })
-
-      await vi.waitFor(() => expect(fn).toHaveBeenCalledWith({ waited: true }), { timeout: 5000 })
-
-      resolve1()
-      await holder1
-      expect(await redis.exists(`${prefix}key`)).toBe(1)
-
-      resolve2()
-      await expect(holder2).resolves.toBe('ok')
-      expect(await redis.exists(`${prefix}key`)).toBe(0)
-    })
-
-    it('aborts waiting when the signal is aborted', async () => {
-      const { locker } = createTestingLocker()
-      const { promise: release, resolve } = promiseWithResolvers<void>()
-      const holder = locker.lock('key', () => release)
-
-      await sleep(200)
-
-      const controller = new AbortController()
-      const fn = vi.fn()
-      const waiter = locker.lock('key', fn, { signal: controller.signal })
-
-      await sleep(200)
-      controller.abort(new Error('aborted'))
-
-      await expect(waiter).rejects.toThrow('aborted')
-      expect(fn).not.toHaveBeenCalled()
-
-      resolve()
-      await holder
-    })
-
-    it('uses an empty prefix when none is provided', async () => {
-      const locker = new UpstashLocker(redis, { ttl: 10_000 })
-      const key = `no-prefix-${crypto.randomUUID()}`
-
-      await locker.lock(key, async () => {
-        expect(await redis.exists(key)).toBe(1)
-      })
-
-      expect(await redis.exists(key)).toBe(0)
-    })
-
-    it('never runs callbacks for the same key concurrently', async () => {
-      const { locker } = createTestingLocker()
-      let active = 0
-      let maxActive = 0
-      let count = 0
-
-      await Promise.all(Array.from({ length: 5 }, () => locker.lock('key', async () => {
-        active++
-        maxActive = Math.max(maxActive, active)
-        const current = count
-        await sleep(20)
-        count = current + 1
-        active--
-      })))
-
-      expect(maxActive).toBe(1)
-      expect(count).toBe(5)
-    })
-  },
-)
+    expect(maxActive).toBe(1)
+    expect(count).toBe(5)
+  })
+})

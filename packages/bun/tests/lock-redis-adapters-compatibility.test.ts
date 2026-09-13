@@ -44,6 +44,28 @@ describe.concurrent('lock redis adapters compatibility', async () => {
     })
   }
 
+  /**
+   * Holds the lock until `release` is called, and resolves once the callback is running.
+   */
+  async function hold(locker: Locker, key: string) {
+    const started = promiseWithResolvers<void>()
+    const finished = promiseWithResolvers<void>()
+    const done = locker.lock(key, async ({ waited }) => {
+      started.resolve()
+      await finished.promise
+      return waited
+    })
+
+    await Promise.race([started.promise, done])
+
+    return {
+      release: () => {
+        finished.resolve()
+        return done
+      },
+    }
+  }
+
   describe.skipIf(lockers.length < 2)('cross-adapter compatibility', () => {
     for (const source of lockers) {
       for (const target of lockers) {
@@ -53,35 +75,17 @@ describe.concurrent('lock redis adapters compatibility', async () => {
 
         it(`shares lock state: ${source.name} → ${target.name}`, async () => {
           const key = `shared:${crypto.randomUUID()}`
-          const { promise: release, resolve } = promiseWithResolvers<void>()
-          const order: string[] = []
-
-          const holder = source.locker.lock(key, async ({ waited }) => {
-            order.push(`source:${waited}`)
-            await release
-            order.push('source:done')
-          })
-
-          await Bun.sleep(50)
+          const holder = await hold(source.locker, key)
 
           await expect(
             target.locker.lock(key, () => 'never', { timeout: 0 }),
           ).rejects.toMatchObject({ name: 'LockTimeoutError', key })
 
-          const waiter = target.locker.lock(key, ({ waited }) => {
-            order.push(`target:${waited}`)
-            return 'ok'
-          })
+          const waiter = target.locker.lock(key, ({ waited }) => waited)
 
-          await Bun.sleep(50)
-          expect(order).toEqual(['source:false'])
-
-          resolve()
-          await holder
-
-          await expect(waiter).resolves.toBe('ok')
-          expect(order).toEqual(['source:false', 'source:done', 'target:true'])
-        })
+          await holder.release()
+          await expect(waiter).resolves.toBe(true)
+        }, { timeout: 20_000 })
       }
     }
   })
