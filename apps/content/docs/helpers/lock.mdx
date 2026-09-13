@@ -280,7 +280,7 @@ const locker = new BunRedisLocker(redis, {
 
 ### Cloudflare
 
-Keeps each lock in a Durable Object named after its key, so every Worker instance shares the same locks. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
+Keeps each lock in a Durable Object named after its key, so every Worker instance shares the same locks. Waiting callers park on a hibernatable WebSocket instead of polling, so the object is not billed while they wait and the lock is handed over the moment it is released. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
 
 ```jsonc title="wrangler.jsonc"
 {
@@ -321,14 +321,6 @@ export default {
       timeout: 5,
 
       /**
-       * How long to wait between acquisition attempts while the lock
-       * is held by someone else, in seconds.
-       *
-       * @default 0.1
-       */
-      retryInterval: 0.1,
-
-      /**
        * Custom function to get the Durable Object stub for a lock key.
        *
        * @default ((namespace, key) => namespace.getByName(key))
@@ -338,3 +330,27 @@ export default {
   },
 }
 ```
+
+:::tip[Fewer Durable Objects]
+By default every key gets its own Durable Object. To bound how many objects exist, use `getStubByName` to map keys onto a fixed set of them. Keys that land on the same object share one lock, so pick enough stripes to keep unrelated work from waiting on each other.
+
+```ts
+const STRIPES = 64
+
+function stripe(key: string): number {
+  let hash = 2166136261
+
+  for (let i = 0; i < key.length; i++) {
+    hash = Math.imul(hash ^ key.charCodeAt(i), 16777619)
+  }
+
+  return (hash >>> 0) % STRIPES
+}
+
+const locker = new DurableLocker(env.LOCK_DON, {
+  ttl: 30,
+  getStubByName: (namespace, key) => namespace.getByName(`stripe:${stripe(key)}`),
+})
+```
+
+:::
