@@ -16,12 +16,14 @@ interface LockSocket {
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
 export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
-  private seq: number
+  private seq = 0
 
   constructor(ctx: DurableObjectState<Props>, env: Env) {
     super(ctx, env)
 
-    this.seq = Math.max(0, ...ctx.getWebSockets().map(ws => attachmentOf(ws).seq))
+    for (const ws of ctx.getWebSockets()) {
+      this.seq = Math.max(this.seq, attachmentOf(ws).seq)
+    }
   }
 
   /**
