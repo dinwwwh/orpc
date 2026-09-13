@@ -1,4 +1,3 @@
-import { tryOrUndefined } from '@orpc/shared'
 import { DurableObject } from 'cloudflare:workers'
 
 /**
@@ -10,7 +9,7 @@ import { DurableObject } from 'cloudflare:workers'
  */
 export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknown> extends DurableObject<Env, Props> {
   override fetch(): Response {
-    const held = this.handover()
+    const held = this.isHeld()
     const { '0': client, '1': server } = new WebSocketPair()
 
     server.serializeAttachment({ holder: !held })
@@ -23,47 +22,49 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     })
   }
 
-  override webSocketClose(ws: WebSocket, code: number, reason: string, _wasClean: boolean): void {
-    try {
-      this.handover([ws])
-    }
-    finally {
-      tryOrUndefined(() => ws.close(code, reason))
+  override webSocketClose(ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void {
+    if (ws.deserializeAttachment().holder) {
+      this.handover(ws)
     }
   }
 
   override webSocketError(ws: WebSocket, _error: unknown): void {
-    this.handover([ws])
+    if (ws.deserializeAttachment().holder) {
+      this.handover(ws)
+    }
   }
 
-  private handover(excluded: WebSocket[] = []): boolean {
-    let oldest: WebSocket | undefined
+  private isHeld(): boolean {
+    const sockets = this.ctx.getWebSockets() // newest first
 
-    for (const ws of this.ctx.getWebSockets()) { // newest first
-      if (excluded.includes(ws)) {
+    for (let i = sockets.length - 1; i >= 0; i--) {
+      if (sockets[i]!.deserializeAttachment().holder) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private handover(previous: WebSocket): void {
+    const sockets = this.ctx.getWebSockets() // newest first
+
+    for (let i = sockets.length - 1; i >= 0; i--) {
+      const ws = sockets[i]!
+
+      if (ws === previous) {
         continue
       }
 
-      if (ws.deserializeAttachment().holder) {
-        return true
+      try {
+        ws.send('acquired')
+      }
+      catch {
+        continue
       }
 
-      oldest = ws
+      ws.serializeAttachment({ holder: true })
+      return
     }
-
-    if (!oldest) {
-      return false
-    }
-
-    try {
-      oldest.send('acquired')
-    }
-    catch {
-      return this.handover([...excluded, oldest])
-    }
-
-    oldest.serializeAttachment({ holder: true })
-
-    return true
   }
 }

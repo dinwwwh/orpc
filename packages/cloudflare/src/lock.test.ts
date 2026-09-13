@@ -31,7 +31,7 @@ describe('durableLocker', () => {
 
     expect(fn).toHaveBeenCalledTimes(1)
     expect(fn).toHaveBeenCalledWith({ waited: false })
-    await expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again')
+    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
   })
 
   it('waits for the holder to release', async () => {
@@ -102,7 +102,7 @@ describe('durableLocker', () => {
       throw new Error('boom')
     })).rejects.toThrow('boom')
 
-    await expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok')
+    await vi.waitFor(() => expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok'))
   })
 
   it('rejects with LockTimeoutError when the lock is not released in time', async () => {
@@ -147,7 +147,7 @@ describe('durableLocker', () => {
 
     resolve2()
     await expect(holder2).resolves.toBe('ok')
-    await expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again')
+    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
   })
 
   it('aborts waiting when the signal is aborted', async () => {

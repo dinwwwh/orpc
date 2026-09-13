@@ -1,4 +1,4 @@
-import { promiseWithResolvers, sleep } from '@orpc/shared'
+import { sleep } from '@orpc/shared'
 import { evictDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
@@ -17,19 +17,14 @@ describe('durableLockObject', () => {
 
     const socket = response.webSocket!
     const granted = vi.fn()
-    const closed = promiseWithResolvers<void>()
 
     socket.addEventListener('message', () => granted())
-    socket.addEventListener('close', () => closed.resolve())
     socket.accept()
 
     return {
       acquired: response.headers.has('x-orpc-lock-acquired'),
       granted,
-      release: async () => {
-        socket.close(1000)
-        await closed.promise
-      },
+      release: () => socket.close(1000),
     }
   }
 
@@ -38,7 +33,7 @@ describe('durableLockObject', () => {
    */
   async function isHeld(stub: DurableObjectStub) {
     const probe = await connect(stub)
-    await probe.release()
+    probe.release()
 
     return !probe.acquired
   }
@@ -58,16 +53,15 @@ describe('durableLockObject', () => {
     expect(second.granted).not.toHaveBeenCalled()
     expect(third.granted).not.toHaveBeenCalled()
 
-    await first.release()
+    first.release()
     await vi.waitFor(() => expect(second.granted).toHaveBeenCalled())
     expect(third.granted).not.toHaveBeenCalled()
 
-    await second.release()
+    second.release()
     await vi.waitFor(() => expect(third.granted).toHaveBeenCalled())
 
-    await third.release()
-    const fourth = await connect(stub)
-    expect(fourth.acquired).toBe(true)
+    third.release()
+    await vi.waitFor(async () => expect(await isHeld(stub)).toBe(false))
   })
 
   it('skips sockets that left before their turn', async () => {
@@ -78,9 +72,10 @@ describe('durableLockObject', () => {
 
     const first = await connect(stub)
     const second = await connect(stub)
-    await first.release()
+    first.release()
+    await sleep(50)
 
-    await holder.release()
+    holder.release()
     await vi.waitFor(() => expect(second.granted).toHaveBeenCalled())
   })
 
@@ -96,7 +91,7 @@ describe('durableLockObject', () => {
     expect(await isHeld(stub)).toBe(true)
     expect(waiter.granted).not.toHaveBeenCalled()
 
-    await holder.release()
+    holder.release()
     await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalled())
   })
 })

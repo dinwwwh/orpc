@@ -72,14 +72,10 @@ export class experimental_DurableLocker implements Locker {
       })
     }
 
-    const closed = promiseWithResolvers<void>()
     const close = () => tryOrUndefined(() => websocket.close(1000))
-
-    websocket.addEventListener('close', () => closed.resolve())
-    websocket.addEventListener('error', () => closed.resolve())
-    websocket.accept()
-
     const waited = !response.headers.has('x-orpc-lock-acquired')
+
+    websocket.accept()
 
     if (waited) {
       const timeout = options.timeout ?? this.timeout
@@ -93,7 +89,8 @@ export class experimental_DurableLocker implements Locker {
       const timer = setTimeout(() => granted.reject(new LockTimeoutError(key)), timeout)
 
       websocket.addEventListener('message', () => granted.resolve())
-      closed.promise.then(() => granted.reject(new Error('The lock durable object closed the socket before handing the lock over')))
+      websocket.addEventListener('close', () => granted.reject(new Error('The lock durable object closed the socket before handing the lock over')))
+      websocket.addEventListener('error', event => granted.reject(new Error('Lock websocket error', { cause: event })))
 
       await runWithSignal(options.signal, () => granted.promise)
         .catch((error) => {
@@ -111,7 +108,6 @@ export class experimental_DurableLocker implements Locker {
     finally {
       clearTimeout(expiry)
       close()
-      await closed.promise
     }
   }
 }
