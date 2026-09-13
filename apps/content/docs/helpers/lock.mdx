@@ -62,10 +62,6 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 })
 ```
 
-:::warning
-`ttl` is a safety net for holders that never release the lock, such as a crashed process. Pick a value longer than the work takes, because another holder can acquire the lock as soon as it expires.
-:::
-
 ### Timeout
 
 When the lock cannot be acquired before `timeout` elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, which turns the lock into a "skip if already running" guard:
