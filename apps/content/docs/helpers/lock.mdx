@@ -48,15 +48,38 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 })
 ```
 
-When the lock cannot be acquired before `timeout` elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, and pass a `signal` to stop waiting early, for example when the client disconnects.
-
 :::warning
 `ttl` is a safety net for holders that never release the lock, such as a crashed process. Pick a value longer than the work takes, because another holder can acquire the lock as soon as it expires.
 :::
 
+### Timeout
+
+When the lock cannot be acquired before `timeout` elapses, `lock` rejects with a `LockTimeoutError`. Set `timeout: 0` to give up immediately when the lock is held by someone else, which turns the lock into a "skip if already running" guard:
+
+```ts twoslash
+import { MemoryLocker } from '@orpc/lock/memory'
+declare function syncInventory(): Promise<void>
+const locker = new MemoryLocker()
+// ---cut---
+import { LockTimeoutError } from '@orpc/lock'
+
+try {
+  await locker.lock('sync:inventory', () => syncInventory(), { timeout: 0 })
+}
+catch (error) {
+  if (!(error instanceof LockTimeoutError)) {
+    throw error
+  }
+
+  // Another sync is already running, so skip this one
+}
+```
+
+Pass a `signal` to stop waiting early. It rejects with the abort reason and has no effect once the lock is acquired.
+
 ## Lock Middleware
 
-The `lock` helper creates middleware that runs [procedures](/docs/procedure) under a lock, so that calls sharing the same key never run concurrently. When the lock cannot be acquired before the timeout elapses, the procedure rejects with a `CONFLICT` error.
+The `lock` helper creates middleware that runs [procedures](/docs/procedure) under a lock, so that calls sharing the same key never run concurrently. When the lock cannot be acquired before the timeout elapses, the procedure rejects with a `CONFLICT` error. The request `signal` is forwarded, so a call stops waiting as soon as the client disconnects.
 
 ```ts
 import { lock, Locker } from '@orpc/lock'
