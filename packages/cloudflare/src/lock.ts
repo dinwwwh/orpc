@@ -35,11 +35,9 @@ export interface experimental_DurableLockerOptions {
 }
 
 /**
- * Locker adapter for Cloudflare Durable Objects. Keeps each lock in an
- * `experimental_DurableLockObject`, named after the key by default, so every Worker
- * instance shares the same locks. A caller holds a hibernatable WebSocket while it holds
- * or waits for the lock, so the object is not billed meanwhile, and closing the socket
- * releases the lock.
+ * Locker adapter for Cloudflare Durable Objects. A caller holds a hibernatable WebSocket
+ * to an `experimental_DurableLockObject` while it holds or waits for the lock, so the
+ * object is not billed meanwhile, and closing the socket releases the lock.
  *
  * @see {@link https://orpc.dev/docs/helpers/lock#adapters | Lock Helpers - Adapters}
  */
@@ -63,20 +61,9 @@ export class experimental_DurableLocker implements Locker {
     options.signal?.throwIfAborted()
 
     const prefixedKey = `${this.prefix}${key}`
-    const stub = this.getStubByName(this.namespace, prefixedKey)
-    const ttl = options.ttl ?? this.ttl
-    const timeout = options.timeout ?? this.timeout
-
-    const headers = new Headers({ 'upgrade': 'websocket', 'x-orpc-lock-key': safeEncodeURIComponent(prefixedKey) })
-    if (timeout > 0) {
-      headers.set('x-orpc-lock-wait', 'true')
-    }
-
-    const response = await stub.fetch('http://localhost/acquire', { headers })
-
-    if (response.status === 409) {
-      throw new LockTimeoutError(key)
-    }
+    const response = await this.getStubByName(this.namespace, prefixedKey).fetch('http://localhost/acquire', {
+      headers: { 'upgrade': 'websocket', 'x-orpc-lock-key': safeEncodeURIComponent(prefixedKey) },
+    })
 
     const websocket = response.webSocket
 
@@ -96,6 +83,13 @@ export class experimental_DurableLocker implements Locker {
     const waited = !response.headers.has('x-orpc-lock-acquired')
 
     if (waited) {
+      const timeout = options.timeout ?? this.timeout
+
+      if (timeout <= 0) {
+        close()
+        throw new LockTimeoutError(key)
+      }
+
       const granted = promiseWithResolvers<void>()
       const timer = setTimeout(() => granted.reject(new LockTimeoutError(key)), timeout)
 
@@ -110,7 +104,7 @@ export class experimental_DurableLocker implements Locker {
         .finally(() => clearTimeout(timer))
     }
 
-    const expiry = setTimeout(close, ttl)
+    const expiry = setTimeout(close, options.ttl ?? this.ttl)
 
     try {
       return await fn({ waited })
