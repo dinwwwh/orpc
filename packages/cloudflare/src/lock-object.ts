@@ -24,11 +24,7 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     }
   }
 
-  override fetch(request: Request): Response {
-    if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
-      return new Response('Expected a websocket upgrade', { status: 400 })
-    }
-
+  override fetch(): Response {
     const held = this.handover()
     const { '0': client, '1': server } = new WebSocketPair()
 

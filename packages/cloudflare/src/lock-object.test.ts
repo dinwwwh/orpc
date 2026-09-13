@@ -99,10 +99,4 @@ describe('durableLockObject', () => {
     await holder.release()
     await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalled())
   })
-
-  it('rejects requests without a websocket upgrade', async () => {
-    const stub = createStub()
-
-    expect((await stub.fetch('https://example.com/acquire')).status).toBe(400)
-  })
 })
