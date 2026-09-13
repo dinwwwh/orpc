@@ -1,3 +1,4 @@
+import type { LockDO } from '../tests/__shared__/main'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
 import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
@@ -5,10 +6,10 @@ import { describe, expect, it } from 'vitest'
 
 describe('durableLockObject', () => {
   function createStub() {
-    return env.LOCK_DON.getByName(crypto.randomUUID())
+    return env.LOCK_DON.getByName(crypto.randomUUID()) as DurableObjectStub<LockDO>
   }
 
-  function acquire(stub: DurableObjectStub, token: string, ttlMs = 10_000) {
+  function acquire(stub: DurableObjectStub<LockDO>, token: string, ttlMs = 10_000) {
     return stub.fetch('https://example.com/acquire', {
       headers: {
         'x-orpc-lock-token': token,
@@ -17,16 +18,11 @@ describe('durableLockObject', () => {
     })
   }
 
-  async function release(stub: DurableObjectStub, token: string) {
-    const response = await stub.fetch('https://example.com/release', {
-      method: 'DELETE',
-      headers: { 'x-orpc-lock-token': token },
-    })
-
-    expect(response.status).toBe(204)
+  function release(stub: DurableObjectStub<LockDO>, token: string) {
+    return stub.release(token)
   }
 
-  async function park(stub: DurableObjectStub, token: string, ttlMs = 10_000) {
+  async function park(stub: DurableObjectStub<LockDO>, token: string, ttlMs = 10_000) {
     const response = await stub.fetch('https://example.com/acquire', {
       headers: {
         'upgrade': 'websocket',
@@ -45,7 +41,7 @@ describe('durableLockObject', () => {
     return { socket, acquired }
   }
 
-  function getAlarm(stub: DurableObjectStub) {
+  function getAlarm(stub: DurableObjectStub<LockDO>) {
     return runInDurableObject(stub, async (_, state) => state.storage.getAlarm())
   }
 
@@ -184,7 +180,6 @@ describe('durableLockObject', () => {
     const stub = createStub()
 
     expect((await stub.fetch('https://example.com/acquire')).status).toBe(400)
-    expect((await stub.fetch('https://example.com/release', { method: 'DELETE' })).status).toBe(400)
 
     const missingTtl = await stub.fetch('https://example.com/acquire', {
       headers: { 'x-orpc-lock-token': 'a' },

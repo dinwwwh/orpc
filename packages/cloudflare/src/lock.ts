@@ -1,5 +1,6 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
+import type { experimental_DurableLockObject } from './lock-object'
 import { LockTimeoutError } from '@orpc/experimental-lock'
 import { promiseWithResolvers, tryOrUndefined } from '@orpc/shared'
 
@@ -59,7 +60,7 @@ export class experimental_DurableLocker implements Locker {
   }
 
   async lock<T>(key: string, fn: (options: LockCallbackOptions) => Promisable<T>, options: LockOptions = {}): Promise<T> {
-    const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`)
+    const stub = this.getStubByName(this.namespace, `${this.prefix}${key}`) as DurableObjectStub<experimental_DurableLockObject>
     const ttlMs = Math.round((options.ttl ?? this.ttl) * 1000)
     const timeoutMs = (options.timeout ?? this.timeout) * 1000
     const token = crypto.randomUUID()
@@ -72,7 +73,7 @@ export class experimental_DurableLocker implements Locker {
       return await fn({ waited })
     }
     finally {
-      await this.release(stub, token)
+      await stub.release(token)
     }
   }
 
@@ -83,7 +84,7 @@ export class experimental_DurableLocker implements Locker {
    * object can hibernate meanwhile instead of being polled.
    */
   private async acquire(
-    stub: DurableObjectStub,
+    stub: DurableObjectStub<experimental_DurableLockObject>,
     key: string,
     token: string,
     ttlMs: number,
@@ -131,7 +132,7 @@ export class experimental_DurableLocker implements Locker {
       await promise
     }
     catch (error) {
-      await this.release(stub, token) // the lock may have been handed over meanwhile
+      await stub.release(token) // the lock may have been handed over meanwhile
       throw error
     }
     finally {
@@ -141,18 +142,5 @@ export class experimental_DurableLocker implements Locker {
     }
 
     return true
-  }
-
-  private async release(stub: DurableObjectStub, token: string): Promise<void> {
-    const response = await stub.fetch('http://localhost/release', {
-      method: 'DELETE',
-      headers: { 'x-orpc-lock-token': token },
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to release the lock: ${response.status} ${response.statusText}`, {
-        cause: response,
-      })
-    }
   }
 }

@@ -35,30 +35,18 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
   }
 
   /**
-   * Every request identifies its caller with the `x-orpc-lock-token` header.
-   *
-   * - `DELETE` releases the lock if the caller holds it, and responds with `204`.
-   * - Anything else acquires the lock for `x-orpc-lock-ttl` milliseconds: `204` when
-   *   acquired right away, `409` when held and the caller sent no `Upgrade: websocket`
-   *   header, otherwise `101` with a hibernatable WebSocket that receives a message once
-   *   the lock is handed over to the caller and is then closed.
+   * Acquires the lock for the caller identified by the `x-orpc-lock-token` header,
+   * for `x-orpc-lock-ttl` milliseconds. Responds with `204` when acquired right away,
+   * `409` when held and the caller sent no `Upgrade: websocket` header, and otherwise
+   * `101` with a hibernatable WebSocket that receives a message once the lock is
+   * handed over to the caller and is then closed.
    */
   override async fetch(request: Request): Promise<Response> {
     const token = request.headers.get('x-orpc-lock-token')
-
-    if (!token) {
-      return new Response('Expected the x-orpc-lock-token header', { status: 400 })
-    }
-
-    if (request.method === 'DELETE') {
-      await this.release(token)
-      return new Response(null, { status: 204 })
-    }
-
     const ttlMs = Number(request.headers.get('x-orpc-lock-ttl'))
 
-    if (!(ttlMs > 0)) {
-      return new Response('Expected the x-orpc-lock-ttl header to be a positive number', { status: 400 })
+    if (!token || !(ttlMs > 0)) {
+      return new Response('Expected the x-orpc-lock-token header and a positive x-orpc-lock-ttl header', { status: 400 })
     }
 
     if (!(await this.isHeld())) {
@@ -77,18 +65,11 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  override webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void | Promise<void> {
-  }
-
-  override async alarm(): Promise<void> {
-    await this.handover()
-  }
-
   /**
    * Removes the holder only while it is still `token`, and hands the lock over
    * to the waiter that has been parked the longest, if any.
    */
-  private async release(token: string): Promise<void> {
+  async release(token: string): Promise<void> {
     const holder = await this.ctx.storage.get<LockHolder>(HOLDER_KEY)
 
     if (holder?.token !== token) {
@@ -96,6 +77,13 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     }
 
     await this.ctx.storage.delete(HOLDER_KEY)
+    await this.handover()
+  }
+
+  override webSocketClose(_ws: WebSocket, _code: number, _reason: string, _wasClean: boolean): void | Promise<void> {
+  }
+
+  override async alarm(): Promise<void> {
     await this.handover()
   }
 
