@@ -1,7 +1,7 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
 import { LockTimeoutError } from '@orpc/experimental-lock'
-import { promiseWithResolvers, runWithSignal, tryOrUndefined } from '@orpc/shared'
+import { promiseWithResolvers, runWithSignal } from '@orpc/shared'
 
 export interface experimental_DurableLockerOptions {
   /**
@@ -72,8 +72,12 @@ export class experimental_DurableLocker implements Locker {
       })
     }
 
-    const close = () => tryOrUndefined(() => websocket.close(1000))
-    const waited = !response.headers.has('x-orpc-lock-acquired')
+    const close = () => {
+      if (websocket.readyState === WebSocket.READY_STATE_OPEN) {
+        websocket.close(1000)
+      }
+    }
+    const waited = !response.headers.has('orpc-lock-acquired')
 
     websocket.accept()
 

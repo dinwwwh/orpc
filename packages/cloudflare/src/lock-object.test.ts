@@ -22,7 +22,7 @@ describe('durableLockObject', () => {
     socket.accept()
 
     return {
-      acquired: response.headers.has('x-orpc-lock-acquired'),
+      acquired: response.headers.has('orpc-lock-acquired'),
       granted,
       release: () => socket.close(1000),
     }

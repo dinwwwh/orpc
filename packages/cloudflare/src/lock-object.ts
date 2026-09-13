@@ -18,7 +18,7 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     return new Response(null, {
       status: 101,
       webSocket: client,
-      headers: held ? undefined : { 'x-orpc-lock-acquired': 'true' },
+      headers: held ? undefined : { 'orpc-lock-acquired': 'true' },
     })
   }
 
