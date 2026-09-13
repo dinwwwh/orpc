@@ -328,24 +328,12 @@ export default {
 ```
 
 :::tip[Fewer Durable Objects]
-An object serves any number of keys independently, so `getStubByName` can map keys onto a fixed set of objects. Keys are limited to 256 characters.
+An object serves any number of keys independently, so `getStubByName` can map keys onto a fixed set of objects.
 
 ```ts
-const STRIPES = 16
-
-function stripe(key: string): number {
-  let hash = 2166136261
-
-  for (let i = 0; i < key.length; i++) {
-    hash = Math.imul(hash ^ key.charCodeAt(i), 16777619)
-  }
-
-  return (hash >>> 0) % STRIPES
-}
-
 const locker = new DurableLocker(env.LOCK_DON, {
   ttl: 30_000,
-  getStubByName: (namespace, key) => namespace.getByName(String(stripe(key))),
+  getStubByName: (namespace, key) => namespace.getByName(key.slice(0, 2)),
 })
 ```
 
