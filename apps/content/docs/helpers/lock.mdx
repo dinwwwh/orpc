@@ -276,7 +276,7 @@ const locker = new BunRedisLocker(redis, {
 
 ### Cloudflare
 
-Stores locks in Durable Objects, one per key by default, so every Worker instance shares the same locks. Callers hold a hibernatable WebSocket while holding or waiting, so objects keep no storage and are not billed meanwhile. Export a class extending `DurableLockObject`, bind it in your Wrangler config, and pass the namespace to `DurableLocker`.
+Stores locks in Durable Objects, so every Worker instance shares the same locks. Export a class extending `DurableLockObject`, bind it in your Wrangler config, and pass the namespace to `DurableLocker`.
 
 ```jsonc title="wrangler.jsonc"
 {
