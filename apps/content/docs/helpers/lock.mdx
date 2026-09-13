@@ -121,7 +121,7 @@ When the same `locker` and `key` combination is used multiple times in a single 
 
 ### Memory
 
-Keeps locks in the memory of the current process, so they are not shared between instances. Waiters acquire the lock in order, without polling. A good fit for development, tests, and single-process servers.
+Keeps locks in the memory of the current process, so they are not shared between instances. A good fit for development, tests, and single-process servers.
 
 ```ts
 import { MemoryLocker } from '@orpc/experimental-lock/memory'
@@ -147,7 +147,7 @@ const locker = new MemoryLocker({
 
 ### Redis
 
-Stores locks in Redis, so every instance using the same server shares the same locks. Locks are acquired with `SET NX PX` and released atomically with a Lua script, so a holder can never release a lock that expired and was acquired by someone else. Works with both standalone and cluster clients.
+Stores locks in Redis, so every instance using the same server shares the same locks. Works with both standalone and cluster clients.
 
 ```ts
 import { RedisLocker } from '@orpc/experimental-lock/redis'
@@ -194,7 +194,7 @@ const locker = new RedisLocker(client, {
 
 ### Upstash
 
-Stores locks in Upstash Redis over its REST API, so it shares locks with `RedisLocker`. A good fit for serverless and edge runtimes.
+Stores locks in Upstash Redis, so it shares locks with `RedisLocker`. A good fit for serverless and edge runtimes, keeping in mind that every acquisition attempt is a REST request.
 
 ```ts
 import { UpstashLocker } from '@orpc/experimental-lock/upstash'
@@ -233,10 +233,6 @@ const locker = new UpstashLocker(redis, {
   retryInterval: 100,
 })
 ```
-
-:::info
-Every acquisition attempt is a REST request, so waiting for a held lock costs one request per `retryInterval`. Raise `retryInterval` or lower `timeout` if that matters for your usage.
-:::
 
 ### Bun Redis
 
@@ -280,7 +276,7 @@ const locker = new BunRedisLocker(redis, {
 
 ### Cloudflare
 
-Keeps each lock in a Durable Object, named after the key by default, so every Worker instance shares the same locks. A caller holds a hibernatable WebSocket while it holds or waits for the lock, so the object keeps no storage and is not billed meanwhile. Closing the socket releases the lock, so a crashed Worker releases it right away and the next caller is served the moment the previous one finishes. Export a class extending `DurableLockObject` and bind it as a Durable Object namespace in your Wrangler config, then pass the namespace to `DurableLocker`.
+Stores locks in Durable Objects, one per key by default, so every Worker instance shares the same locks. Callers hold a hibernatable WebSocket while holding or waiting, so objects keep no storage and are not billed meanwhile. Export a class extending `DurableLockObject`, bind it in your Wrangler config, and pass the namespace to `DurableLocker`.
 
 ```jsonc title="wrangler.jsonc"
 {
@@ -332,7 +328,7 @@ export default {
 ```
 
 :::tip[Fewer Durable Objects]
-By default every key gets its own Durable Object. An object serves any number of keys independently, each tracked as a WebSocket tag, so to bound how many objects exist you can map keys onto a fixed set of them with `getStubByName` without changing how the locks behave. Keys are limited to 256 characters.
+An object serves any number of keys independently, so `getStubByName` can map keys onto a fixed set of objects. Keys are limited to 256 characters.
 
 ```ts
 const STRIPES = 16
