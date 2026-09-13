@@ -11,7 +11,6 @@ export interface LockOptions {
 
   /**
    * How long to wait for the lock to become available, in milliseconds.
-   * Use `0` to give up immediately when the lock is held by someone else.
    *
    * @default the adapter default
    */

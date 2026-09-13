@@ -49,7 +49,7 @@ const report = await locker.lock('report:123', async ({ waited }) => {
 ### Options
 
 - `ttl`: how long the lock is held before it expires automatically, in milliseconds. Guards against holders that never release the lock. Each adapter has its own default.
-- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses, and `0` gives up immediately when the lock is held by someone else.
+- `timeout`: how long to wait for the lock to become available, in milliseconds. `lock` rejects with a `LockTimeoutError` once it elapses.
 - `signal`: stops waiting early and rejects with the abort reason. Has no effect once the lock is acquired.
 
 ```ts
