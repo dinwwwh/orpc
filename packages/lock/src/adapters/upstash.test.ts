@@ -70,15 +70,16 @@ describe.concurrent('upstash locker integration', {
     await expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again')
   })
 
-  it('makes callers wait until the holder releases, across instances sharing a prefix', async () => {
-    const { prefix, locker } = createTestingLocker()
-    const { locker: other } = createTestingLocker({ prefix })
-    const holder = await hold(locker, 'key')
+  it('makes callers wait until the holder releases, across instances', async () => {
+    const key = `orpc-upstash-locker-${crypto.randomUUID()}`
+    const locker = new UpstashLocker(redis, { ttl: 10_000 })
+    const other = new UpstashLocker(redis, { ttl: 10_000 })
+    const holder = await hold(locker, key)
     const fn = vi.fn(() => 'ok')
-    const waiter = other.lock('key', fn)
+    const waiter = other.lock(key, fn)
 
     // Commands on one client run in order, so the waiter's first attempt was rejected as well
-    await expect(other.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+    await expect(other.lock(key, () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
 
     await holder.release()
     await expect(waiter).resolves.toBe('ok')
@@ -145,6 +146,7 @@ describe.concurrent('upstash locker integration', {
     controller.abort(new Error('aborted'))
 
     await expect(waiter).rejects.toThrow('aborted')
+    await expect(locker.lock('key', fn, { signal: controller.signal })).rejects.toThrow('aborted')
     expect(fn).not.toHaveBeenCalled()
 
     await holder.release()
