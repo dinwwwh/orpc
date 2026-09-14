@@ -420,7 +420,6 @@ describe('bracket notation serializer', () => {
         ['b[constructor][prototype][polluted]', '3'],
       ]) as any
 
-      // global prototypes must be completely unaffected
       expect(({} as any).polluted).toBeUndefined()
       expect((Object.prototype as any).polluted).toBeUndefined()
 

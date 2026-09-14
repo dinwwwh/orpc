@@ -52,59 +52,44 @@ export class BracketNotationSerializer {
   }
 
   deserialize(serialized: BracketNotationSerializeResult): Record<string, unknown> {
-    if (serialized.length === 0) {
-      return new NullProtoObj() // Prevent Prototype Pollution with NullProtoObj
-    }
-
+    // A caller-supplied object value can become a container for deeper paths, and unlike
+    // `NullProtoObj` it carries a real prototype, so accesses below stay own-property only.
     const arrayPushStyles = new WeakSet()
-    const ref: { value: Record<string, unknown> } = { value: new NullProtoObj() } // Prevent Prototype Pollution with NullProtoObj
+    const root: Record<string, unknown> = new NullProtoObj()
 
     for (const [path, value] of serialized) {
       const segments = this.parsePath(path)
 
-      let currentRef: any = ref
-      let nextSegment: string = 'value'
+      let currentRef: any = root
+      let nextSegment: string = segments[0]!
 
-      for (let i = 0; i < segments.length; i++) {
+      for (let i = 1; i < segments.length; i++) {
         const segment = segments[i]!
+        const isLast = i === segments.length - 1
 
-        // Read/write own properties only, so a `__proto__` segment cannot walk into a prototype
-        let child: any = getOwn(currentRef, nextSegment)
+        const existing: any = getOwn(currentRef, nextSegment)
+        let child: any = existing
 
         if (!Array.isArray(child) && !isPlainObject(child)) {
           child = []
         }
 
-        if (i !== segments.length - 1) {
-          if (Array.isArray(child) && !internalIsValidArrayIndex(segment, this.maxExplicitDeserializingArrayIndex)) {
-            if (arrayPushStyles.delete(child)) {
-              child = internalPushStyleArrayToObject(child)
-            }
-            else {
-              child = internalArrayToObject(child)
-            }
-          }
-        }
-        else {
-          if (Array.isArray(child)) {
-            if (segment === '') {
-              if (child.length && !arrayPushStyles.has(child)) {
-                child = internalArrayToObject(child)
-              }
-            }
-            else {
-              if (arrayPushStyles.delete(child)) {
-                child = internalPushStyleArrayToObject(child)
-              }
+        if (Array.isArray(child)) {
+          const isPushStyle = arrayPushStyles.has(child)
 
-              else if (!internalIsValidArrayIndex(segment, this.maxExplicitDeserializingArrayIndex)) {
-                child = internalArrayToObject(child)
-              }
-            }
+          const canStayArray = segment === ''
+            ? isLast && (isPushStyle || child.length === 0)
+            : internalIsValidArrayIndex(segment, this.maxExplicitDeserializingArrayIndex) && !(isLast && isPushStyle)
+
+          if (!canStayArray) {
+            arrayPushStyles.delete(child)
+            child = isPushStyle ? internalPushStyleArrayToObject(child) : internalArrayToObject(child)
           }
         }
 
-        setOwn(currentRef, nextSegment, child)
+        if (child !== existing) {
+          setOwn(currentRef, nextSegment, child)
+        }
 
         currentRef = child
         nextSegment = segment
@@ -115,7 +100,7 @@ export class BracketNotationSerializer {
         currentRef.push(value)
       }
       else if (Object.hasOwn(currentRef, nextSegment)) {
-        const current = getOwn(currentRef, nextSegment)
+        const current = currentRef[nextSegment]
 
         if (Array.isArray(current)) {
           current.push(value)
@@ -129,7 +114,7 @@ export class BracketNotationSerializer {
       }
     }
 
-    return ref.value
+    return root
   }
 
   stringifyPath(segments: readonly Segment[]): string {
