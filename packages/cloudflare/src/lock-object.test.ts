@@ -39,11 +39,6 @@ describe('durableLockObject', () => {
     return !probe.acquired
   }
 
-  /**
-   * Resolves once the object holds exactly `count` open sockets. Tests wait for this
-   * instead of sleeping, so they never hand the lock over before the object has seen
-   * a socket leave, which would hand it to a socket that is already gone.
-   */
   async function waitForSockets(stub: DurableObjectStub, count: number) {
     await vi.waitFor(async () => {
       const open = await runInDurableObject(
@@ -52,7 +47,7 @@ describe('durableLockObject', () => {
       )
 
       expect(open).toBe(count)
-    }, { timeout: 5000, interval: 10 })
+    }, { interval: 10 })
   }
 
   it('grants the first socket right away and hands over to parked sockets in order', async () => {

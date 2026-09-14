@@ -45,20 +45,15 @@ describe('durableLocker', () => {
     }
   }
 
-  /**
-   * Resolves once the object holds exactly `count` open sockets. Tests wait for this
-   * instead of sleeping, so they never release the lock before the object has parked
-   * the waiter, which would hand the waiter the lock without it ever waiting.
-   */
-  async function waitForSockets(prefix: string, count: number, key = 'key') {
+  async function waitForSockets(prefix: string, count: number) {
     await vi.waitFor(async () => {
       const open = await runInDurableObject(
-        env.LOCK_DON.getByName(`${prefix}${key}`),
+        env.LOCK_DON.getByName(`${prefix}key`),
         (_, ctx) => ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN).length,
       )
 
       expect(open).toBe(count)
-    }, { timeout: 5000, interval: 10 })
+    }, { interval: 10 })
   }
 
   it('runs the callback immediately when the lock is free and releases afterwards', async () => {
@@ -152,7 +147,7 @@ describe('durableLocker', () => {
     await expect(attempt(locker, fn)).rejects.toMatchObject(rejection)
     expect(Date.now() - start).toBeGreaterThanOrEqual(minWait)
     expect(fn).not.toHaveBeenCalled()
-    await waitForSockets(prefix, 1) // only the holder is left
+    await waitForSockets(prefix, 1)
 
     const waiter = locker.lock('key', ({ waited }) => waited, { timeout: 1000 })
 
