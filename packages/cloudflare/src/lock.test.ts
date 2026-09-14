@@ -206,14 +206,15 @@ describe('durableLocker', () => {
     const { prefix, locker } = createTestingLocker()
     const holder = await hold(locker)
     const fn = vi.fn()
-    const waiter = locker.lock('key', fn)
+    // Assert before closing the socket, so the rejection never sits unobserved
+    const rejected = expect(locker.lock('key', fn)).rejects.toThrow('The lock durable object closed the socket before handing the lock over')
 
     await sleep(50)
     await runInDurableObject(env.LOCK_DON.getByName(`${prefix}key`), (_, ctx) => {
       ctx.getWebSockets()[0]!.close() // newest first, so the parked waiter
     })
 
-    await expect(waiter).rejects.toThrow('The lock durable object closed the socket before handing the lock over')
+    await rejected
     expect(fn).not.toHaveBeenCalled()
 
     await holder.release()
