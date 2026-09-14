@@ -1,5 +1,5 @@
 import { sleep } from '@standard-server/shared'
-import { evictDurableObject, reset, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
+import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -71,8 +71,7 @@ async function closeSocket(socket: OpenSocket): Promise<void> {
   await sleep(0)
 }
 
-beforeEach(async () => {
-  await reset()
+beforeEach(() => {
   vi.clearAllMocks()
 })
 

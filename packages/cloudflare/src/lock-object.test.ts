@@ -39,6 +39,17 @@ describe('durableLockObject', () => {
     return !probe.acquired
   }
 
+  async function waitForSockets(stub: DurableObjectStub, count: number) {
+    await vi.waitFor(async () => {
+      const open = await runInDurableObject(
+        stub,
+        (_, ctx) => ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN).length,
+      )
+
+      expect(open).toBe(count)
+    }, { interval: 10 })
+  }
+
   it('grants the first socket right away and hands over to parked sockets in order', async () => {
     const stub = createStub()
 
@@ -74,7 +85,7 @@ describe('durableLockObject', () => {
     const first = await connect(stub)
     const second = await connect(stub)
     first.release()
-    await sleep(50)
+    await waitForSockets(stub, 2)
 
     holder.release()
     await vi.waitFor(() => expect(second.granted).toHaveBeenCalled())
