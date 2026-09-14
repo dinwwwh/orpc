@@ -26,24 +26,17 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     const sockets = this.ctx.getWebSockets() // newest first
 
     for (let i = sockets.length - 1; i >= 0; i--) { // oldest first
-      const ws = sockets[i]!
+      const next = sockets[i]!
 
-      if (ws.readyState !== WebSocket.OPEN) {
+      if (next.readyState !== WebSocket.OPEN) {
         continue
       }
 
-      if (ws.deserializeAttachment().holder) {
-        return
+      if (!next.deserializeAttachment().holder) {
+        next.send('acquired')
+        next.serializeAttachment({ holder: true })
       }
 
-      try {
-        ws.send('acquired')
-      }
-      catch {
-        continue
-      }
-
-      ws.serializeAttachment({ holder: true })
       return
     }
   }
