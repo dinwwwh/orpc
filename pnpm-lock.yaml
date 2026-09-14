@@ -193,6 +193,9 @@ importers:
       '@orpc/experimental-effect':
         specifier: workspace:*
         version: link:packages/effect
+      '@orpc/experimental-lock':
+        specifier: workspace:*
+        version: link:packages/lock
       '@orpc/experimental-msw':
         specifier: workspace:*
         version: link:packages/msw
@@ -373,6 +376,9 @@ importers:
       '@orpc/evlog':
         specifier: workspace:*
         version: link:../../packages/evlog
+      '@orpc/experimental-lock':
+        specifier: workspace:*
+        version: link:../../packages/lock
       '@orpc/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
@@ -477,6 +483,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-lock':
+        specifier: workspace:*
+        version: link:../lock
       '@orpc/publisher':
         specifier: workspace:*
         version: link:../publisher
@@ -524,6 +533,9 @@ importers:
       '@orpc/client':
         specifier: workspace:*
         version: link:../client
+      '@orpc/experimental-lock':
+        specifier: workspace:*
+        version: link:../lock
       '@orpc/publisher':
         specifier: workspace:*
         version: link:../publisher
@@ -655,6 +667,22 @@ importers:
       zod:
         specifier: ^4.5.4
         version: 4.5.4
+
+  packages/lock:
+    dependencies:
+      '@orpc/server':
+        specifier: workspace:*
+        version: link:../server
+      '@orpc/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@upstash/redis':
+        specifier: ^1.38.2
+        version: 1.38.3
+      redis:
+        specifier: ^6.2.1
+        version: 6.2.1(@opentelemetry/api@1.9.1)
 
   packages/msw:
     dependencies:
