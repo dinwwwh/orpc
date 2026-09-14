@@ -74,7 +74,7 @@ export class experimental_DurableLocker implements Locker {
 
     const close = () => {
       if (websocket.readyState === WebSocket.OPEN) {
-        websocket.close(1000)
+        websocket.close()
       }
     }
     const waited = !response.headers.has('orpc-lock-acquired')
