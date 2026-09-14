@@ -171,6 +171,52 @@ describe('durableLocker', () => {
     await holder
   })
 
+  it.each([
+    {
+      case: 'gives up immediately',
+      attempt: (locker: DurableLocker) => locker.lock('key', () => 'never', { timeout: 0 }),
+    },
+    {
+      case: 'times out while waiting',
+      attempt: (locker: DurableLocker) => locker.lock('key', () => 'never', { timeout: 100 }),
+    },
+    {
+      case: 'is aborted while waiting',
+      attempt: (locker: DurableLocker) => {
+        const controller = new AbortController()
+        setTimeout(() => controller.abort(new Error('aborted')), 50)
+
+        return locker.lock('key', () => 'never', { signal: controller.signal })
+      },
+    },
+  ])('releases the socket of a waiter that $case, so the next waiter still gets the lock', async ({ attempt }) => {
+    const { locker } = createTestingLocker()
+    const { promise: release, resolve } = promiseWithResolvers<void>()
+    const holder = locker.lock('key', () => release)
+
+    await sleep(50)
+    await expect(attempt(locker)).rejects.toThrow()
+
+    const waiter = locker.lock('key', ({ waited }) => waited, { timeout: 1000 })
+
+    await sleep(50)
+    resolve()
+    await holder
+
+    await expect(waiter).resolves.toBe(true)
+  })
+
+  it('releases the lock when the ttl expires while the callback is still running', async () => {
+    const { locker } = createTestingLocker({ ttl: 100 })
+
+    await expect(locker.lock('key', async () => {
+      await sleep(300)
+      return 'ok'
+    })).resolves.toBe('ok')
+
+    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
+  })
+
   it('makes one request per lock and never polls', async () => {
     const fetch = vi.fn()
     const getStubByName = vi.fn((namespace, key) => {
