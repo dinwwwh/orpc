@@ -22,7 +22,11 @@ export class experimental_DurableLockObject<Env = Cloudflare.Env, Props = unknow
     })
   }
 
-  override webSocketClose(): void {
+  override webSocketClose(closing: WebSocket): void {
+    if (!closing.deserializeAttachment().holder) {
+      return
+    }
+
     const sockets = this.ctx.getWebSockets() // newest first
 
     for (let i = sockets.length - 1; i >= 0; i--) { // oldest first
