@@ -45,6 +45,22 @@ describe('durableLocker', () => {
     }
   }
 
+  /**
+   * Resolves once the object holds exactly `count` open sockets. Tests wait for this
+   * instead of sleeping, so they never release the lock before the object has parked
+   * the waiter, which would hand the waiter the lock without it ever waiting.
+   */
+  async function waitForSockets(prefix: string, count: number, key = 'key') {
+    await vi.waitFor(async () => {
+      const open = await runInDurableObject(
+        env.LOCK_DON.getByName(`${prefix}${key}`),
+        (_, ctx) => ctx.getWebSockets().filter(ws => ws.readyState === WebSocket.OPEN).length,
+      )
+
+      expect(open).toBe(count)
+    }, { timeout: 5000, interval: 10 })
+  }
+
   it('runs the callback immediately when the lock is free and releases afterwards', async () => {
     const { locker } = createTestingLocker()
     const fn = vi.fn(async () => {
@@ -59,12 +75,12 @@ describe('durableLocker', () => {
   })
 
   it('waits for the holder to release', async () => {
-    const { locker } = createTestingLocker()
+    const { prefix, locker } = createTestingLocker()
     const holder = await hold(locker)
     const fn = vi.fn(({ waited }) => waited)
     const waiter = locker.lock('key', fn)
 
-    await sleep(100)
+    await waitForSockets(prefix, 2)
     expect(fn).not.toHaveBeenCalled()
 
     await expect(holder.release()).resolves.toBe(false)
@@ -128,7 +144,7 @@ describe('durableLocker', () => {
       minWait: 50,
     },
   ])('releases the socket of a waiter that $case, so the next waiter still gets the lock', async ({ attempt, rejection, minWait }) => {
-    const { locker } = createTestingLocker()
+    const { prefix, locker } = createTestingLocker()
     const holder = await hold(locker)
     const fn = vi.fn()
     const start = Date.now()
@@ -136,10 +152,11 @@ describe('durableLocker', () => {
     await expect(attempt(locker, fn)).rejects.toMatchObject(rejection)
     expect(Date.now() - start).toBeGreaterThanOrEqual(minWait)
     expect(fn).not.toHaveBeenCalled()
+    await waitForSockets(prefix, 1) // only the holder is left
 
     const waiter = locker.lock('key', ({ waited }) => waited, { timeout: 1000 })
 
-    await sleep(50)
+    await waitForSockets(prefix, 2)
     await holder.release()
     await expect(waiter).resolves.toBe(true)
   })
@@ -179,10 +196,11 @@ describe('durableLocker', () => {
         },
       } as unknown as DurableObjectStub
     })
-    const { locker } = createTestingLocker({ getStubByName })
+    const { prefix, locker } = createTestingLocker({ getStubByName })
     const holder = await hold(locker)
     const waiter = locker.lock('key', ({ waited }) => waited)
 
+    await waitForSockets(prefix, 2)
     await sleep(300)
     expect(fetch).toHaveBeenCalledTimes(2)
 
@@ -209,7 +227,7 @@ describe('durableLocker', () => {
     // Assert before closing the socket, so the rejection never sits unobserved
     const rejected = expect(locker.lock('key', fn)).rejects.toThrow('The lock durable object closed the socket before handing the lock over')
 
-    await sleep(50)
+    await waitForSockets(prefix, 2)
     await runInDurableObject(env.LOCK_DON.getByName(`${prefix}key`), (_, ctx) => {
       ctx.getWebSockets()[0]!.close() // newest first, so the parked waiter
     })
