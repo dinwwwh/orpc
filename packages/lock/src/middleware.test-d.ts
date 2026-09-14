@@ -1,4 +1,4 @@
-import type { LockCallbackOptions, Locker } from './types'
+import type { Locker } from './types'
 import { os, type } from '@orpc/server'
 import { lock } from './middleware'
 
@@ -48,8 +48,7 @@ describe('lock', () => {
       )
       .handler(({ context, input }) => {
         expectTypeOf(context.locker).toEqualTypeOf<Locker>()
-        expectTypeOf(context.lock).toEqualTypeOf<LockCallbackOptions>()
-        expectTypeOf(context.lock.waited).toBeBoolean()
+        expectTypeOf(context['lock/waited']).toEqualTypeOf<boolean>()
         expectTypeOf(context.userId).toBeString()
         expectTypeOf(context.db).toBeString()
         expectTypeOf(input.id).toBeString()

@@ -27,7 +27,7 @@ it('works', async () => {
         await sleep(20)
         active--
 
-        return { waited: context.lock.waited }
+        return { waited: context['lock/waited'] }
       }),
   }
 

@@ -11,11 +11,11 @@ describe('lock', () => {
   it('runs the handler under the lock', async () => {
     const locker = createLocker()
     const mw = lock({ locker, key: 'key' })
-    const procedure = os.use(mw).handler(({ context }) => context.lock)
+    const procedure = os.use(mw).handler(({ context }) => context['lock/waited'])
 
     await expect(
       call(procedure, undefined, { context: {} }),
-    ).resolves.toEqual({ waited: false })
+    ).resolves.toBe(false)
 
     expect(locker.lock).toHaveBeenCalledTimes(1)
     expect(locker.lock).toHaveBeenCalledWith('key', expect.any(Function), { ttl: undefined, timeout: undefined, signal: undefined })
@@ -23,7 +23,7 @@ describe('lock', () => {
 
   it('exposes whether the lock was waited for', async () => {
     const locker = createLocker(true)
-    const procedure = os.use(lock({ locker, key: 'key' })).handler(({ context }) => context.lock.waited)
+    const procedure = os.use(lock({ locker, key: 'key' })).handler(({ context }) => context['lock/waited'])
 
     await expect(
       call(procedure, undefined, { context: {} }),
@@ -127,8 +127,8 @@ describe('lock', () => {
     expect(context0).toEqual(context1)
     expect(context0).toEqual({
       held: [
-        { locker, key: 'k', lock: { waited: false } },
-        { locker, key: 'k', lock: { waited: false } },
+        { locker, key: 'k', waited: false },
+        { locker, key: 'k', waited: false },
       ],
     })
   })
@@ -137,11 +137,11 @@ describe('lock', () => {
     it('deduplicates by default', async () => {
       const locker = createLocker(true)
       const mw = lock({ locker, key: 'k' })
-      const procedure = os.use(mw).use(mw).handler(({ context }) => context.lock)
+      const procedure = os.use(mw).use(mw).handler(({ context }) => context['lock/waited'])
 
       await expect(
         call(procedure, undefined, { context: {} }),
-      ).resolves.toEqual({ waited: true })
+      ).resolves.toBe(true)
 
       expect(locker.lock).toHaveBeenCalledTimes(1)
     })
@@ -176,14 +176,14 @@ describe('lock', () => {
       const mw = lock({ locker, key: 'k' })
       const inner = os
         .use(mw)
-        .handler(({ context }) => context.lock)
+        .handler(({ context }) => context['lock/waited'])
       const outer = os
         .use(mw)
         .handler(async ({ context }) => call(inner, undefined, { context }))
 
       await expect(
         call(outer, undefined, { context: {} }),
-      ).resolves.toEqual({ waited: true })
+      ).resolves.toBe(true)
 
       expect(locker.lock).toHaveBeenCalledTimes(1)
     })

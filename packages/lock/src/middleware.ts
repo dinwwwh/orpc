@@ -1,6 +1,6 @@
 import type { Context, Middleware, MiddlewareOptions } from '@orpc/server'
 import type { Promisable, Value } from '@orpc/shared'
-import type { LockCallbackOptions, Locker } from './types'
+import type { Locker } from './types'
 import { ORPCError } from '@orpc/server'
 import { toArray, value } from '@orpc/shared'
 import { LockTimeoutError } from './error'
@@ -12,15 +12,16 @@ export interface LockMiddlewareContext {
     /**
      * The locks held in this request, mainly for deduplication purposes
      */
-    held: { locker: Locker, key: string, lock: LockCallbackOptions }[]
+    held: { locker: Locker, key: string, waited: boolean }[]
   }
 }
 
 export interface LockMiddlewareOutContext {
   /**
-   * Details about the lock held for the current request.
+   * Whether the lock was acquired only after waiting for another holder to release it.
+   * `false` means the lock was acquired immediately.
    */
-  lock: LockCallbackOptions
+  ['lock/waited']: boolean
 }
 
 export interface LockMiddlewareOptions<
@@ -90,7 +91,7 @@ export function lock<
     if (dedupe && held) {
       return middlewareOptions.next({
         context: {
-          lock: held.lock,
+          'lock/waited': held.waited,
         } satisfies LockMiddlewareOutContext,
       })
     }
@@ -98,17 +99,17 @@ export function lock<
     let acquired = false
 
     try {
-      return await locker.lock(key, (lock) => {
+      return await locker.lock(key, ({ waited }) => {
         acquired = true
 
         return middlewareOptions.next({
           context: {
-            lock,
+            'lock/waited': waited,
             [LOCK_MIDDLEWARE_CONTEXT_SYMBOL]: {
               ...middlewareContext,
               held: [
                 ...toArray(middlewareContext?.held),
-                { locker, key, lock },
+                { locker, key, waited },
               ],
             },
           } satisfies LockMiddlewareOutContext & LockMiddlewareContext,

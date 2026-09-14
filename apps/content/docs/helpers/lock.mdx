@@ -91,7 +91,7 @@ const procedure = os
     }),
   )
   .handler(async ({ context, input }) => {
-    if (context.lock.waited) {
+    if (context['lock/waited']) {
       // Another call with the same key just finished, so its result may already be available
     }
 
