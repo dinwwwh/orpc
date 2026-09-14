@@ -1,7 +1,7 @@
 import type { LockCallbackOptions, Locker, LockOptions } from '@orpc/experimental-lock'
 import type { Promisable } from '@orpc/shared'
 import { LockTimeoutError } from '@orpc/experimental-lock'
-import { promiseWithResolvers, runWithSignal, tryOrUndefined } from '@orpc/shared'
+import { promiseWithResolvers, runWithSignal } from '@orpc/shared'
 
 export interface experimental_DurableLockerOptions {
   /**
@@ -72,7 +72,11 @@ export class experimental_DurableLocker implements Locker {
       })
     }
 
-    const safeClose = () => tryOrUndefined(() => websocket.close(1000))
+    const close = () => {
+      if (websocket.readyState === WebSocket.OPEN) {
+        websocket.close(1000)
+      }
+    }
     const waited = !response.headers.has('orpc-lock-acquired')
 
     websocket.accept()
@@ -81,7 +85,7 @@ export class experimental_DurableLocker implements Locker {
       const timeout = options.timeout ?? this.timeout
 
       if (timeout <= 0) {
-        safeClose()
+        close()
         throw new LockTimeoutError(key)
       }
 
@@ -94,20 +98,20 @@ export class experimental_DurableLocker implements Locker {
 
       await runWithSignal(options.signal, () => granted.promise)
         .catch((error) => {
-          safeClose()
+          close()
           throw error
         })
         .finally(() => clearTimeout(timer))
     }
 
-    const expiry = setTimeout(safeClose, options.ttl ?? this.ttl)
+    const expiry = setTimeout(close, options.ttl ?? this.ttl)
 
     try {
       return await fn({ waited })
     }
     finally {
       clearTimeout(expiry)
-      safeClose()
+      close()
     }
   }
 }
