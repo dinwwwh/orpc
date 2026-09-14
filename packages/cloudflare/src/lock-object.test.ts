@@ -38,6 +38,21 @@ describe('durableLockObject', () => {
     return !probe.acquired
   }
 
+  it('returns a socket that is already open, so it is never left connecting', async () => {
+    const response = await createStub().fetch('https://example.com/acquire', {
+      headers: { upgrade: 'websocket' },
+    })
+    const socket = response.webSocket!
+
+    expect(socket.readyState).toBe(WebSocket.OPEN)
+
+    socket.accept()
+    expect(socket.readyState).toBe(WebSocket.OPEN)
+
+    socket.close()
+    expect(socket.readyState).toBe(WebSocket.CLOSING)
+  })
+
   it('grants the first socket right away and hands over to parked sockets in order', async () => {
     const stub = createStub()
 
