@@ -1,5 +1,6 @@
+import type { experimental_DurableLockObject as DurableLockObject } from './lock-object'
 import { sleep } from '@orpc/shared'
-import { evictDurableObject } from 'cloudflare:test'
+import { evictDurableObject, runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -77,6 +78,29 @@ describe('durableLockObject', () => {
 
     holder.release()
     await vi.waitFor(() => expect(second.granted).toHaveBeenCalled())
+  })
+
+  it('skips sockets that are no longer open while handing over', async () => {
+    const stub = createStub()
+    const holder = await connect(stub)
+    const stale = await connect(stub)
+    const waiter = await connect(stub)
+
+    expect(holder.acquired).toBe(true)
+
+    // The runtime still lists a socket while it is closing, which only happens
+    // inside the close event itself, so drive that state directly.
+    await runInDurableObject(stub as unknown as DurableObjectStub<DurableLockObject>, (instance, ctx) => {
+      const [, staleWs, holderWs] = ctx.getWebSockets() // newest first
+
+      staleWs!.close()
+      holderWs!.close()
+
+      instance.webSocketClose(holderWs!)
+    })
+
+    await vi.waitFor(() => expect(waiter.granted).toHaveBeenCalled())
+    expect(stale.granted).not.toHaveBeenCalled()
   })
 
   it('keeps the holder and the parked sockets across evictions', async () => {

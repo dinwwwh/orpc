@@ -1,5 +1,7 @@
+import type { LockOptions } from '@orpc/experimental-lock'
 import { LockTimeoutError } from '@orpc/experimental-lock'
 import { promiseWithResolvers, sleep } from '@orpc/shared'
+import { runInDurableObject } from 'cloudflare:test'
 import { env } from 'cloudflare:workers'
 import { describe, expect, it, vi } from 'vitest'
 import { experimental_DurableLocker as DurableLocker } from './lock'
@@ -20,6 +22,29 @@ describe('durableLocker', () => {
     }
   }
 
+  /**
+   * Holds the lock until `release` is called, and resolves once the callback is running.
+   * `release` resolves with whether the lock was acquired only after waiting.
+   */
+  async function hold(locker: DurableLocker, key = 'key', options?: LockOptions) {
+    const started = promiseWithResolvers<void>()
+    const finished = promiseWithResolvers<void>()
+    const done = locker.lock(key, async ({ waited }) => {
+      started.resolve()
+      await finished.promise
+      return waited
+    }, options)
+
+    await Promise.race([started.promise, done])
+
+    return {
+      release: () => {
+        finished.resolve()
+        return done
+      },
+    }
+  }
+
   it('runs the callback immediately when the lock is free and releases afterwards', async () => {
     const { locker } = createTestingLocker()
     const fn = vi.fn(async () => {
@@ -29,70 +54,43 @@ describe('durableLocker', () => {
 
     await expect(locker.lock('key', fn)).resolves.toBe('ok')
 
-    expect(fn).toHaveBeenCalledTimes(1)
-    expect(fn).toHaveBeenCalledWith({ waited: false })
+    expect(fn).toHaveBeenCalledExactlyOnceWith({ waited: false })
     await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
   })
 
   it('waits for the holder to release', async () => {
     const { locker } = createTestingLocker()
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const order: string[] = []
-
-    const holder = locker.lock('key', async ({ waited }) => {
-      order.push(`first:${waited}`)
-      await release
-      order.push('first:done')
-    })
-
-    await sleep(50)
-
-    const waiter = locker.lock('key', ({ waited }) => {
-      order.push(`second:${waited}`)
-      return 'ok'
-    })
+    const holder = await hold(locker)
+    const fn = vi.fn(({ waited }) => waited)
+    const waiter = locker.lock('key', fn)
 
     await sleep(100)
-    expect(order).toEqual(['first:false'])
+    expect(fn).not.toHaveBeenCalled()
 
-    resolve()
-    await holder
-
-    await expect(waiter).resolves.toBe('ok')
-    expect(order).toEqual(['first:false', 'first:done', 'second:true'])
+    await expect(holder.release()).resolves.toBe(false)
+    await expect(waiter).resolves.toBe(true)
   })
 
   it('shares locks across instances using the same prefix', async () => {
     const { prefix, locker } = createTestingLocker()
     const { locker: other } = createTestingLocker({ prefix })
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const holder = locker.lock('key', () => release)
+    const holder = await hold(locker)
 
-    await sleep(50)
+    await expect(other.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
 
-    const fn = vi.fn()
-    await expect(other.lock('key', fn, { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
-    expect(fn).not.toHaveBeenCalled()
-
-    resolve()
-    await holder
-
+    await holder.release()
     await expect(other.lock('key', () => 'ok')).resolves.toBe('ok')
   })
 
   it('tracks locks independently per key', async () => {
     const { locker } = createTestingLocker()
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const holder = locker.lock('alice', () => release)
-
-    await sleep(50)
-
+    const holder = await hold(locker, 'alice')
     const fn = vi.fn(() => 'bob')
+
     await expect(locker.lock('bob', fn, { timeout: 0 })).resolves.toBe('bob')
     expect(fn).toHaveBeenCalledWith({ waited: false })
 
-    resolve()
-    await holder
+    await holder.release()
   })
 
   it('releases the lock when the callback throws', async () => {
@@ -105,105 +103,57 @@ describe('durableLocker', () => {
     await vi.waitFor(() => expect(locker.lock('key', () => 'ok', { timeout: 0 })).resolves.toBe('ok'))
   })
 
-  it('rejects with LockTimeoutError when the lock is not released in time', async () => {
-    const { locker } = createTestingLocker({ timeout: 200 })
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const holder = locker.lock('key', () => release)
-
-    await sleep(50)
-
-    const fn = vi.fn()
-    const start = Date.now()
-
-    await expect(locker.lock('key', fn)).rejects.toMatchObject({
-      name: 'LockTimeoutError',
-      key: 'key',
-      message: 'Timed out waiting for the lock of key "key"',
-    })
-
-    expect(Date.now() - start).toBeGreaterThanOrEqual(150)
-    expect(fn).not.toHaveBeenCalled()
-
-    resolve()
-    await holder
-  })
-
-  it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
-    const { locker } = createTestingLocker({ ttl: 200 })
-    const { promise: release1, resolve: resolve1 } = promiseWithResolvers<void>()
-    const { promise: release2, resolve: resolve2 } = promiseWithResolvers<void>()
-    const holder1 = locker.lock('key', () => release1)
-
-    await sleep(50)
-
-    const fn = vi.fn(() => release2.then(() => 'ok'))
-    const holder2 = locker.lock('key', fn, { ttl: 10_000 })
-
-    await vi.waitFor(() => expect(fn).toHaveBeenCalledWith({ waited: true }), { timeout: 2000 })
-
-    resolve1()
-    await holder1
-    await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
-
-    resolve2()
-    await expect(holder2).resolves.toBe('ok')
-    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
-  })
-
-  it('aborts waiting when the signal is aborted', async () => {
-    const { locker } = createTestingLocker()
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const holder = locker.lock('key', () => release)
-
-    await sleep(50)
-
-    const controller = new AbortController()
-    const fn = vi.fn()
-    const waiter = locker.lock('key', fn, { signal: controller.signal })
-
-    await sleep(50)
-    controller.abort(new Error('aborted'))
-
-    await expect(waiter).rejects.toThrow('aborted')
-    expect(fn).not.toHaveBeenCalled()
-
-    resolve()
-    await holder
-  })
-
   it.each([
     {
       case: 'gives up immediately',
-      attempt: (locker: DurableLocker) => locker.lock('key', () => 'never', { timeout: 0 }),
+      attempt: (locker: DurableLocker, fn: () => unknown) => locker.lock('key', fn, { timeout: 0 }),
+      rejection: { name: 'LockTimeoutError', key: 'key', message: 'Timed out waiting for the lock of key "key"' },
+      minWait: 0,
     },
     {
       case: 'times out while waiting',
-      attempt: (locker: DurableLocker) => locker.lock('key', () => 'never', { timeout: 100 }),
+      attempt: (locker: DurableLocker, fn: () => unknown) => locker.lock('key', fn, { timeout: 200 }),
+      rejection: { name: 'LockTimeoutError', key: 'key' },
+      minWait: 150,
     },
     {
       case: 'is aborted while waiting',
-      attempt: (locker: DurableLocker) => {
+      attempt: (locker: DurableLocker, fn: () => unknown) => {
         const controller = new AbortController()
         setTimeout(() => controller.abort(new Error('aborted')), 50)
 
-        return locker.lock('key', () => 'never', { signal: controller.signal })
+        return locker.lock('key', fn, { signal: controller.signal })
       },
+      rejection: { message: 'aborted' },
+      minWait: 50,
     },
-  ])('releases the socket of a waiter that $case, so the next waiter still gets the lock', async ({ attempt }) => {
+  ])('releases the socket of a waiter that $case, so the next waiter still gets the lock', async ({ attempt, rejection, minWait }) => {
     const { locker } = createTestingLocker()
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const holder = locker.lock('key', () => release)
+    const holder = await hold(locker)
+    const fn = vi.fn()
+    const start = Date.now()
 
-    await sleep(50)
-    await expect(attempt(locker)).rejects.toThrow()
+    await expect(attempt(locker, fn)).rejects.toMatchObject(rejection)
+    expect(Date.now() - start).toBeGreaterThanOrEqual(minWait)
+    expect(fn).not.toHaveBeenCalled()
 
     const waiter = locker.lock('key', ({ waited }) => waited, { timeout: 1000 })
 
     await sleep(50)
-    resolve()
-    await holder
-
+    await holder.release()
     await expect(waiter).resolves.toBe(true)
+  })
+
+  it('hands the lock over when the ttl expires, and the expired holder cannot release it', async () => {
+    const { locker } = createTestingLocker({ ttl: 200 })
+    const expired = await hold(locker)
+    const next = await hold(locker, 'key', { ttl: 10_000 })
+
+    await expect(expired.release()).resolves.toBe(false)
+    await expect(locker.lock('key', () => 'never', { timeout: 0 })).rejects.toBeInstanceOf(LockTimeoutError)
+
+    await expect(next.release()).resolves.toBe(true)
+    await vi.waitFor(() => expect(locker.lock('key', () => 'again', { timeout: 0 })).resolves.toBe('again'))
   })
 
   it('releases the lock when the ttl expires while the callback is still running', async () => {
@@ -230,23 +180,51 @@ describe('durableLocker', () => {
       } as unknown as DurableObjectStub
     })
     const { locker } = createTestingLocker({ getStubByName })
-    const { promise: release, resolve } = promiseWithResolvers<void>()
-    const holder = locker.lock('key', () => release)
-
-    await sleep(50)
-
+    const holder = await hold(locker)
     const waiter = locker.lock('key', ({ waited }) => waited)
 
     await sleep(300)
     expect(fetch).toHaveBeenCalledTimes(2)
 
-    resolve()
-    await holder
-
+    await holder.release()
     await expect(waiter).resolves.toBe(true)
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
+  it('throws when the object does not return a socket', async () => {
+    const getStubByName = vi.fn(() => ({
+      fetch: async () => new Response(null, { status: 500, statusText: 'Internal Server Error' }),
+    }) as unknown as DurableObjectStub)
+    const { locker } = createTestingLocker({ getStubByName })
+    const fn = vi.fn()
+
+    await expect(locker.lock('key', fn)).rejects.toThrow('Failed to acquire the lock: 500 Internal Server Error')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it('rejects a waiter whose socket the object closes before handing the lock over', async () => {
+    const { prefix, locker } = createTestingLocker()
+    const holder = await hold(locker)
+    const fn = vi.fn()
+    const waiter = locker.lock('key', fn)
+
+    await sleep(50)
+    await runInDurableObject(env.LOCK_DON.getByName(`${prefix}key`), (_, ctx) => {
+      ctx.getWebSockets()[0]!.close() // newest first, so the parked waiter
+    })
+
+    await expect(waiter).rejects.toThrow('The lock durable object closed the socket before handing the lock over')
+    expect(fn).not.toHaveBeenCalled()
+
+    await holder.release()
+  })
+
+  it('uses no prefix when none is provided', async () => {
+    const locker = new DurableLocker(env.LOCK_DON, { ttl: 10_000 })
+    const key = `no-prefix-${crypto.randomUUID()}`
+
+    await expect(locker.lock(key, ({ waited }) => waited)).resolves.toBe(false)
+  })
   it('names the Durable Object after the prefixed key', async () => {
     const getStubByName = vi.fn((namespace, key) => namespace.getByName(key))
     const { prefix, locker } = createTestingLocker({ getStubByName })
