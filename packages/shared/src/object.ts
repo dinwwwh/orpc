@@ -121,7 +121,7 @@ export function set(
 /**
  * Sets `object[key]`, defining `__proto__` as an own property instead of re-parenting the object.
  */
-function setOwn(object: object, key: PropertyKey, value: unknown): void {
+export function setOwn(object: object, key: PropertyKey, value: unknown): void {
   if (key === '__proto__') {
     Object.defineProperty(object, key, {
       value,
