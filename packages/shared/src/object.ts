@@ -81,11 +81,11 @@ export function get(object: unknown, path: readonly PropertyKey[]): unknown {
   let current: unknown = object
 
   for (const key of path) {
-    if (!isTypescriptObject(current) || !Object.hasOwn(current, key)) {
+    if (!isTypescriptObject(current)) {
       return undefined
     }
 
-    current = current[key]
+    current = getOwn(current, key)
   }
 
   return current
@@ -103,7 +103,7 @@ export function set(
 
   for (let i = 0; i < path.length - 1; i++) {
     const key = path[i]!
-    const next = Object.hasOwn(current, key) ? (current as Record<PropertyKey, unknown>)[key] : undefined
+    const next = getOwn(current, key)
 
     if (!isTypescriptObject(next)) {
       const child = {}
