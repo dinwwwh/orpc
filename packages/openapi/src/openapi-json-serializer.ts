@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { isPlainObject, NullProtoObj } from '@orpc/shared'
+import { getOwn, isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
 
 export type OpenAPIJsonSerialization
   = | { json: unknown, maps?: undefined, blobs?: undefined }
@@ -319,7 +319,7 @@ export class OpenAPIJsonSerializer {
         let preSegment: string | number = 'data'
 
         for (let j = 0; j < segments.length; j++) {
-          currentRef = currentRef[preSegment]
+          currentRef = getOwn(currentRef, preSegment)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -327,7 +327,7 @@ export class OpenAPIJsonSerializer {
           }
         }
 
-        currentRef[preSegment] = serialized.blobs[i]
+        setOwn(currentRef, preSegment, serialized.blobs[i])
       }
     }
 

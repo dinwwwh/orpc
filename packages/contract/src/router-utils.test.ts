@@ -195,6 +195,14 @@ describe('getRouterContract', () => {
     expect(getRouterContract('invalid' as any, [])).toBeUndefined()
     expect(getRouterContract('invalid' as any, ['invalid'])).toBeUndefined()
   })
+
+  it('never resolves a segment through the prototype chain', () => {
+    expect(getRouterContract(router, ['__proto__'])).toBeUndefined()
+    expect(getRouterContract(router, ['constructor'])).toBeUndefined()
+    expect(getRouterContract(router, ['constructor', 'prototype'])).toBeUndefined()
+    expect(getRouterContract(router, ['toString'])).toBeUndefined()
+    expect(getRouterContract(router, ['nested', '__proto__', 'ping'])).toBeUndefined()
+  })
 })
 
 describe('getProcedureContractOrThrow', () => {
