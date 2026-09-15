@@ -216,9 +216,7 @@ export class JsonSchemaCoercer {
 
             const propertySchemas = schema.properties
 
-            for (const key in coerced) {
-              const value = coerced[key]
-
+            for (const [key, value] of Object.entries(coerced)) {
               // `properties[key]` alone would resolve keys like `__proto__` to `Object.prototype`
               const subSchema = (propertySchemas !== undefined && Object.hasOwn(propertySchemas, key) ? propertySchemas[key] : undefined)
                 ?? patternProperties.find(([pattern]) => pattern.test(key))?.[1]
