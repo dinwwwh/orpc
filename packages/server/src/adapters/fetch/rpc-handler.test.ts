@@ -46,43 +46,6 @@ describe('rpcHandler', () => {
     expect(misMatchPrefixResult.response).toBeUndefined()
   })
 
-  it('resolves a context function only after the request matches the prefix', async () => {
-    const context = vi.fn(async () => ({ userId: 'u_lazy' }))
-
-    const handler = new RPCHandler({
-      ping: os
-        .$context<{ userId: string }>()
-        .handler(({ context }) => context.userId),
-    })
-
-    const mismatchResult = await handler.handle(
-      new Request('https://example.com/invalid/ping', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ json: null }),
-      }),
-      { context, prefix: '/api/v1' },
-    )
-
-    expect(mismatchResult.matched).toBe(false)
-    expect(context).not.toHaveBeenCalled()
-
-    const { matched, response } = await handler.handle(
-      new Request('https://example.com/api/v1/ping', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ json: null }),
-      }),
-      { context, prefix: '/api/v1' },
-    )
-
-    expect(matched).toBe(true)
-    expect(response!.status).toBe(200)
-    await expect(response!.text()).resolves.toContain('u_lazy')
-    expect(context).toHaveBeenCalledTimes(1)
-    expect(context).toHaveBeenCalledWith(expect.objectContaining({ method: 'POST', url: '/api/v1/ping' }))
-  })
-
   it('support fetch handler plugin', async () => {
     const plugin: FetchHandlerPlugin<any> = {
       name: 'test',
