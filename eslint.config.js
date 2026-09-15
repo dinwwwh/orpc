@@ -11,6 +11,7 @@ export default antfu({
     'pnpm/yaml-enforce-settings': 'off',
     'yaml/sort-keys': 'off',
     'jsdoc/no-defaults': 'off',
+    'guard-for-in': 'error',
   },
 }, {
   plugins: { ban: pluginBan },
