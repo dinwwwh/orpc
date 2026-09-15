@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { get, getOwn, isPlainObject, setOwn, toArray, tryOrUndefined } from '@orpc/shared'
+import { get, getOwn, isPlainObject, toArray, tryOrUndefined } from '@orpc/shared'
 import { decodeJsonPointerSegment } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
@@ -204,7 +204,7 @@ export class JsonSchemaCoercer {
 
           if (isPlainObject(coerced)) {
             let shouldUseCoercedItems = false
-            // copy so the input is never mutated
+            // copy here so special keys like `__proto__` are kept as own properties
             const coercedItems = { ...coerced }
 
             const patternProperties = Object.entries(schema.patternProperties ?? {})
@@ -229,7 +229,7 @@ export class JsonSchemaCoercer {
                 }
                 else {
                   const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, value)
-                  setOwn(coercedItems, key, subCoerced)
+                  coercedItems[key] = subCoerced
 
                   satisfied = minSatisfaction(satisfied, subSatisfied)
 

@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { getOwn, isPlainObject, NullProtoObj, setOwn } from '@orpc/shared'
+import { isPlainObject, NullProtoObj } from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
 export type RPCJsonSerialization
@@ -383,7 +383,7 @@ export class RPCJsonSerializer {
         let preSegment: string | number = 'data'
 
         for (let j = 0; j < segments.length; j++) {
-          currentRef = getOwn(currentRef, preSegment)
+          currentRef = currentRef[preSegment]
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -391,7 +391,7 @@ export class RPCJsonSerializer {
           }
         }
 
-        setOwn(currentRef, preSegment, serialized.blobs[i])
+        currentRef[preSegment] = serialized.blobs[i]
       }
     }
 
@@ -403,7 +403,7 @@ export class RPCJsonSerializer {
         let preSegment: string | number = 'data'
 
         for (let i = 1; i < item.length; i++) {
-          currentRef = getOwn(currentRef, preSegment)
+          currentRef = currentRef[preSegment]
           preSegment = item[i]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -411,7 +411,7 @@ export class RPCJsonSerializer {
           }
         }
 
-        setOwn(currentRef, preSegment, this.handlers[type]!.deserialize(getOwn(currentRef, preSegment)))
+        currentRef[preSegment] = this.handlers[type]!.deserialize(currentRef[preSegment])
       }
     }
 
