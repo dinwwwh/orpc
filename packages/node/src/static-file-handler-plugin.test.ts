@@ -928,8 +928,10 @@ describe('staticFileHandlerPlugin', () => {
 
   describe('tracing', () => {
     it('renames the active span to the mounted base path', async ({ onTestFinished }) => {
-      const span = { updateName: vi.fn(), setAttribute: vi.fn() }
+      const span = { updateName: vi.fn(), setAttribute: vi.fn(), recordException: vi.fn(), end: vi.fn() }
       const spy = vi.spyOn(sharedModule, 'getTracer').mockReturnValue({
+        startSpan: () => span,
+        withActiveSpan: (_: unknown, fn: () => unknown) => fn(),
         getActiveSpan: () => span,
       } as any)
       onTestFinished(() => spy.mockRestore())
