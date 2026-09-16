@@ -8,6 +8,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { Observable } from 'rxjs'
 import type { NestStandardLazyRequest, ORPCModuleConfig } from './module'
 import { Readable } from 'node:stream'
+import * as NestCommon from '@nestjs/common'
 import { applyDecorators, Delete, Get, Head, HttpCode, HttpException, Inject, Injectable, Optional, Options, Patch, Post, Put, StreamableFile, UseInterceptors } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { getPathMeta, ProcedureContract } from '@orpc/contract'
@@ -21,6 +22,9 @@ import { toEventStream, toStandardLazyRequest } from '@standard-server/node'
 import { mergeMap } from 'rxjs'
 
 import { ORPC_MODULE_CONFIG_SYMBOL } from './module'
+
+// Namespace access so NestJS < 11.2 (no QueryMethod export) loads without a SyntaxError
+const QueryMethod = NestCommon.QueryMethod as typeof NestCommon.QueryMethod | undefined
 
 const MethodDecoratorMap = {
   HEAD: Head,
@@ -40,6 +44,7 @@ const MethodDecoratorMap = {
  * @remarks
  * **Note**: Every procedure contract must define an `openapi.path` meta;
  * use `populateRouterContractOpenAPIPaths` from `@orpc/openapi` to fill in missing paths.
+ * **Note**: The HTTP `QUERY` method requires NestJS v11.2+ (`QueryMethod`). Older NestJS versions throw; use `GET` instead.
  *
  * @see {@link https://orpc.dev/docs/integrations/nest#implement-your-contract | Implement oRPC contract with NestJS - Implement Your Contract}
  */
@@ -84,10 +89,17 @@ function toNestRouteDecorator(contract: AnyProcedureContract): MethodDecorator {
   const successStatus = meta.successStatus ?? DEFAULT_SUCCESS_STATUS
 
   if (method === 'QUERY') {
-    throw new TypeError(`
-      @Implement decorator does not support the 'QUERY' HTTP method because NestJS does not support it.
-      Use the 'GET' method instead.
-    `)
+    if (!QueryMethod) {
+      throw new TypeError(`
+        @Implement decorator does not support the 'QUERY' HTTP method because the installed version of NestJS does not support it.
+        The 'QUERY' HTTP method requires NestJS v11.2 or later. Alternatively, use 'GET' method.
+      `)
+    }
+
+    return applyDecorators(
+      QueryMethod(path),
+      HttpCode(successStatus),
+    )
   }
 
   return applyDecorators(
