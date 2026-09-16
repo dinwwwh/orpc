@@ -19,7 +19,7 @@ export interface RateLimitMiddlewareContext {
 
 export interface RateLimitMiddlewareOptions<
   TInContext extends Context,
-  TInput,
+  TInput = unknown,
 > {
   /**
    * The rule set to use for rate limiting
@@ -58,7 +58,7 @@ export interface RateLimitMiddlewareOptions<
  */
 export function ratelimit<
   TInContext extends Context,
-  TInput,
+  TInput = unknown,
 >(
   { dedupe = true, ...options }: RateLimitMiddlewareOptions<TInContext, TInput>,
 ): Middleware<TInContext, object, TInput, any, object> {
