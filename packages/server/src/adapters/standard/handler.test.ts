@@ -433,7 +433,8 @@ describe('standardHandler', () => {
       span = createSpan()
       tracer = {
         startSpan: vi.fn(() => span),
-        startActiveSpan: vi.fn((_name, _parent, fn) => fn(createSpan())),
+        // the request span is the first active span started
+        startActiveSpan: vi.fn((_name, _parent, fn) => fn(createSpan())).mockImplementationOnce((_name, _parent, fn) => fn(span)),
         withActiveSpan: vi.fn((_span, fn) => fn()),
         getActiveSpan: () => span,
         extract: vi.fn(),
@@ -476,8 +477,9 @@ describe('standardHandler', () => {
       await expect(handler.handle(request, OPTIONS)).resolves.toEqual({ matched: false })
 
       expect(tracer.extract).toHaveBeenCalledWith(request.headers)
-      expect(tracer.startSpan).toHaveBeenCalledExactlyOnceWith('POST /api/v1/ping', parent)
-      expect(tracer.withActiveSpan).toHaveBeenCalledExactlyOnceWith(span, expect.any(Function))
+      expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', parent, expect.any(Function))
+      expect(tracer.startSpan).not.toHaveBeenCalled()
+      expect(tracer.withActiveSpan).not.toHaveBeenCalled()
       expect(tracer.startActiveSpan).toHaveBeenCalledWith('find_procedure', undefined, expect.any(Function))
       expect(span.updateName).toHaveBeenCalledWith('orpc_no_match')
       expect(span.recordException).not.toHaveBeenCalled()
@@ -490,7 +492,7 @@ describe('standardHandler', () => {
 
       await handler.handle(makeRequest(), OPTIONS)
 
-      expect(tracer.startSpan).toHaveBeenCalledExactlyOnceWith('POST /api/v1/ping', undefined)
+      expect(tracer.startActiveSpan).toHaveBeenNthCalledWith(1, 'POST /api/v1/ping', undefined, expect.any(Function))
     })
 
     it('ends the request span right away for a non-streaming body', async () => {
