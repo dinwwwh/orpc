@@ -155,25 +155,6 @@ const handler = new OpenAPIHandler(router, {
 })
 ```
 
-### Adapter Interceptors
-
-Some `OpenAPIHandler` implementations, such as fetch or node adapters, also support adapter interceptors. These run before [Routing Interceptors](#routing-interceptors) and let you work with the adapter's native request and response objects.
-
-```ts
-const handler = new OpenAPIHandler(router, {
-  fetchInterceptors: [
-    async ({ next, request }) => {
-      const { matched, response } = await next()
-      return { matched, response }
-    },
-  ],
-})
-```
-
-:::info
-This example uses the fetch adapter. For other adapters, refer to their JSDoc or adapter-specific documentation.
-:::
-
 ## Plugins
 
 Plugins package reusable interceptors. For example, [CORS Plugin](/docs/plugins/cors) adds a [routing interceptor](#routing-interceptors) to handle preflight requests and adds CORS headers to every response.
@@ -339,7 +320,6 @@ sequenceDiagram
   participant Procedure as Server-Side Procedure Client
 
   Client ->> Adapter: request
-  Note over Adapter: adapter interceptors (e.g. fetchInterceptors)
   Adapter ->> Handler: standard request
   Note over Handler: routingInterceptors
   Handler ->> Handler: find matching procedure
