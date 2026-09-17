@@ -223,13 +223,73 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
            */
           const [pathname] = parseStandardUrl(request.url)
 
-          /**
-           * Started as the active span because some backends cannot activate an existing span.
-           */
           return tracer.startActiveSpan(`${request.method} ${pathname}`, parent, async (span) => {
-            let result: StandardHandlerHandleResult
             try {
-              result = await next()
+              const result = await next()
+
+              if (!result.matched) {
+                span.end()
+                return result
+              }
+
+              const body = result.response.body
+              if (isAsyncIteratorObject(body)) {
+                return {
+                  ...result,
+                  response: {
+                    ...result.response,
+                    /**
+                     * @remarks
+                     * **Warning**: Remember use `override` for remaining special properties
+                     */
+                    body: override(body, wrapAsyncIterator(body, {
+                      runWith: fn => tracer.withActiveSpan(span, fn),
+                      onError(error) {
+                        /**
+                         * Errors here are internal (interceptor/framework) failures,
+                         * except `ErrorEvent`: a business error the protocol delivers
+                         * inside the event stream, already logged by the client interceptor.
+                         */
+                        if (!(error instanceof ErrorEvent)) {
+                          span.recordException('error', toTracingException(error))
+                        }
+                      },
+                      onFinish() {
+                        span.end()
+                      },
+                    })),
+                  },
+                }
+              }
+
+              if (body instanceof ReadableStream) {
+                return {
+                  ...result,
+                  response: {
+                    ...result.response,
+                    /**
+                     * @remarks
+                     * **Warning**: Remember use `override` for remaining special properties
+                     */
+                    body: override(body, wrapReadableStream(body, {
+                      runWith: fn => tracer.withActiveSpan(span, fn),
+                      onError(error) {
+                        /**
+                         * Any error here is internal (interceptor/framework), not business logic.
+                         * Indicates unexpected handler failure.
+                         */
+                        span.recordException('error', toTracingException(error))
+                      },
+                      onFinish() {
+                        span.end()
+                      },
+                    })),
+                  },
+                }
+              }
+
+              span.end()
+              return result
             }
             catch (e) {
               /**
@@ -240,70 +300,6 @@ export class TracingHandlerPlugin implements StandardHandlerPlugin<any> {
               span.end()
               throw e
             }
-
-            if (!result.matched) {
-              span.end()
-              return result
-            }
-
-            const body = result.response.body
-            if (isAsyncIteratorObject(body)) {
-              return {
-                ...result,
-                response: {
-                  ...result.response,
-                  /**
-                   * @remarks
-                   * **Warning**: Remember use `override` for remaining special properties
-                   */
-                  body: override(body, wrapAsyncIterator(body, {
-                    runWith: fn => tracer.withActiveSpan(span, fn),
-                    onError(error) {
-                      /**
-                       * Errors here are internal (interceptor/framework) failures,
-                       * except `ErrorEvent`: a business error the protocol delivers
-                       * inside the event stream, already logged by the client interceptor.
-                       */
-                      if (!(error instanceof ErrorEvent)) {
-                        span.recordException('error', toTracingException(error))
-                      }
-                    },
-                    onFinish() {
-                      span.end()
-                    },
-                  })),
-                },
-              }
-            }
-
-            if (body instanceof ReadableStream) {
-              return {
-                ...result,
-                response: {
-                  ...result.response,
-                  /**
-                   * @remarks
-                   * **Warning**: Remember use `override` for remaining special properties
-                   */
-                  body: override(body, wrapReadableStream(body, {
-                    runWith: fn => tracer.withActiveSpan(span, fn),
-                    onError(error) {
-                      /**
-                       * Any error here is internal (interceptor/framework), not business logic.
-                       * Indicates unexpected handler failure.
-                       */
-                      span.recordException('error', toTracingException(error))
-                    },
-                    onFinish() {
-                      span.end()
-                    },
-                  })),
-                },
-              }
-            }
-
-            span.end()
-            return result
           })
         },
         ...toArray(options.routingInterceptors),
