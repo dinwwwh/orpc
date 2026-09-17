@@ -109,7 +109,11 @@ export class PrototypePollutionProtectionHandlerPlugin<T extends Context> implem
         return true
       }
 
-      for (const key of Object.keys(value)) {
+      for (const key in value) {
+        if (!Object.hasOwn(value, key)) {
+          continue
+        }
+
         stack.push(value[key])
       }
     }

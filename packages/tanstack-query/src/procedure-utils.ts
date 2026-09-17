@@ -199,7 +199,7 @@ export function isProcedureUtilsOptions(value: unknown): value is ProcedureUtils
   }
 
   for (const key in value) {
-    if (value[key] === undefined) {
+    if (!Object.hasOwn(value, key) || value[key] === undefined) {
       continue
     }
 

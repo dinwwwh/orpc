@@ -54,7 +54,11 @@ export class OpenAPIComponentRegistry {
     const defs: Record<string, Exclude<JsonSchema, boolean>> = {}
     const preferredNames: Record<string, string> = {}
 
-    for (const defName of Object.keys($defs)) {
+    for (const defName in $defs) {
+      if (!Object.hasOwn($defs, defName)) {
+        continue
+      }
+
       const defSchema = $defs[defName]
 
       if (defSchema === undefined) {

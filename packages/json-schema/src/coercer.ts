@@ -216,7 +216,13 @@ export class JsonSchemaCoercer {
 
             const propertySchemas: Record<string, JsonSchema> = schema.properties ?? {}
 
-            for (const [key, value] of Object.entries(coerced)) {
+            for (const key in coerced) {
+              if (!Object.hasOwn(coerced, key)) {
+                continue
+              }
+
+              const value = coerced[key]
+
               const subSchema = getOwn(propertySchemas, key)
                 ?? patternProperties.find(([pattern]) => pattern.test(key))?.[1]
                 ?? schema.additionalProperties

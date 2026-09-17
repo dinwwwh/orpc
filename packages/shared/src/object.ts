@@ -20,8 +20,12 @@ export function findDeepMatches(
     })
   }
   else if (isPlainObject(payload)) {
-    for (const [key, value] of Object.entries(payload)) {
-      findDeepMatches(check, value, [...segments, key], maps, values)
+    for (const key in payload) {
+      if (!Object.hasOwn(payload, key)) {
+        continue
+      }
+
+      findDeepMatches(check, payload[key], [...segments, key], maps, values)
     }
   }
 
@@ -148,7 +152,7 @@ export function mergeTwoLevels(first: unknown, second: unknown): unknown {
   const result: Record<PropertyKey, unknown> = { ...first, ...second }
 
   for (const key in second) {
-    if (!Object.hasOwn(first, key)) {
+    if (!Object.hasOwn(second, key) || !Object.hasOwn(first, key)) {
       continue
     }
 
@@ -211,8 +215,12 @@ function cloneWithVisited(value: unknown, visited: WeakMap<object, unknown>): un
     visited.set(value, result)
 
     // Use setOwn so special keys like __proto__ don't re-parent the result.
-    for (const [key, item] of Object.entries(value)) {
-      setOwn(result, key, cloneWithVisited(item, visited))
+    for (const key in value) {
+      if (!Object.hasOwn(value, key)) {
+        continue
+      }
+
+      setOwn(result, key, cloneWithVisited(value[key], visited))
     }
 
     for (const sym of Object.getOwnPropertySymbols(value)) {

@@ -381,6 +381,12 @@ describe('mergeTwoLevels', () => {
       own: { b: 2, d: 4 },
     })
   })
+
+  it('ignores inherited values of the second object', () => {
+    const second = Object.create(Object.assign(Object.create(null), { shared: { c: 3 } }))
+
+    expect(mergeTwoLevels({ shared: { a: 1 } }, second)).toEqual({ shared: { a: 1 } })
+  })
 })
 
 describe('omit', () => {
