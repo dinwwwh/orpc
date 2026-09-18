@@ -71,11 +71,7 @@ export function resolveBasePathMeta(contract: RouterContract, currentPath: strin
   }
 
   if (isTypescriptObject(contract)) {
-    for (const key in contract) {
-      if (!Object.hasOwn(contract, key)) {
-        continue
-      }
-
+    for (const key of Object.keys(contract)) {
       const base = resolveBasePathMeta(contract[key]!, [...currentPath, key])
 
       if (base !== undefined) {

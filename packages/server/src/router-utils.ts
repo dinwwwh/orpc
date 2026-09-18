@@ -333,11 +333,7 @@ export async function unlazyRouter<T extends AnyRouter>(router: T): Promise<Unla
 
   const unlazied = {} as Record<string, any>
 
-  for (const key in router) {
-    if (!Object.hasOwn(router, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(router)) {
     const item: Lazyable<AnyRouter> = router[key]!
 
     const { default: unlaziedRouter } = await unlazy(item)

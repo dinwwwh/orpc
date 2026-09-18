@@ -160,11 +160,7 @@ export class OpenAPIJsonSerializer {
     let inlineBuiltInHandlers = true
     let handlerEntries: OpenAPIJsonSerializerHandler[] = []
 
-    for (const key in customHandlers) {
-      if (!Object.hasOwn(customHandlers, key)) {
-        continue
-      }
-
+    for (const key of Object.keys(customHandlers)) {
       const handler = customHandlers[key]
 
       if (inlineBuiltInHandlers && key in DEFAULT_OPEN_API_JSON_SERIALIZER_HANDLERS) {
@@ -286,11 +282,7 @@ export class OpenAPIJsonSerializer {
     if (isPlainObject(data)) {
       const json: Record<string, unknown> = new NullProtoObj()
 
-      for (const k in data) {
-        if (!Object.hasOwn(data, k)) {
-          continue
-        }
-
+      for (const k of Object.keys(data)) {
         const v = data[k]
         /**
          * Skip custom toJSON methods to avoid JSON.stringify invoking them,

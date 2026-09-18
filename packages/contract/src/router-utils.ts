@@ -51,11 +51,7 @@ export function augmentContractRouter<T extends RouterContract, TErrorMap extend
 
   const enhanced: Record<string, any> = {}
 
-  for (const key in router) {
-    if (!Object.hasOwn(router, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(router)) {
     enhanced[key] = augmentContractRouter(router[key]!, options)
   }
 
@@ -123,11 +119,7 @@ export function minifyRouterContract(router: RouterContract): RouterContract {
 
   const json: Record<string, RouterContract> = {}
 
-  for (const key in router) {
-    if (!Object.hasOwn(router, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(router)) {
     json[key] = minifyRouterContract(router[key]!)
   }
 

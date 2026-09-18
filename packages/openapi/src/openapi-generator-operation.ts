@@ -452,11 +452,7 @@ export function buildErrorResponse(
 ): void {
   const definitionsByStatus = new Map<number, OpenAPIErrorBodyDefinition[]>()
 
-  for (const code in def.errorMap) {
-    if (!Object.hasOwn(def.errorMap, code)) {
-      continue
-    }
-
+  for (const code of Object.keys(def.errorMap)) {
     const config = def.errorMap[code]
     if (!config) {
       continue

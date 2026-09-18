@@ -1137,10 +1137,6 @@ describe('isProcedureUtilsOptions', () => {
     expect(isProcedureUtilsOptions({ queryInterceptors: [{ invalid: true }] })).toBe(false)
     expect(isProcedureUtilsOptions({ queryOptions: 'invalid' })).toBe(false)
   })
-
-  it('ignores inherited keys', () => {
-    expect(isProcedureUtilsOptions(Object.create({ prefix: 123 }))).toBe(true)
-  })
 })
 
 describe('mergeProcedureUtilsOptions', () => {

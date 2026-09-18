@@ -48,11 +48,7 @@ export function visitJsonSchemaRefs(
     return
   }
 
-  for (const key in value) {
-    if (!Object.hasOwn(value, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(value)) {
     const val = value[key]
     if (key === '$ref' && typeof val === 'string') {
       visit(val)
@@ -81,11 +77,7 @@ export function mapJsonSchemaRefs(
   }
 
   const result: Record<string, unknown> = {}
-  for (const key in value) {
-    if (!Object.hasOwn(value, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(value)) {
     const val = value[key]
     if (key === '$ref' && typeof val === 'string') {
       result[key] = map(val, [...path, key])

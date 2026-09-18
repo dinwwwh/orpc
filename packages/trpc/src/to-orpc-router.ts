@@ -43,11 +43,7 @@ export function toORPCRouter<T extends AnyRouter>(
 > {
   const result = recordToORPCRouterRecord(router._def.record)
 
-  for (const key in router._def.lazy) {
-    if (!Object.hasOwn(router._def.lazy, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(router._def.lazy)) {
     const item = router._def.lazy[key]!
 
     set(result, key.split('.') as [string, ...string[]], new ORPC.Lazy({
@@ -65,11 +61,7 @@ export function toORPCRouter<T extends AnyRouter>(
 function recordToORPCRouterRecord(records: AnyRouter['_def']['record']) {
   const orpcRouter: Record<string, any> = {}
 
-  for (const key in records) {
-    if (!Object.hasOwn(records, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(records)) {
     const item = records[key]
 
     if (typeof item === 'function') {

@@ -231,11 +231,7 @@ export class ImplementInterceptor implements NestInterceptor {
 
         httpAdapter.status(res, result.response.status)
 
-        for (const key in result.response.headers) {
-          if (!Object.hasOwn(result.response.headers, key)) {
-            continue
-          }
-
+        for (const key of Object.keys(result.response.headers)) {
           const value = result.response.headers[key]
           if (typeof value === 'string') {
             httpAdapter.setHeader(res, key, value)
@@ -331,11 +327,7 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
   // express use `path` while fastify use `*` for rest matching
   const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
 
-  for (const key in params) {
-    if (!Object.hasOwn(params, key)) {
-      continue
-    }
-
+  for (const key of Object.keys(params)) {
     const value = params[key]!
 
     if (key === restKey) {

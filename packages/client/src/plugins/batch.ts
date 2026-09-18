@@ -139,11 +139,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       const headersList = options.map(o => o.request.headers)
       const commonHeaders: StandardHeaders = {}
       for (const headers of headersList) {
-        for (const key in headers) {
-          if (!Object.hasOwn(headers, key)) {
-            continue
-          }
-
+        for (const key of Object.keys(headers)) {
           const value = headers[key]
           if (headersList.every(h => h[key] === value)) {
             commonHeaders[key] = value
@@ -155,11 +151,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     })
     this.mapSubrequest = options.mapSubrequest ?? (({ request }, { headers }) => {
       const subHeaders = { ...request.headers }
-      for (const key in headers) {
-        if (!Object.hasOwn(headers, key)) {
-          continue
-        }
-
+      for (const key of Object.keys(headers)) {
         const value = headers[key]
         if (subHeaders[key] === value) {
           subHeaders[key] = undefined
