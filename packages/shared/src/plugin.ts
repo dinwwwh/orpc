@@ -11,9 +11,6 @@ export interface OrderablePlugin {
 
 /**
  * Sorts plugins based on their `before` and `after` dependencies.
- *
- * The sort is stable: plugins keep their registration order unless a
- * `before` or `after` constraint forces them to move.
  */
 export function sortPlugins<T extends OrderablePlugin>(
   plugins: T[],
@@ -34,97 +31,64 @@ export function sortPlugins<T extends OrderablePlugin>(
     }
   }
 
-  const dependencies: Array<Set<number>> = Array.from(
-    { length: pluginCount },
-    () => new Set<number>(),
-  )
+  const dependencies: number[][] = Array.from({ length: pluginCount }, () => [])
 
   for (let i = 0; i < pluginCount; i++) {
     const plugin = plugins[i]!
 
-    const beforeList = plugin.before
-    if (beforeList !== undefined) {
-      for (const beforeId of beforeList) {
+    if (plugin.before !== undefined) {
+      for (const beforeId of plugin.before) {
         const beforeIndices = pluginIdToIndices.get(beforeId)
-        if (beforeIndices === undefined)
-          continue
 
-        for (const beforeIndex of beforeIndices) {
-          dependencies[beforeIndex]!.add(i)
+        if (beforeIndices !== undefined) {
+          for (const beforeIndex of beforeIndices) {
+            dependencies[beforeIndex]!.push(i)
+          }
         }
       }
     }
 
-    const afterList = plugin.after
-    if (afterList !== undefined) {
-      for (const afterId of afterList) {
+    if (plugin.after !== undefined) {
+      for (const afterId of plugin.after) {
         const afterIndices = pluginIdToIndices.get(afterId)
-        if (afterIndices === undefined)
-          continue
 
-        for (const afterIndex of afterIndices) {
-          dependencies[i]!.add(afterIndex)
+        if (afterIndices !== undefined) {
+          for (const afterIndex of afterIndices) {
+            dependencies[i]!.push(afterIndex)
+          }
         }
       }
     }
   }
 
   const sorted: T[] = []
-  const placed: boolean[] = Array.from({ length: pluginCount }).fill(false) as boolean[]
+  const placed = new Set<number>()
 
   while (sorted.length < pluginCount) {
-    let next = -1
-
-    for (let i = 0; i < pluginCount; i++) {
-      if (placed[i])
-        continue
-
-      let ready = true
-      for (const dependency of dependencies[i]!) {
-        if (!placed[dependency]) {
-          ready = false
-          break
-        }
-      }
-
-      if (ready) {
-        next = i
-        break
-      }
-    }
+    const next = plugins.findIndex((_, i) => !placed.has(i) && dependencies[i]!.every(dependency => placed.has(dependency)))
 
     if (next === -1) {
       throw new Error(`Circular dependency detected involving plugin "${findCyclicPlugin(plugins, dependencies, placed).name}"`)
     }
 
-    placed[next] = true
+    placed.add(next)
     sorted.push(plugins[next]!)
   }
 
   return sorted
 }
 
-/**
- * Every unplaced plugin either sits on a cycle or depends on one, so walking
- * unplaced dependencies from any of them eventually revisits a cycle member.
- */
 function findCyclicPlugin<T extends OrderablePlugin>(
   plugins: T[],
-  dependencies: Array<Set<number>>,
-  placed: boolean[],
+  dependencies: number[][],
+  placed: Set<number>,
 ): T {
   const seen = new Set<number>()
-  let current = placed.indexOf(false)
+  let current = plugins.findIndex((_, i) => !placed.has(i))
 
   while (!seen.has(current)) {
     seen.add(current)
-
-    for (const dependency of dependencies[current]!) {
-      if (!placed[dependency]) {
-        current = dependency
-        break
-      }
-    }
+    current = dependencies[current]!.find(dependency => !placed.has(dependency))!
   }
 
   return plugins[current]!

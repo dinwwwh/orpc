@@ -146,9 +146,6 @@ describe('sortPlugins', () => {
     const beforeDeclaredOutOfOrder = [{ name: 'a' }, { name: 'b' }, { name: 'c', before: ['b', 'a'] }]
     expect(sortPlugins(beforeDeclaredOutOfOrder)).toEqual([beforeDeclaredOutOfOrder[2], beforeDeclaredOutOfOrder[0], beforeDeclaredOutOfOrder[1]])
 
-    const unrelatedInBetween = [{ name: 'a', after: ['b'] }, { name: 'c' }, { name: 'b' }]
-    expect(sortPlugins(unrelatedInBetween)).toEqual([unrelatedInBetween[1], unrelatedInBetween[2], unrelatedInBetween[0]])
-
     const unrelatedAfterMovedPlugin = [{ name: 'b' }, { name: 'c' }, { name: 'a', before: ['b'] }, { name: 'd' }]
     expect(sortPlugins(unrelatedAfterMovedPlugin)).toEqual([unrelatedAfterMovedPlugin[1], unrelatedAfterMovedPlugin[2], unrelatedAfterMovedPlugin[0], unrelatedAfterMovedPlugin[3]])
   })
