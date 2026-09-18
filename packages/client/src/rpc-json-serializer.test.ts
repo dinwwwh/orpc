@@ -408,11 +408,32 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it.each(['nonexistent', '__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty', 'valueOf'])('never resolves the meta type "%s" through the prototype chain', (type) => {
-    expect(() => serializer.deserialize({ json: 1, meta: [[type]] })).toThrow()
+    expect(() => serializer.deserialize({ json: 1, meta: [[type]] }))
+      .toThrow(`Security error: Invalid serialized data. Type "${type}" is not supported.`)
   })
 
   it('throws instead of producing garbage for corrupted built-in payloads', () => {
     expect(() => serializer.deserialize({ json: 'not-a-bigint', meta: [['bigint']] })).toThrow()
+  })
+
+  it.each([
+    ['undefined', 'null', ['text', 1, true, [], {}]],
+    ['nan', 'null', ['text', 1, true, [], {}]],
+    ['bigint', 'a string', [null, 1, true, [], {}]],
+    ['url', 'a string', [null, 1, true, [], {}]],
+    ['date', 'a string or null', [1, true, [], {}]],
+    ['set', 'an array', [null, 'text', 1, true, {}]],
+    ['map', 'an array', [null, 'text', 1, true, {}]],
+  ])('%s rejects mistyped serialized values', (type, expected, rejected) => {
+    for (const value of rejected) {
+      expect(() => serializer.deserialize({ json: { value }, meta: [[type, 'value']] }))
+        .toThrow(`Security error: Invalid serialized data. Type "${type}" expects ${expected}.`)
+    }
+  })
+
+  it('rejects a value already restored by an earlier meta entry', () => {
+    expect(() => serializer.deserialize({ json: { value: '1' }, meta: [['bigint', 'value'], ['url', 'value']] }))
+      .toThrow('Security error: Invalid serialized data. Type "url" expects a string.')
   })
 
   /* eslint-disable no-proto, no-restricted-properties */
