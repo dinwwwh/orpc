@@ -70,7 +70,7 @@ const serializer = new RPCSerializer({
     date: { // <- replace the default Date handler
       condition: v => v instanceof Date,
       serialize: (v: Date) => v.getTime(),
-      deserialize: v => new Date(v),
+      deserialize: v => new Date(z.number().parse(v)),
     },
   },
 })

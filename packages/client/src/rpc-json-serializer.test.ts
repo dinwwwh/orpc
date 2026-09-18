@@ -71,12 +71,12 @@ describe.each([
       person: {
         condition: data => data instanceof Person,
         serialize: data => data.toJSON(),
-        deserialize: data => new Person(data.name, data.date),
+        deserialize: (data: any) => new Person(data.name, data.date),
       },
       person2: {
         condition: data => data instanceof Person2,
         serialize: data => data.toJSON(),
-        deserialize: data => new Person2(data.name, data.data),
+        deserialize: (data: any) => new Person2(data.name, data.data),
       },
     },
   })
@@ -281,7 +281,7 @@ describe('rpcJsonSerializer: custom handlers', () => {
         person: {
           condition: data => data instanceof Person,
           serialize: (data: Person) => data.toJSON(),
-          deserialize: data => new Person(data.name, data.date),
+          deserialize: (data: any) => new Person(data.name, data.date),
         },
       },
     })
