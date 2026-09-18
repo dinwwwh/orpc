@@ -50,7 +50,7 @@ export async function fetch(request: Request) {
 :::
 
 :::tip
-`context` also accepts an sync or async function, that receives the standard request. The handler only calls it once the request matches `prefix`, so work such as loading a session is skipped for requests that other routes serve:
+`context` also accepts a sync or async function that receives the standard request. The handler only calls it once the request matches `prefix`, so work such as loading a session is skipped for requests that other routes serve:
 
 ```ts
 const { matched, response } = await handler.handle(request, {
