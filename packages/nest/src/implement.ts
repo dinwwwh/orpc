@@ -327,9 +327,7 @@ function toORPCOpenAPIParams(contract: AnyProcedureContract, params: NestStandar
   // express use `path` while fastify use `*` for rest matching
   const restKey = Object.hasOwn(params, '*') ? '*' : 'path'
 
-  for (const key of Object.keys(params)) {
-    const value = params[key]!
-
+  for (const [key, value] of Object.entries(params)) {
     if (key === restKey) {
       const restParams = getDynamicPathParams(
         meta.prefix ? mergeHttpPath(meta.prefix, meta.path) : meta.path,

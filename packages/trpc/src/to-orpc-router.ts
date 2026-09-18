@@ -43,9 +43,7 @@ export function toORPCRouter<T extends AnyRouter>(
 > {
   const result = recordToORPCRouterRecord(router._def.record)
 
-  for (const key of Object.keys(router._def.lazy)) {
-    const item = router._def.lazy[key]!
-
+  for (const [key, item] of Object.entries(router._def.lazy)) {
     set(result, key.split('.') as [string, ...string[]], new ORPC.Lazy({
       meta: {},
       loader: async () => {

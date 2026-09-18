@@ -119,8 +119,8 @@ export function minifyRouterContract(router: RouterContract): RouterContract {
 
   const json: Record<string, RouterContract> = {}
 
-  for (const key of Object.keys(router)) {
-    json[key] = minifyRouterContract(router[key]!)
+  for (const [key, child] of Object.entries(router)) {
+    json[key] = minifyRouterContract(child)
   }
 
   return json
