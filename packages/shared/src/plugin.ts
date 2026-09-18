@@ -36,15 +36,27 @@ export function sortPlugins<T extends OrderablePlugin>(
   for (let i = 0; i < pluginCount; i++) {
     const plugin = plugins[i]!
 
-    for (const beforeId of plugin.before ?? []) {
-      for (const beforeIndex of pluginIdToIndices.get(beforeId) ?? []) {
-        dependencies[beforeIndex]!.push(i)
+    if (plugin.before !== undefined) {
+      for (const beforeId of plugin.before) {
+        const beforeIndices = pluginIdToIndices.get(beforeId)
+
+        if (beforeIndices !== undefined) {
+          for (const beforeIndex of beforeIndices) {
+            dependencies[beforeIndex]!.push(i)
+          }
+        }
       }
     }
 
-    for (const afterId of plugin.after ?? []) {
-      for (const afterIndex of pluginIdToIndices.get(afterId) ?? []) {
-        dependencies[i]!.push(afterIndex)
+    if (plugin.after !== undefined) {
+      for (const afterId of plugin.after) {
+        const afterIndices = pluginIdToIndices.get(afterId)
+
+        if (afterIndices !== undefined) {
+          for (const afterIndex of afterIndices) {
+            dependencies[i]!.push(afterIndex)
+          }
+        }
       }
     }
   }
