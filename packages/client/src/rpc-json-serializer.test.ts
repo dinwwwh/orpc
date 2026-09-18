@@ -37,8 +37,8 @@ const customSupportedDataTypes: { name: string, value: unknown, expected: unknow
   },
   {
     name: 'person - 2',
-    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
-    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, /uic/gi]),
+    value: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://orpc.dev')]),
+    expected: new Person2('dinwwwh - 2', [{ nested: new Date('2023-01-02') }, new URL('https://orpc.dev')]),
   },
   {
     name: 'should not resolve toJSON',
@@ -110,7 +110,6 @@ describe.each([
   it('complex', () => {
     assert({
       'date': new Date('2023-01-01'),
-      'regexp': /uic/gi,
       'url': new URL('https://dinwwwh.com'),
       '!@#$%^^&()[]>?<~_<:"~+!_': value,
       'list': [value],
@@ -121,7 +120,6 @@ describe.each([
       },
     }, {
       'date': new Date('2023-01-01'),
-      'regexp': /uic/gi,
       'url': new URL('https://dinwwwh.com'),
       '!@#$%^^&()[]>?<~_<:"~+!_': expected,
       'list': [expected],
@@ -143,7 +141,6 @@ describe('rpcJsonSerializer: wire format', () => {
       createdAt: new Date('2023-01-01T00:00:00.000Z'),
       tags: new Set(['a']),
       scores: new Map([['x', 1]]),
-      pattern: /^a$/i,
       homepage: new URL('https://orpc.dev'),
       missing: Number.NaN,
     })
@@ -153,7 +150,6 @@ describe('rpcJsonSerializer: wire format', () => {
       createdAt: '2023-01-01T00:00:00.000Z',
       tags: ['a'],
       scores: [['x', 1]],
-      pattern: '/^a$/i',
       homepage: 'https://orpc.dev/',
       missing: null,
     })
@@ -163,11 +159,10 @@ describe('rpcJsonSerializer: wire format', () => {
       ['date', 'createdAt'],
       ['set', 'tags'],
       ['map', 'scores'],
-      ['regexp', 'pattern'],
       ['url', 'homepage'],
       ['nan', 'missing'],
     ]))
-    expect(meta).toHaveLength(7)
+    expect(meta).toHaveLength(6)
   })
 
   it('omits meta entirely for pure JSON payloads', () => {
@@ -337,7 +332,6 @@ describe('rpcJsonSerializer: custom handlers', () => {
       invalidDate: new Date('Invalid'),
       nan: Number.NaN,
       url: new URL('https://orpc.dev'),
-      regexp: /uic/gi,
       set: new Set([1, 2]),
       map: new Map([['a', 1]]),
       bigint: 123n,
@@ -418,7 +412,6 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it('throws instead of producing garbage for corrupted built-in payloads', () => {
-    expect(() => serializer.deserialize({ json: 'not-a-regexp', meta: [['regexp']] })).toThrow()
     expect(() => serializer.deserialize({ json: 'not-a-bigint', meta: [['bigint']] })).toThrow()
   })
 

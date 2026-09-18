@@ -21,8 +21,6 @@ export interface RPCJsonSerializerHandler {
   isTerminal?: boolean
 }
 
-const REGEX_STRING_PATTERN = /^\/([\s\S]*)\/([a-z]*)$/
-
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
   undefined: {
     condition(data: unknown): boolean {
@@ -88,19 +86,6 @@ const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHand
     },
     isTerminal: true,
   },
-  regexp: {
-    condition(data: unknown): boolean {
-      return data instanceof RegExp
-    },
-    serialize(data: RegExp): string {
-      return data.toString()
-    },
-    deserialize(serialized: string): RegExp {
-      const [, pattern, flags] = serialized.match(REGEX_STRING_PATTERN)!
-      return new RegExp(pattern!, flags)
-    },
-    isTerminal: true,
-  },
   set: {
     condition(data: unknown): boolean {
       return data instanceof Set
@@ -158,10 +143,10 @@ export interface RPCJsonSerializerOptions {
    *
    * **Disabling:** Set a key to `undefined` to remove a built-in handler:
    * ```ts
-   * handlers: { regexp: undefined }
+   * handlers: { url: undefined }
    * ```
    *
-   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `regexp`, `set`, `map`.
+   * Built-in type keys: `undefined`, `bigint`, `date`, `nan`, `url`, `set`, `map`.
    */
   handlers?: Record<string, undefined | RPCJsonSerializerHandler> | undefined
 
@@ -278,10 +263,6 @@ export class RPCJsonSerializer {
           }
           if (data instanceof URL) {
             meta.push(['url', ...segments])
-            return data.toString()
-          }
-          if (data instanceof RegExp) {
-            meta.push(['regexp', ...segments])
             return data.toString()
           }
           if (data instanceof Set) {
