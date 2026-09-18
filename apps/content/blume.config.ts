@@ -120,6 +120,7 @@ export default defineConfig({
     { from: '/docs/openapi/openapi-specification', to: '/docs/openapi/specification' },
     { from: '/docs/openapi/advanced/openapi-json-serializer', to: '/docs/openapi/serializer' },
     { from: '/docs/openapi/input-output-structure', to: '/docs/openapi/input-and-output-mapping' },
+    { from: '/docs/openapi/advanced/redirect-response', to: '/docs/openapi/input-and-output-mapping#redirect-response' },
     { from: '/docs/openapi/advanced/expanding-type-support-for-openapi-link', to: '/docs/openapi/expanding-type-support-for-link' },
 
     { from: '/docs/event-iterator', to: '/docs/async-iterator-object' },
