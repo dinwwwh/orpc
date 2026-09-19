@@ -311,7 +311,7 @@ export class OpenAPIJsonSerializer {
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw new Error(`Security error: Invalid serialized data. Segment "${preSegment}" does not exist.`)
+            throw new TypeError(`Invalid OpenAPI serialized data: segment "${preSegment}" does not exist.`)
           }
         }
 

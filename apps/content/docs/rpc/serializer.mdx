@@ -51,24 +51,34 @@ class Person {
     public age: number,
   ) {}
 }
+import * as z from 'zod'
 // ---cut---
 import { RPCSerializer } from '@orpc/client'
+
+const PersonSchema = z.object({ name: z.string(), age: z.number() })
 
 const serializer = new RPCSerializer({
   handlers: {
     person: { // <- add support for Person
       condition: v => v instanceof Person,
       serialize: (v: Person) => ({ name: v.name, age: v.age }),
-      deserialize: v => new Person(v.name, v.age),
+      deserialize: (v) => {
+        const { name, age } = PersonSchema.parse(v)
+        return new Person(name, age)
+      },
     },
     date: { // <- replace the default Date handler
       condition: v => v instanceof Date,
       serialize: (v: Date) => v.getTime(),
-      deserialize: v => new Date(v),
+      deserialize: v => new Date(z.number().parse(v)),
     },
   },
 })
 ```
+
+:::warning
+`deserialize` receives untrusted input. A malicious client controls `meta` and can point any handler at any JSON value, so never assume `deserialize` receives what `serialize` produced. Validate the value and throw when it does not match. Built-in handlers do the same, and [RPC Handler](/docs/rpc/handler) turns these errors into a `BAD_REQUEST` response.
+:::
 
 :::info[Use a custom serializer with RPCHandler and RPCLink]
 

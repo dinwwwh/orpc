@@ -311,7 +311,7 @@ describe.concurrent(
           person: {
             condition: p => p instanceof Person,
             serialize: p => ({ name: p.name, date: p.date }),
-            deserialize: p => new Person(p.name, p.date),
+            deserialize: (p: any) => new Person(p.name, p.date),
           },
         },
       })

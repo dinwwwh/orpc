@@ -172,7 +172,7 @@ describe('durable publisher', () => {
         person: {
           condition: p => p instanceof Person,
           serialize: (p: Person) => ({ name: p.name, age: p.age }),
-          deserialize: data => new Person(data.name, data.age),
+          deserialize: (data: any) => new Person(data.name, data.age),
         },
       },
     })

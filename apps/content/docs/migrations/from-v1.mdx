@@ -621,7 +621,7 @@ const serializer = new RPCSerializer({
     user: {
       condition: data => data instanceof User,
       serialize: data => data.toJSON(),
-      deserialize: data => new User(data.id, data.name),
+      deserialize: (data: any) => new User(data.id, data.name),
     },
   },
 })
