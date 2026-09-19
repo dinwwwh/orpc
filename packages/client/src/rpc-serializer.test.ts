@@ -337,7 +337,7 @@ describe('rpcSerializer', () => {
         meta: [['date', '__proto__', 'polluted']],
       }))
 
-      expect(() => serializer.deserialize(body)).toThrow('Security error')
+      expect(() => serializer.deserialize(body)).toThrow('Invalid RPC serialized data')
     })
 
     it('rejects meta paths escaping the payload in form data bodies', () => {
@@ -348,7 +348,7 @@ describe('rpcSerializer', () => {
         maps: [],
       }))
 
-      expect(() => serializer.deserialize(form)).toThrow('Security error')
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data')
     })
 
     it('rejects blob maps escaping the payload in form data bodies', () => {
@@ -359,7 +359,7 @@ describe('rpcSerializer', () => {
       }))
       form.set('0', new Blob(['x']))
 
-      expect(() => serializer.deserialize(form)).toThrow('Security error')
+      expect(() => serializer.deserialize(form)).toThrow('Invalid RPC serialized data')
     })
 
     it('rejects unknown meta types instead of resolving them on the prototype chain', () => {

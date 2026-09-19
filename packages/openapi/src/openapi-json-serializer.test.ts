@@ -258,15 +258,15 @@ describe('openAPIJsonSerializer', () => {
     it.each(['doesNotExist', '__proto__', 'constructor', 'prototype'])('throws on invalid blob map segment "%s" to prevent prototype pollution', (segment) => {
       expect(
         () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment]] }),
-      ).toThrowError(`Security error: Invalid serialized data. Segment "${segment}" does not exist.`)
+      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
 
       expect(
         () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [['o', segment]] }),
-      ).toThrowError(`Security error: Invalid serialized data. Segment "${segment}" does not exist.`)
+      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
 
       expect(
         () => serializer.deserialize({ json: { o: {} }, blobs: [new Blob()], maps: [[segment, 'o']] }),
-      ).toThrowError(`Security error: Invalid serialized data. Segment "${segment}" does not exist.`)
+      ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
     })
 
     /* eslint-disable no-proto, no-restricted-properties */

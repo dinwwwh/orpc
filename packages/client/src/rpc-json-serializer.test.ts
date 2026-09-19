@@ -380,7 +380,7 @@ describe('rpcJsonSerializer: security', () => {
   })
 
   it.each(['doesNotExist', '__proto__', 'constructor', 'prototype'])('throws when a meta or blob path references the non-own segment "%s"', (segment) => {
-    const error = `Security error: Invalid serialized data. Segment "${segment}" does not exist.`
+    const error = `Invalid RPC serialized data: segment "${segment}" does not exist.`
 
     expect(
       () => serializer.deserialize({ json: { o: {} }, meta: [['date', segment]] }),
@@ -409,7 +409,7 @@ describe('rpcJsonSerializer: security', () => {
 
   it.each(['nonexistent', '__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty', 'valueOf'])('never resolves the meta type "%s" through the prototype chain', (type) => {
     expect(() => serializer.deserialize({ json: 1, meta: [[type]] }))
-      .toThrow(`Security error: Invalid serialized data. Type "${type}" is not supported.`)
+      .toThrow(`Invalid RPC serialized data: type "${type}" is not supported.`)
   })
 
   it('throws instead of producing garbage for corrupted built-in payloads', () => {
@@ -427,13 +427,13 @@ describe('rpcJsonSerializer: security', () => {
   ])('%s rejects mistyped serialized values', (type, expected, rejected) => {
     for (const value of rejected) {
       expect(() => serializer.deserialize({ json: { value }, meta: [[type, 'value']] }))
-        .toThrow(`Security error: Invalid serialized data. Type "${type}" expects ${expected}.`)
+        .toThrow(`Invalid RPC serialized data: type "${type}" expects ${expected}.`)
     }
   })
 
   it('rejects a value already restored by an earlier meta entry', () => {
     expect(() => serializer.deserialize({ json: { value: '1' }, meta: [['bigint', 'value'], ['url', 'value']] }))
-      .toThrow('Security error: Invalid serialized data. Type "url" expects a string.')
+      .toThrow('Invalid RPC serialized data: type "url" expects a string.')
   })
 
   /* eslint-disable no-proto, no-restricted-properties */

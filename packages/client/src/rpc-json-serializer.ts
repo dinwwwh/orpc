@@ -24,13 +24,13 @@ export interface RPCJsonSerializerHandler {
   isTerminal?: boolean
 }
 
-function invalidSerializedData(detail: string): Error {
-  return new Error(`Security error: Invalid serialized data. ${detail}`)
+function invalidSerializedData(detail: string): TypeError {
+  return new TypeError(`Invalid RPC serialized data: ${detail}`)
 }
 
 function assertSerializedType(ok: boolean, type: string, expected: string): void {
   if (!ok) {
-    throw invalidSerializedData(`Type "${type}" expects ${expected}.`)
+    throw invalidSerializedData(`type "${type}" expects ${expected}.`)
   }
 }
 
@@ -388,7 +388,7 @@ export class RPCJsonSerializer {
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw invalidSerializedData(`Segment "${preSegment}" does not exist.`)
+            throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
           }
         }
 
@@ -402,7 +402,7 @@ export class RPCJsonSerializer {
         const handler = this.handlers[type]
 
         if (handler === undefined) {
-          throw invalidSerializedData(`Type "${type}" is not supported.`)
+          throw invalidSerializedData(`type "${type}" is not supported.`)
         }
 
         let currentRef: any = ref
@@ -413,7 +413,7 @@ export class RPCJsonSerializer {
           preSegment = item[i]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
-            throw invalidSerializedData(`Segment "${preSegment}" does not exist.`)
+            throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
           }
         }
 
