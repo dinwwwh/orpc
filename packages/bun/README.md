@@ -35,11 +35,11 @@ You can read the documentation [here](https://orpc.dev).
 
 **Schema validation**
 
-| Package                                                      | Purpose                                         | Docs                                                  |
-| ------------------------------------------------------------ | ----------------------------------------------- | ----------------------------------------------------- |
-| [@orpc/zod](https://www.npmjs.com/package/@orpc/zod)         | Integrate with [Zod](https://zod.dev/).         | [Zod](https://orpc.dev/docs/integrations/zod)         |
-| [@orpc/valibot](https://www.npmjs.com/package/@orpc/valibot) | Integrate with [Valibot](https://valibot.dev/). | [Valibot](https://orpc.dev/docs/integrations/valibot) |
-| [@orpc/arktype](https://www.npmjs.com/package/@orpc/arktype) | Integrate with [ArkType](https://arktype.io/).  | [ArkType](https://orpc.dev/docs/integrations/arktype) |
+| Package                                                      | Purpose                                                    | Docs                                                  |
+| ------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------- |
+| [@orpc/zod](https://www.npmjs.com/package/@orpc/zod)         | JSON Schema converter for [Zod](https://zod.dev/).         | [Zod](https://orpc.dev/docs/integrations/zod)         |
+| [@orpc/valibot](https://www.npmjs.com/package/@orpc/valibot) | JSON Schema converter for [Valibot](https://valibot.dev/). | [Valibot](https://orpc.dev/docs/integrations/valibot) |
+| [@orpc/arktype](https://www.npmjs.com/package/@orpc/arktype) | JSON Schema converter for [ArkType](https://arktype.io/).  | [ArkType](https://orpc.dev/docs/integrations/arktype) |
 
 **Built-in features**
 
