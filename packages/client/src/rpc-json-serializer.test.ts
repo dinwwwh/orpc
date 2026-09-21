@@ -371,6 +371,23 @@ describe('rpcJsonSerializer: custom handlers', () => {
   })
 })
 
+describe('rpcJsonSerializer: deserialize', () => {
+  const serializer = new RPCJsonSerializer()
+
+  it.each([
+    ['json', { count: 10n, list: [{ tags: new Set(['a']), nested: [new Date('2023-01-01'), new URL('https://orpc.dev')] }] }],
+    ['blobs', { files: [new Blob(['hello'])], map: new Map([[1n, new Set(['a'])]]) }],
+  ])('does not mutate the input and can deserialize repeatedly: %s', (_, value) => {
+    // https://github.com/middleapi/orpc/issues/2053
+    const payload = serializer.serialize(value)
+    const snapshot = JSON.stringify(payload)
+
+    expect(serializer.deserialize(payload)).toEqual(value)
+    expect(serializer.deserialize(payload)).toEqual(value)
+    expect(JSON.stringify(payload)).toBe(snapshot)
+  })
+})
+
 describe('rpcJsonSerializer: security', () => {
   const serializer = new RPCJsonSerializer()
 

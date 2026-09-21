@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { isPlainObject, NullProtoObj } from '@orpc/shared'
+import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
 
 export type OpenAPIJsonSerialization
   = | { json: unknown, maps?: undefined, blobs?: undefined }
@@ -297,17 +297,19 @@ export class OpenAPIJsonSerializer {
   }
 
   deserialize(serialized: OpenAPIJsonSerialization): unknown {
-    const ref = { data: serialized.json }
+    const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
         const segments = serialized.maps[i]!
 
+        let original: any = serialized
         let currentRef: any = ref
-        let preSegment: string | number = 'data'
+        let preSegment: string | number = 'json'
 
         for (let j = 0; j < segments.length; j++) {
-          currentRef = currentRef[preSegment]
+          original = original[preSegment]
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -319,6 +321,6 @@ export class OpenAPIJsonSerializer {
       }
     }
 
-    return ref.data
+    return ref.json
   }
 }

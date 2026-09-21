@@ -225,6 +225,30 @@ function cloneWithVisited(value: unknown, visited: WeakMap<object, unknown>): un
   return value
 }
 
+export function copyOnWrite(parent: object, key: PropertyKey, original: unknown): unknown {
+  const value = (parent as Record<PropertyKey, unknown>)[key]
+
+  if (value !== original) {
+    return value
+  }
+
+  let copy: object
+
+  if (Array.isArray(value)) {
+    copy = value.slice()
+  }
+  else if (isPlainObject(value)) {
+    copy = { ...value }
+  }
+  else {
+    return value
+  }
+
+  setOwn(parent, key, copy)
+
+  return copy
+}
+
 export function isPropertyKey(value: unknown): value is PropertyKey {
   const type = typeof value
   return type === 'string' || type === 'number' || type === 'symbol'
