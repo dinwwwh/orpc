@@ -1,5 +1,5 @@
 import type { Segment } from '@orpc/shared'
-import { isPlainObject, NullProtoObj } from '@orpc/shared'
+import { copyOnWrite, isPlainObject, NullProtoObj } from '@orpc/shared'
 
 export type RPCJsonSerializationMeta = [type: string, ...path: Segment[]]
 export type RPCJsonSerialization
@@ -374,17 +374,19 @@ export class RPCJsonSerializer {
   }
 
   deserialize(serialized: RPCJsonSerialization): unknown {
-    const ref = { data: serialized.json }
+    const ref = { json: serialized.json }
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
         const segments = serialized.maps[i]!
 
+        let original: any = serialized
         let currentRef: any = ref
-        let preSegment: string | number = 'data'
+        let preSegment: string | number = 'json'
 
         for (let j = 0; j < segments.length; j++) {
-          currentRef = currentRef[preSegment]
+          original = original[preSegment]
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -405,11 +407,13 @@ export class RPCJsonSerializer {
           throw invalidSerializedData(`type "${type}" is not supported.`)
         }
 
+        let original: any = serialized
         let currentRef: any = ref
-        let preSegment: string | number = 'data'
+        let preSegment: string | number = 'json'
 
         for (let i = 1; i < item.length; i++) {
-          currentRef = currentRef[preSegment]
+          original = original[preSegment]
+          currentRef = copyOnWrite(currentRef, preSegment, original)
           preSegment = item[i]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -421,6 +425,6 @@ export class RPCJsonSerializer {
       }
     }
 
-    return ref.data
+    return ref.json
   }
 }

@@ -1,7 +1,7 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set, setOwn } from './object'
+import { bindMethods, clone, copyOnWrite, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set, setOwn } from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -457,6 +457,41 @@ it('nullProtoObj', () => {
   // eslint-disable-next-line no-restricted-properties, no-proto
   expect(clone.__proto__).toBe(2)
   expect(clone.a).toBe(1)
+})
+
+describe('copyOnWrite', () => {
+  it('copies arrays and plain objects still held by the input, returns everything else as is', () => {
+    const child = { a: 1 }
+    const list = [1]
+    const parent = { child, list, date: new Date(), none: null }
+
+    const childCopy = copyOnWrite(parent, 'child', child)
+    expect(childCopy).toEqual(child)
+    expect(childCopy).not.toBe(child)
+    expect(parent.child).toBe(childCopy)
+    expect(copyOnWrite(parent, 'child', child)).toBe(childCopy)
+
+    const listCopy = copyOnWrite(parent, 'list', list)
+    expect(listCopy).toEqual(list)
+    expect(listCopy).not.toBe(list)
+    expect(parent.list).toBe(listCopy)
+
+    expect(copyOnWrite(parent, 'date', parent.date)).toBe(parent.date)
+    expect(copyOnWrite(parent, 'none', null)).toBeNull()
+  })
+
+  it('keeps __proto__ an own property on the parent and the copy', () => {
+    const parent = JSON.parse('{"__proto__": {"a": 1}}')
+    const original = getOwn(parent, '__proto__')
+
+    const copy = copyOnWrite(parent, '__proto__', original) as any
+
+    expect(Object.getPrototypeOf(parent)).toBe(Object.prototype)
+    expect(Object.getPrototypeOf(copy)).toBe(Object.prototype)
+    expect(getOwn(parent, '__proto__')).toBe(copy)
+    expect(copy).toEqual({ a: 1 })
+    expect(({} as any).a).toBeUndefined()
+  })
 })
 
 describe('clone', () => {

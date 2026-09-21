@@ -127,6 +127,15 @@ describe('openAPIJsonSerializer', () => {
       expect((result as any).file).toBe(blob)
     })
 
+    it('does not mutate the input and deserializes it repeatedly', () => {
+      const blob = new Blob(['hello'])
+      const payload = { json: { files: [null] }, maps: [['files', 0]], blobs: [blob] }
+
+      expect(serializer.deserialize(payload)).toEqual({ files: [blob] })
+      expect(serializer.deserialize(payload)).toEqual({ files: [blob] })
+      expect(payload.json).toEqual({ files: [null] })
+    })
+
     it('returns json as-is when no blobs', () => {
       const json = { a: 1, b: '2023-01-01T00:00:00.000Z' }
       expect(serializer.deserialize({ json })).toEqual(json)
