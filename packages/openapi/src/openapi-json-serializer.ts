@@ -301,6 +301,12 @@ export class OpenAPIJsonSerializer {
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
+        const blob = serialized.blobs[i]
+
+        if (!(blob instanceof Blob)) {
+          throw new TypeError(`Invalid OpenAPI serialized data: blob ${i} is not a Blob.`)
+        }
+
         const segments = serialized.maps[i]!
 
         let original: any = serialized
@@ -317,7 +323,7 @@ export class OpenAPIJsonSerializer {
           }
         }
 
-        currentRef[preSegment] = serialized.blobs[i]
+        currentRef[preSegment] = blob
       }
     }
 

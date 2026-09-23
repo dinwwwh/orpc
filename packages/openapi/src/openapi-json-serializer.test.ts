@@ -278,6 +278,16 @@ describe('openAPIJsonSerializer', () => {
       ).toThrowError(`Invalid OpenAPI serialized data: segment "${segment}" does not exist.`)
     })
 
+    it('throws when a blobs entry is not a Blob', () => {
+      for (const value of [4294967295, 'text', null, {}, []]) {
+        expect(() => serializer.deserialize({ json: [null], blobs: [value as any], maps: [[0]] }))
+          .toThrowError('Invalid OpenAPI serialized data: blob 0 is not a Blob.')
+      }
+
+      expect(() => serializer.deserialize({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }))
+        .toThrowError('Invalid OpenAPI serialized data: blob 1 is not a Blob.')
+    })
+
     /* eslint-disable no-proto, no-restricted-properties */
     it('serializes own __proto__ keys as plain data', () => {
       // JSON.parse creates own __proto__ properties, exactly like a real request body
