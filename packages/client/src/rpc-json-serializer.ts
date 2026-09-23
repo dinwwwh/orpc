@@ -378,6 +378,12 @@ export class RPCJsonSerializer {
 
     if (serialized.blobs?.length) {
       for (let i = 0; i < serialized.maps.length; i++) {
+        const blob = serialized.blobs[i]
+
+        if (!(blob instanceof Blob)) {
+          throw invalidSerializedData(`blob ${i} is not a Blob.`)
+        }
+
         const segments = serialized.maps[i]!
 
         let original: any = serialized
@@ -394,7 +400,7 @@ export class RPCJsonSerializer {
           }
         }
 
-        currentRef[preSegment] = serialized.blobs[i]
+        currentRef[preSegment] = blob
       }
     }
 

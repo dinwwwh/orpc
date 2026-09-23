@@ -424,6 +424,16 @@ describe('rpcJsonSerializer: security', () => {
     ).toThrow(error)
   })
 
+  it('throws when a blobs entry is not a Blob', () => {
+    for (const value of [4294967295, 'text', null, {}, []]) {
+      expect(() => serializer.deserialize({ json: [null], blobs: [value as any], maps: [[0]] }))
+        .toThrow('Invalid RPC serialized data: blob 0 is not a Blob.')
+    }
+
+    expect(() => serializer.deserialize({ json: [null, null], blobs: [new Blob()], maps: [[0], [1]] }))
+      .toThrow('Invalid RPC serialized data: blob 1 is not a Blob.')
+  })
+
   it.each(['nonexistent', '__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty', 'valueOf'])('never resolves the meta type "%s" through the prototype chain', (type) => {
     expect(() => serializer.deserialize({ json: 1, meta: [[type]] }))
       .toThrow(`Invalid RPC serialized data: type "${type}" is not supported.`)
