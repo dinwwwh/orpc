@@ -27,8 +27,7 @@ export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
    * The maximum total size in bytes of upload content a request streams into
    * temporary files: file bodies and the file parts of a multipart body
-   * combined, headers included. A larger body rejects the request with
-   * `PAYLOAD_TOO_LARGE`.
+   * combined. A larger body rejects the request with `PAYLOAD_TOO_LARGE`.
    */
   file: number
 
@@ -366,9 +365,6 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
           },
         }
       }
-
-      // Even an empty file part creates a tmp file
-      charge('file', part.headerSize)
 
       const filename = part.filename
       // A part without a content-type defaults to text/plain, matching the standard parser

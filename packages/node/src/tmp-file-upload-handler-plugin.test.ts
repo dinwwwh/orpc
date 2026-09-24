@@ -873,14 +873,14 @@ describe('tmpFileUploadHandlerPlugin', () => {
     /**
      * Serializes parts by hand, so each part's exact cost is known.
      */
-    function createMultipartBody(parts: Array<{ header: string, content?: string }>): { body: Buffer, headerSizes: number[], costs: number[] } {
+    function createMultipartBody(parts: Array<{ header: string, content?: string }>): { body: Buffer, headerSizes: number[], contentSizes: number[] } {
       const headerBlocks = parts.map(part => `${part.header}\r\n\r\n`)
-      const blocks = parts.map((part, i) => `${headerBlocks[i]}${part.content ?? ''}`)
+      const contents = parts.map(part => part.content ?? '')
 
       return {
-        body: Buffer.from(`${blocks.map(block => `--${boundary}\r\n${block}\r\n`).join('')}--${boundary}--\r\n`),
+        body: Buffer.from(`${parts.map((_, i) => `--${boundary}\r\n${headerBlocks[i]}${contents[i]}\r\n`).join('')}--${boundary}--\r\n`),
         headerSizes: headerBlocks.map(block => Buffer.byteLength(block)),
-        costs: blocks.map(block => Buffer.byteLength(block)),
+        contentSizes: contents.map(content => Buffer.byteLength(content)),
       }
     }
 
@@ -1002,14 +1002,14 @@ describe('tmpFileUploadHandlerPlugin', () => {
     })
 
     it('limits multipart fields and files against their own categories', async () => {
-      const { body, headerSizes, costs } = createMultipartBody([
+      const { body, headerSizes, contentSizes } = createMultipartBody([
         { header: 'Content-Disposition: form-data; name="first"', content: 'x'.repeat(6) },
         { header: 'Content-Disposition: form-data; name="upload-1"; filename="a.bin"', content: 'z'.repeat(6) },
         { header: 'Content-Disposition: form-data; name="second"', content: 'y'.repeat(6) },
         { header: 'Content-Disposition: form-data; name="upload-2"; filename="b.bin"', content: 'w'.repeat(6) },
       ])
-      const memoryCost = costs[0]! + headerSizes[1]! + costs[2]! + headerSizes[3]!
-      const fileCost = costs[1]! + costs[3]!
+      const memoryCost = sum(headerSizes) + contentSizes[0]! + contentSizes[2]!
+      const fileCost = contentSizes[1]! + contentSizes[3]!
 
       for (const limits of [{ memory: memoryCost }, { file: fileCost }]) {
         await runThroughPlugin({
@@ -1034,40 +1034,36 @@ describe('tmpFileUploadHandlerPlugin', () => {
       expect(readdirSync(tmpDir)).toHaveLength(0)
     })
 
-    it('charges file parts their headers against both limits, so even empty ones are never free', async () => {
+    it('charges file part headers against maxBodySize.memory, so even empty file parts are never free', async () => {
       // The smallest possible file part
       const { body, headerSizes } = createMultipartBody(Array.from({ length: 64 }, () => ({
         header: 'Content-Disposition: form-data; name=""; filename=""',
       })))
       const headerCost = sum(headerSizes)
 
-      for (const limits of [{ memory: headerCost }, { file: headerCost }]) {
-        await runThroughPlugin({
-          limits,
-          headers: multipartHeaders,
-          body,
-          inspect: (parsed) => {
-            const entries = [...(parsed as FormData)]
+      await runThroughPlugin({
+        limits: { memory: headerCost },
+        headers: multipartHeaders,
+        body,
+        inspect: (parsed) => {
+          const entries = [...(parsed as FormData)]
 
-            expect(entries).toHaveLength(64)
-            expect(entries.every(([, value]) => value instanceof TmpFile && value.size === 0)).toBe(true)
-          },
-        })
-      }
+          expect(entries).toHaveLength(64)
+          expect(entries.every(([, value]) => value instanceof TmpFile && value.size === 0)).toBe(true)
+        },
+      })
 
       // The part over the limit never reaches disk
-      for (const limits of [{ memory: headerCost - 1 }, { file: headerCost - 1 }]) {
-        expect(await countTmpFilesWhenRejected(limits, body)).toBe(63)
-      }
+      expect(await countTmpFilesWhenRejected({ memory: headerCost - 1 }, body)).toBe(63)
     })
 
     it('charges field parts their headers, so long names consume maxBodySize.memory', async () => {
       const name = 'n'.repeat(4096)
-      const { body, costs } = createMultipartBody([
+      const { body, headerSizes } = createMultipartBody([
         { header: `Content-Disposition: form-data; name="${name}"` },
         { header: `Content-Disposition: form-data; name="${name}"` },
       ])
-      const memoryCost = sum(costs)
+      const memoryCost = sum(headerSizes)
 
       await runThroughPlugin({
         limits: { memory: memoryCost },
@@ -1088,15 +1084,15 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
     it('limits the whole multipart body to the sum of the memory and file limits', async () => {
       const content = 'y'.repeat(1024)
-      const { body: parts, headerSizes, costs } = createMultipartBody([
+      const { body: parts, headerSizes, contentSizes } = createMultipartBody([
         { header: 'Content-Disposition: form-data; name="a"', content: 'x' },
         { header: 'Content-Disposition: form-data; name="b"; filename="a.bin"', content },
       ])
       // An uncharged preamble
       const body = Buffer.concat([Buffer.from(`${'p'.repeat(510)}\r\n`), parts])
 
-      const memory = costs[0]! + headerSizes[1]!
-      const file = costs[1]!
+      const memory = sum(headerSizes) + contentSizes[0]!
+      const file = contentSizes[1]!
 
       // Crosses the sum partway through the file part
       expect(await countTmpFilesWhenRejected({ memory, file }, body)).toBe(1)
