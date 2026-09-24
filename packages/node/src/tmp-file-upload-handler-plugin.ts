@@ -17,16 +17,18 @@ import { parseHeaderParameters, parseMultipart } from './multipart'
 export interface TmpFileUploadHandlerPluginMaxBodySize {
   /**
    * The maximum total size in bytes of request body content that is parsed
-   * into memory: JSON, URL-encoded forms, and the plain fields of a multipart
-   * body. A larger body rejects the request with `PAYLOAD_TOO_LARGE`. Usually
-   * the lowest of the three limits, because this content cannot stream anywhere.
+   * into memory: JSON, URL-encoded forms, and the fields and part headers of
+   * a multipart body. A larger body rejects the request with
+   * `PAYLOAD_TOO_LARGE`. Usually the lowest of the three limits, because this
+   * content cannot stream anywhere.
    */
   memory: number
 
   /**
    * The maximum total size in bytes of upload content a request streams into
    * temporary files: file bodies and the file parts of a multipart body
-   * combined. A larger body rejects the request with `PAYLOAD_TOO_LARGE`.
+   * combined, headers included. A larger body rejects the request with
+   * `PAYLOAD_TOO_LARGE`.
    */
   file: number
 
@@ -318,8 +320,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
 
     /**
      * The whole multipart body, framing included, can never exceed what its two
-     * content categories allow together, which also bounds bodies that hide
-     * their size in part headers rather than part content.
+     * content categories allow together.
      */
     const totalLimit = maxBodySize.memory + maxBodySize.file
 
@@ -335,22 +336,27 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
     const limited = totalLimit === Number.POSITIVE_INFINITY ? stream : limitStream(stream, totalLimit)
 
     const form = new FormData()
-    let memoryUsed = 0
-    let fileUsed = 0
+    const used = { memory: 0, file: 0 }
+
+    const charge = (category: 'memory' | 'file', size: number): void => {
+      used[category] += size
+
+      if (used[category] > maxBodySize[category]) {
+        throw new ORPCError('PAYLOAD_TOO_LARGE')
+      }
+    }
 
     await parseMultipart(limited, boundary, (part) => {
       const name = part.name
+
+      charge('memory', part.headerSize)
 
       if (part.filename === undefined) {
         const chunks: Buffer[] = []
 
         return {
           write: (chunk) => {
-            memoryUsed += chunk.length
-
-            if (memoryUsed > maxBodySize.memory) {
-              throw new ORPCError('PAYLOAD_TOO_LARGE')
-            }
+            charge('memory', chunk.length)
 
             // The parser only guarantees the chunk until write returns, so retaining it requires a copy
             chunks.push(Buffer.from(chunk))
@@ -361,6 +367,9 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
         }
       }
 
+      // Even an empty file part creates a tmp file
+      charge('file', part.headerSize)
+
       const filename = part.filename
       // A part without a content-type defaults to text/plain, matching the standard parser
       const type = part.type ?? 'text/plain'
@@ -368,11 +377,7 @@ export class TmpFileUploadHandlerPlugin<T extends Context> implements StandardHa
 
       return {
         write: async (chunk) => {
-          fileUsed += chunk.length
-
-          if (fileUsed > maxBodySize.file) {
-            throw new ORPCError('PAYLOAD_TOO_LARGE')
-          }
+          charge('file', chunk.length)
 
           tmpPath ??= await tmpFiles.allocate()
           await tmpFiles.append(tmpPath, chunk)

@@ -28,6 +28,11 @@ export interface MultipartPart {
    * The part's `Content-Type` header value, if present.
    */
   type: string | undefined
+
+  /**
+   * The size in bytes of the part's header block, including the blank line.
+   */
+  headerSize: number
 }
 
 export interface MultipartPartWriter {
@@ -160,8 +165,9 @@ export async function parseMultipart(
         return
       }
 
-      const part = parsePartHeaders(buffer.subarray(0, headerEnd).toString())
-      buffer = buffer.subarray(headerEnd + HEADER_BLOCK_END.length)
+      const headerSize = headerEnd + HEADER_BLOCK_END.length
+      const part = parsePartHeaders(buffer.subarray(0, headerEnd).toString(), headerSize)
+      buffer = buffer.subarray(headerSize)
       writer = await onPart(part)
       state = 'body'
     }
@@ -184,7 +190,7 @@ export async function parseMultipart(
   }
 }
 
-function parsePartHeaders(block: string): MultipartPart {
+function parsePartHeaders(block: string, headerSize: number): MultipartPart {
   let contentDisposition: string | undefined
   let contentType: string | undefined
 
@@ -230,6 +236,7 @@ function parsePartHeaders(block: string): MultipartPart {
     name: decodeContentDispositionParameter(name),
     filename: filename === undefined ? undefined : decodeContentDispositionParameter(filename),
     type: contentType,
+    headerSize,
   }
 }
 
