@@ -1,7 +1,7 @@
 import type { StandardBodyHint } from '@standard-server/core'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
-import { isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
+import { isAcceptableEncoding, isAsyncIteratorObject, isCompressibleContentType, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
 import { flattenStandardHeader, generateContentDisposition } from '@standard-server/core'
 
 // Rough UTF-8 estimate. Mostly ASCII text stays close to 1 byte/char;
@@ -93,7 +93,7 @@ export class ResponseCompressionHandlerPlugin<T extends Context> implements Stan
       const acceptEncodings = parseAcceptEncodingQualities(
         flattenStandardHeader(interceptorOptions.request.headers['accept-encoding']),
       )
-      const encoding = this.encodings.find(enc => (acceptEncodings.get(enc) ?? 0) > 0)
+      const encoding = this.encodings.find(enc => isAcceptableEncoding(acceptEncodings, enc))
 
       if (encoding === undefined) {
         return result
