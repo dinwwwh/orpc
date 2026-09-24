@@ -1,8 +1,11 @@
 import type { AnyRouter } from '../router'
+import { ORPCError } from '@orpc/client'
 import { promiseWithResolvers } from '@orpc/shared'
 import { RPCHandler } from '../adapters/fetch/rpc-handler'
 import { os } from '../builder'
 import { BatchHandlerPlugin } from './batch'
+import { RequestCompressionHandlerPlugin } from './request-compression'
+import { RequestLimitHandlerPlugin } from './request-limit'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -154,6 +157,41 @@ describe('batchHandlerPlugin', () => {
 
       expect(response!.status).toBe(400)
       expect(await response!.text()).toContain('Invalid batch request body')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns the ORPCError message a body plugin throws while resolving the batch body', async () => {
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin(), new RequestCompressionHandlerPlugin()],
+      })
+
+      const { response } = await handler.handle(new Request('https://example.com/__batch__', {
+        method: 'POST',
+        headers: {
+          'orpc-batch': 'buffered',
+          'content-type': 'application/json',
+          'content-encoding': 'gzip, gzip, gzip, gzip, gzip, gzip',
+        },
+        body: JSON.stringify([makePeerRequestMessage(0, '/ping')]),
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain('Too many content encodings.')
+      expect(handlerFn).toHaveBeenCalledTimes(0)
+    })
+
+    it('returns the ORPCError message a body plugin raises while streaming the batch body', async () => {
+      const handler = new RPCHandler(router, {
+        plugins: [new BatchHandlerPlugin(), new RequestLimitHandlerPlugin({ maxBodySize: 10 })],
+      })
+
+      const { response } = await handler.handle(createBatchRequest({
+        mode: 'buffered',
+        messages: [makePeerRequestMessage(0, '/ping')],
+      }))
+
+      expect(response!.status).toBe(400)
+      expect(await response!.text()).toContain(new ORPCError('PAYLOAD_TOO_LARGE').message)
       expect(handlerFn).toHaveBeenCalledTimes(0)
     })
 
