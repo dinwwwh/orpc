@@ -191,6 +191,27 @@ describe('openAPIComponentRegistry', () => {
         Holder: { type: 'object', properties: { x: { $ref: '#/$defs/Missing' } } },
       })
     })
+
+    it('hoists a def named __proto__ as an own component', () => {
+      const { doc, registry } = createRegistry()
+
+      const result = registry.hoistDefs(JSON.parse('{"$ref":"#/$defs/__proto__","$defs":{"__proto__":{"type":"string"},"Planet":{"type":"number"}}}'))
+
+      expect(result).toEqual({ $ref: '#/components/schemas/__proto__' })
+      expect(JSON.stringify(doc.components?.schemas)).toBe('{"__proto__":{"type":"string"},"Planet":{"type":"number"}}')
+    })
+
+    it('does not mistake Object.prototype members for existing components', () => {
+      const { doc, registry } = createRegistry()
+
+      const result = registry.hoistDefs({
+        $ref: '#/$defs/constructor',
+        $defs: { constructor: { type: 'string' as const } },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/constructor' })
+      expect(doc.components?.schemas).toEqual({ constructor: { type: 'string' } })
+    })
   })
 
   describe('component reuse', () => {
@@ -748,6 +769,19 @@ describe('openAPIComponentRegistry', () => {
           properties: { nested: { $ref: '#/components/schemas/Planet' } },
         },
       })
+    })
+
+    it('does not mistake Object.prototype members for taken local def names', () => {
+      const { doc, registry } = createRegistry()
+
+      const result = registry.register('toString', {
+        type: 'object',
+        properties: { nested: { $ref: '#/$defs/Planet' } },
+        $defs: { Planet: { type: 'string' } },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/toString' })
+      expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Planet', 'toString'])
     })
 
     it('applies customComponentName to registered schemas', () => {

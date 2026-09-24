@@ -206,6 +206,15 @@ describe('mapJsonSchemaRefs', () => {
       ['#/$defs/Tracked', ['properties', 'nested', 'allOf', 0, '$ref']],
     ])
   })
+
+  it('keeps properties and defs named __proto__ as own keys', () => {
+    const rewritten = mapJsonSchemaRefs(
+      JSON.parse('{"properties":{"__proto__":{"$ref":"#/$defs/__proto__"}},"$defs":{"__proto__":{"type":"string"}}}'),
+      ref => ref.replace('#/$defs/', '#/$defs/rewritten-'),
+    )
+
+    expect(JSON.stringify(rewritten)).toBe('{"properties":{"__proto__":{"$ref":"#/$defs/rewritten-__proto__"}},"$defs":{"__proto__":{"type":"string"}}}')
+  })
 })
 
 describe('resolveJsonSchemaRootLocalRef', () => {

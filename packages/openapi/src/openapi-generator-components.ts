@@ -6,7 +6,7 @@ import {
   ensureJsonSchemaObject,
   mapJsonSchemaRefs,
 } from '@orpc/json-schema'
-import { isDeepEqual } from '@orpc/shared'
+import { get, getOwn, isDeepEqual, setOwn } from '@orpc/shared'
 
 /**
  * Collects reusable schemas into `doc.components.schemas`.
@@ -30,7 +30,7 @@ export class OpenAPIComponentRegistry {
     // the schema can carry its own local $defs, keep the registered name unique among them
     let defName = preferredName
     if ($defs) {
-      for (let i = 2; defName in $defs; i++) {
+      for (let i = 2; Object.hasOwn($defs, defName); i++) {
         defName = `${preferredName}${i}`
       }
     }
@@ -51,8 +51,8 @@ export class OpenAPIComponentRegistry {
     }
 
     const { $defs, ...rest } = schema
-    const defs: Record<string, Exclude<JsonSchema, boolean>> = {}
-    const preferredNames: Record<string, string> = {}
+    const defs = new Map<string, Exclude<JsonSchema, boolean>>()
+    const preferredNames = new Map<string, string>()
 
     for (const defName of Object.keys($defs)) {
       const defSchema = $defs[defName]
@@ -63,13 +63,11 @@ export class OpenAPIComponentRegistry {
 
       const normalized = ensureJsonSchemaObject(defSchema)
 
-      defs[defName] = normalized
-      preferredNames[defName] = this.customComponentName?.(defName, normalized) ?? defName
+      defs.set(defName, normalized)
+      preferredNames.set(defName, this.customComponentName?.(defName, normalized) ?? defName)
     }
 
-    const defNames = Object.keys(defs)
-
-    if (defNames.length === 0) {
+    if (defs.size === 0) {
       return schema
     }
 
@@ -77,36 +75,30 @@ export class OpenAPIComponentRegistry {
     this.doc.components.schemas ??= {}
 
     const componentsSchemas = this.doc.components.schemas
-    const identityRenameMap = Object.fromEntries(
-      defNames.map(defName => [defName, preferredNames[defName]!]),
-    ) as Record<string, string>
-    const renameMap: Record<string, string> = {}
+    const renameMap = new Map<string, string>()
     const pendingSchemas: { cleanSchema: Exclude<JsonSchema, boolean>, componentName: string }[] = []
 
-    for (const defName of defNames) {
-      const cleanSchema = defs[defName]!
+    for (const [defName, cleanSchema] of defs) {
+      const candidateRenameMap = new Map([...preferredNames, ...renameMap])
       const candidateSchemas = Object.fromEntries(
-        defNames.map(currentDefName => [
-          preferredNames[currentDefName]!,
-          rewriteComponentSchemaRefs(defs[currentDefName]!, {
-            ...identityRenameMap,
-            ...renameMap,
-          }),
+        Array.from(defs, ([currentDefName, currentSchema]) => [
+          preferredNames.get(currentDefName)!,
+          rewriteComponentSchemaRefs(currentSchema, candidateRenameMap),
         ]),
       ) as Record<string, JsonSchema>
-      const preferredName = preferredNames[defName]!
+      const preferredName = preferredNames.get(defName)!
       const prelimSchema = candidateSchemas[preferredName]!
 
       const [componentName, reuseExisting] = resolveComponentName(
         componentsSchemas,
-        new Set(Object.values(renameMap)),
+        new Set(renameMap.values()),
         preferredName,
         prelimSchema,
         candidateSchemas,
         direction,
       )
 
-      renameMap[defName] = componentName
+      renameMap.set(defName, componentName)
 
       if (!reuseExisting) {
         pendingSchemas.push({ cleanSchema, componentName })
@@ -114,10 +106,7 @@ export class OpenAPIComponentRegistry {
     }
 
     for (const { cleanSchema, componentName } of pendingSchemas) {
-      componentsSchemas[componentName] = rewriteComponentSchemaRefs(
-        cleanSchema,
-        renameMap,
-      )
+      setOwn(componentsSchemas, componentName, rewriteComponentSchemaRefs(cleanSchema, renameMap))
     }
 
     return rewriteComponentSchemaRefs(rest, renameMap)
@@ -150,7 +139,7 @@ function resolveComponentName(
 
   for (let i = 1; ; i++) {
     const [componentName, mintable, tail] = componentNameCandidate(preferredName, direction, i)
-    const existingSchema = componentsSchemas[componentName]
+    const existingSchema = getOwn(componentsSchemas, componentName)
 
     if (existingSchema === undefined) {
       // a sibling def can claim a slot before its schema is written, keep probing past it
@@ -329,8 +318,8 @@ function resolveSchemaComparisonRef(
 ): { schema: JsonSchema, rootSchema: JsonSchema } | undefined {
   const localDefName = parseLocalDefRefName(ref)
 
-  if (localDefName !== undefined && typeof rootSchema === 'object' && rootSchema !== null) {
-    const localDef = rootSchema.$defs?.[localDefName]
+  if (localDefName !== undefined) {
+    const localDef = get(rootSchema, ['$defs', localDefName]) as JsonSchema | undefined
 
     if (localDef !== undefined) {
       return {
@@ -343,7 +332,7 @@ function resolveSchemaComparisonRef(
   const componentName = parseComponentRefName(ref)
 
   if (componentName !== undefined) {
-    const componentSchema = componentsSchemas[componentName]
+    const componentSchema = getOwn(componentsSchemas, componentName)
 
     if (componentSchema !== undefined) {
       return {
@@ -423,7 +412,7 @@ function parseLocalDefRefName(ref: string): string | undefined {
     .join('/')
 }
 
-function rewriteComponentSchemaRefs(schema: JsonSchema, renameMap: Record<string, string>): JsonSchema {
+function rewriteComponentSchemaRefs(schema: JsonSchema, renameMap: ReadonlyMap<string, string>): JsonSchema {
   return mapJsonSchemaRefs(schema, (ref) => {
     const refName = parseLocalDefRefName(ref)
 
@@ -431,7 +420,7 @@ function rewriteComponentSchemaRefs(schema: JsonSchema, renameMap: Record<string
       return ref
     }
 
-    const renamedName = renameMap[refName]
+    const renamedName = renameMap.get(refName)
 
     if (renamedName === undefined) {
       return ref

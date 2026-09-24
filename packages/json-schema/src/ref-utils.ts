@@ -4,7 +4,7 @@
  */
 
 import type { JsonSchema } from './types'
-import { get } from '@orpc/shared'
+import { get, setOwn } from '@orpc/shared'
 import { JSON_SCHEMA_LOGIC_KEYWORDS, JSON_SCHEMA_RECORD_KEYWORDS } from './constants'
 
 /**
@@ -80,16 +80,16 @@ export function mapJsonSchemaRefs(
   for (const key of Object.keys(value)) {
     const val = value[key]
     if (key === '$ref' && typeof val === 'string') {
-      result[key] = map(val, [...path, key])
+      setOwn(result, key, map(val, [...path, key]))
     }
     else if (!schemaLevel) {
-      result[key] = mapJsonSchemaRefs(val as JsonSchema, map, true, [...path, key])
+      setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, true, [...path, key]))
     }
     else if (JSON_SCHEMA_LOGIC_KEYWORDS.has(key) || JSON_SCHEMA_RECORD_KEYWORDS.has(key)) {
-      result[key] = mapJsonSchemaRefs(val as JsonSchema, map, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), [...path, key])
+      setOwn(result, key, mapJsonSchemaRefs(val as JsonSchema, map, !JSON_SCHEMA_RECORD_KEYWORDS.has(key), [...path, key]))
     }
     else {
-      result[key] = val
+      setOwn(result, key, val)
     }
   }
 
