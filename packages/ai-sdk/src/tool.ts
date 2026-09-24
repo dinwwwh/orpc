@@ -207,7 +207,7 @@ export function implementToolFactory(_options: ImplementToolFactoryOptions = {})
 export type CreateToolFactoryOptions<TInitialContext extends Context>
   = & ImplementToolFactoryOptions
     & ProcedureClientOptions<TInitialContext, Schema<unknown>, object, object>
-    & Omit<ClientOptions<object>, 'context'>
+    & Omit<ClientOptions<object>, 'context' | 'signal'>
 
 export interface ToolFactory<TInitialContext extends Context> {
   <TInputSchema extends AnySchema, TOutputSchema extends AnySchema>(
@@ -291,10 +291,10 @@ export function createToolFactory<TInitialContext extends Context = object>(
        */
       execute: isIteratorOutput
         ? async function* (input, callingOptions) {
-          yield* await call(disabledValidation, input as any, { signal: callingOptions.abortSignal, ...options }) as AsyncIterable<any>
+          yield* await call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal }) as AsyncIterable<any>
         }
         : (input, callingOptions) => {
-            return call(disabledValidation, input as any, { signal: callingOptions.abortSignal, ...options })
+            return call(disabledValidation, input as any, { ...options, signal: callingOptions.abortSignal })
           },
     }) as any
   }
