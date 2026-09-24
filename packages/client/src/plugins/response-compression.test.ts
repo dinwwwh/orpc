@@ -125,9 +125,10 @@ describe('responseCompressionLinkPlugin', () => {
       }),
     })
 
-    await expect(link.call(['test'], undefined, { context: {} })).rejects.toThrow(
-      'Too many content-encodings: 6, maximum allowed is 5.',
-    )
+    const promise = link.call(['test'], undefined, { context: {} })
+
+    await expect(promise).rejects.toBeInstanceOf(TypeError)
+    await expect(promise).rejects.toThrow('Too many content encodings.')
   })
 
   it('does not decompress when content-encoding is not supported', async () => {

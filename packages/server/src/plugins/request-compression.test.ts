@@ -126,7 +126,7 @@ describe('requestCompressionHandlerPlugin', () => {
     }))
 
     expect(response?.status).toBe(415)
-    await expect(response!.text()).resolves.toContain('Too many content-encodings: 6, maximum allowed is 5.')
+    await expect(response!.text()).resolves.toContain('Too many content encodings.')
     expect(procedureHandler).not.toHaveBeenCalled()
   })
 

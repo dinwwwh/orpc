@@ -48,9 +48,7 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
           headers: decompressedHeaders,
           async resolveBody(hint) {
             if (encodings.length > MAX_CONTENT_ENCODINGS) {
-              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', {
-                message: `Too many content-encodings: ${encodings.length}, maximum allowed is ${MAX_CONTENT_ENCODINGS}.`,
-              })
+              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', { message: 'Too many content encodings.' })
             }
 
             const stream = await interceptorOptions.request.resolveBody('octet-stream')
