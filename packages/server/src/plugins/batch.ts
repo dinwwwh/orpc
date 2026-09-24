@@ -4,6 +4,7 @@ import type { StandardHeaders, StandardLazyRequest, StandardResponse } from '@st
 import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
 import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRoutingInterceptor, StandardHandlerRoutingInterceptorOptions } from '../adapters/standard'
 import type { Context } from '../context'
+import { ORPCError } from '@orpc/client'
 import { toArray, value } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { encodePeerMessage, isClientPeerSendMessage, ServerPeer } from '@standard-server/peer'
@@ -169,10 +170,14 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           messages = mightBeMessages
         }
       }
-      catch {
+      catch (error) {
         return {
           matched: true,
-          response: { status: 400, headers: {}, body: 'Invalid batch request' },
+          response: {
+            status: 400,
+            headers: {},
+            body: error instanceof ORPCError ? error.message : 'Invalid batch request',
+          },
         }
       }
 
