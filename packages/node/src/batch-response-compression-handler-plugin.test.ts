@@ -268,10 +268,15 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   })
 
   describe('encoding negotiation', () => {
-    it.each(['gzip', 'deflate', 'deflate-raw'] as const)('compresses with %s when the client accepts it', async (encoding) => {
+    it.each([
+      ['gzip', 'gzip'],
+      ['deflate', 'deflate'],
+      ['deflate-raw', 'deflate-raw'],
+      ['gzip;q=0, *', 'deflate'],
+    ] as const)('given accept-encoding %s, compresses with %s', async (acceptEncoding, encoding) => {
       const handler = createHandler({ encodings: ['gzip', 'deflate', 'deflate-raw'] })
 
-      const { response } = await handler.handle(createBatchRequest('streaming', ['/ping'], { 'accept-encoding': encoding }))
+      const { response } = await handler.handle(createBatchRequest('streaming', ['/ping'], { 'accept-encoding': acceptEncoding }))
 
       expect(response!.headers.get('content-encoding')).toBe(encoding)
       await expect(decompress(response!, encoding)).resolves.toContain(largeValue)

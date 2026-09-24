@@ -3,7 +3,7 @@ import type { StandardHandlerOptions, StandardHandlerPlugin, StandardHandlerRout
 import type { StandardBodyHint, StandardHeaders } from '@standard-server/core'
 import { Duplex } from 'node:stream'
 import { constants, createDeflate, createDeflateRaw, createGzip } from 'node:zlib'
-import { isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
+import { isAcceptableEncoding, isNoTransformCacheControl, parseAcceptEncodingQualities, stringifyJSON, toArray, varyByAcceptEncoding } from '@orpc/shared'
 import { flattenStandardHeader } from '@standard-server/core'
 
 export interface BatchResponseCompressionHandlerPluginOptions {
@@ -106,7 +106,7 @@ export class BatchResponseCompressionHandlerPlugin<T extends Context> implements
       const acceptEncodings = parseAcceptEncodingQualities(
         flattenStandardHeader(interceptorOptions.request.headers['accept-encoding']),
       )
-      const encoding = this.encodings.find(enc => (acceptEncodings.get(enc) ?? 0) > 0)
+      const encoding = this.encodings.find(enc => isAcceptableEncoding(acceptEncodings, enc))
 
       if (encoding === undefined) {
         return result

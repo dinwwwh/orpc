@@ -50,26 +50,6 @@ describe('responseCompressionHandlerPlugin', () => {
       await expect(response!.json()).resolves.toEqual({ json: largeText })
     })
 
-    it('does not compress when accept-encoding has no supported coding', async () => {
-      const handler = new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
-        plugins: [
-          new ResponseCompressionHandlerPlugin({ threshold: 100 }),
-        ],
-      })
-
-      const { matched, response } = await handler.handle(new Request('http://localhost', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'accept-encoding': 'br, zstd',
-        },
-        body: JSON.stringify({ json: null }),
-      }))
-
-      expect(matched).toBe(true)
-      expect(response!.headers.has('content-encoding')).toBe(false)
-    })
-
     it('prefers the first configured encoding the client accepts', async () => {
       const handler = new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
         plugins: [
@@ -117,7 +97,11 @@ describe('responseCompressionHandlerPlugin', () => {
       ).resolves.toBe(JSON.stringify({ json: largeText }))
     })
 
-    it('skips empty tokens in accept-encoding', async () => {
+    it.each([
+      ['only unsupported codings', 'br, zstd', null],
+      ['empty list elements', ' , gzip , ', 'gzip'],
+      ['a wildcard beside an explicitly rejected coding', 'gzip;q=0, *', 'deflate'],
+    ])('negotiates accept-encoding with %s', async (_case, acceptEncoding, expected) => {
       const handler = new RPCHandler(os.handler(() => 'x'.repeat(2000)), {
         plugins: [
           new ResponseCompressionHandlerPlugin({ threshold: 100 }),
@@ -128,13 +112,13 @@ describe('responseCompressionHandlerPlugin', () => {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'accept-encoding': ' , gzip , ',
+          'accept-encoding': acceptEncoding,
         },
         body: JSON.stringify({ json: null }),
       }))
 
       expect(matched).toBe(true)
-      expect(response!.headers.get('content-encoding')).toBe('gzip')
+      expect(response!.headers.get('content-encoding')).toBe(expected)
     })
   })
 

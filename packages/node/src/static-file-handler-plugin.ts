@@ -5,7 +5,7 @@ import type { Stats } from 'node:fs'
 import { createReadStream } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { getTracer, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
+import { getTracer, isAcceptableEncoding, isCompressibleContentType, matchesHttpPathPrefix, mergeHttpPath, parseAcceptEncodingQualities, safeDecodeURIComponent, safeEncodeURIComponent, toArray } from '@orpc/shared'
 import { flattenStandardHeader, parseStandardUrl } from '@standard-server/core'
 import { toWebReadableStream } from '@standard-server/node'
 import mime from 'mime'
@@ -370,8 +370,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
       const qualities = parseAcceptEncodingQualities(flattenStandardHeader(request.headers['accept-encoding']))
 
       const variants = await Promise.all(PRECOMPRESSED_ENCODINGS
-        // An explicit q-value takes precedence over the wildcard, so `br;q=0, *` never serves brotli
-        .filter(([encoding]) => (qualities.get(encoding) ?? qualities.get('*') ?? 0) > 0)
+        .filter(([encoding]) => isAcceptableEncoding(qualities, encoding))
         .map(async ([encoding, extension]) => {
           const candidatePath = filePath + extension
           // Sidecars are reached by string concatenation, so they need the same containment check
