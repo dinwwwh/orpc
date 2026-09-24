@@ -1,5 +1,5 @@
 import type { RedisClientType } from 'redis'
-import type { BaseRedisPublisherOptions, RedisStreamEntry, RedisStreamTrimOptions } from './base-redis'
+import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
 import { BaseRedisPublisher } from './base-redis'
 
 export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
@@ -45,20 +45,10 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     }
   }
 
-  protected async addStreamEntry(key: string, data: string, trim?: RedisStreamTrimOptions): Promise<string> {
+  protected async evalScript(script: string, keys: string[], args: string[]): Promise<unknown> {
     await connectIfNeeded(this.redis)
 
-    if (!trim) {
-      return await this.redis.xAdd(key, '*', { data }) as string
-    }
-
-    const [id] = await this.redis.multi()
-      .xAdd(key, '*', { data })
-      .xTrim(key, 'MINID', trim.minId, { strategyModifier: trim.exactness })
-      .expire(key, trim.expireSeconds)
-      .exec()
-
-    return id as unknown as string
+    return await this.redis.eval(script, { keys, arguments: args })
   }
 
   protected async readStreamEntries(key: string, lastId: string): Promise<RedisStreamEntry[]> {
