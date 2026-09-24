@@ -138,7 +138,8 @@ export function hoistRecursiveRefToDef(schema: JsonSchema): JsonSchema {
  * intentionally left untouched.
  *
  * If the ref cannot be resolved (missing `$defs`, unknown key, etc.) the
- * schema is returned as-is.
+ * schema is returned as-is. Chained refs are followed until one repeats,
+ * which is kept.
  *
  * @param schema - The schema whose root-level `$ref` should be resolved.
  * @param $defs - Definition map to resolve against. If omitted, falls back to
@@ -161,25 +162,30 @@ export function resolveJsonSchemaRootLocalRef(
     return schema
   }
 
-  if (typeof schema.$ref !== 'string' || !schema.$ref.startsWith('#/$defs/')) {
-    return schema
+  const followedRefs = new Set<string>()
+  let current = schema
+
+  while (typeof current.$ref === 'string' && current.$ref.startsWith('#/$defs/') && !followedRefs.has(current.$ref)) {
+    followedRefs.add(current.$ref)
+
+    const resolved = get($defs, current.$ref.slice('#/$defs/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
+
+    if (resolved === undefined) {
+      return current
+    }
+
+    if (typeof resolved !== 'object') {
+      return resolved
+    }
+
+    const { $ref: _ref, ...rest } = current
+    current = {
+      ...rest,
+      ...resolved,
+    }
   }
 
-  const resolved = get($defs, schema.$ref.slice('#/$defs/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
-
-  if (resolved === undefined) {
-    return schema
-  }
-
-  if (typeof resolved !== 'object') {
-    return resolved
-  }
-
-  const { $ref: _ref, ...rest } = schema
-  return resolveJsonSchemaRootLocalRef({
-    ...rest,
-    ...resolved,
-  })
+  return current
 }
 
 function findRecursiveJsonSchemaDefName(defs: Exclude<JsonSchema, boolean>['$defs'] | undefined): string {

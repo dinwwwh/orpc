@@ -351,6 +351,13 @@ describe('extractJsonObjectSchemaEntries', () => {
     ])
   })
 
+  it('stops on cyclic alias refs', () => {
+    expect(extractJsonObjectSchemaEntries({
+      $ref: '#/$defs/A',
+      $defs: { A: { $ref: '#/$defs/B' }, B: { $ref: '#/$defs/A' } },
+    })).toEqual([])
+  })
+
   it('extracts properties from recursive $ref nested unions and intersections', () => {
     const schema: JsonSchema = {
       $ref: '#/$defs/Node',
@@ -979,6 +986,21 @@ describe('flattenJsonUnionSchema', () => {
     expect(flattenJsonUnionSchema(schema)).toEqual([
       { $defs: schema.$defs, $ref: '#/$defs/Missing' },
       { $defs: schema.$defs, type: 'number' },
+    ])
+  })
+
+  it('keeps cyclic alias $ref branches intact', () => {
+    const schema = {
+      $defs: {
+        A: { $ref: '#/$defs/B' },
+        B: { $ref: '#/$defs/A' },
+      },
+      anyOf: [{ $ref: '#/$defs/A' }, { type: 'string' }],
+    } satisfies JsonSchema
+
+    expect(flattenJsonUnionSchema(schema)).toEqual([
+      { $defs: schema.$defs, $ref: '#/$defs/A' },
+      { $defs: schema.$defs, type: 'string' },
     ])
   })
 
