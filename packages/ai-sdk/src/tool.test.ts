@@ -329,6 +329,34 @@ describe('createToolFactory', () => {
     }), { name: 'Alice' })
   })
 
+  it('always passes the tool call signal to the procedure', async () => {
+    const signals: (AbortSignal | undefined)[] = []
+
+    const procedure = os
+      .input(inputSchema)
+      .output(outputSchema)
+      .handler(({ input, signal }) => {
+        signals.push(signal)
+        return { greeting: `Hello, ${input.name}!` }
+      })
+
+    const streamingProcedure = os
+      .input(inputSchema)
+      .handler(async function* ({ input, signal }) {
+        signals.push(signal)
+        yield { greeting: `Hello, ${input.name}!` }
+      })
+
+    const createTool = createToolFactory({ signal: undefined } as any)
+
+    await (createTool(procedure) as any).execute({ name: 'Alice' }, { abortSignal })
+    for await (const _ of (createTool(streamingProcedure) as any).execute({ name: 'Alice' }, { abortSignal })) {
+      // consume
+    }
+
+    expect(signals).toEqual([abortSignal, abortSignal])
+  })
+
   it('accepts ai sdk tool options in the factory result', async () => {
     const procedure = os
       .input(inputSchema)
