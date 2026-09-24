@@ -177,7 +177,7 @@ describe('createRouterImplementer', () => {
           middlewares: [mid],
         })
 
-        expect(applied.nested).toBe(augmentImplementedRouterSpy.mock.results[0]!.value.nested)
+        expect((applied as any).nested).toBe(augmentImplementedRouterSpy.mock.results[0]!.value.nested)
         expect(getHiddenRouterContract(applied)).toBe(contract)
       })
 
