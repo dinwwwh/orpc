@@ -132,6 +132,34 @@ describe('parseMultipart', () => {
     }
   })
 
+  it('drops transport padding as it arrives instead of buffering it', async () => {
+    // Buffered padding is re-copied and rescanned on every chunk, which would not finish at this size
+    const body = Buffer.from(`--${boundary}${' '.repeat(8 * 1024 * 1024)}\r\nContent-Disposition: form-data; name="a"\r\n\r\nv\r\n--${boundary}--\r\n`)
+
+    const parts = await collect(body, boundary, 4096)
+    expect(parts).toHaveLength(1)
+    expect(parts[0]!.content.toString()).toBe('v')
+  })
+
+  it('limits part headers to 16 KiB however the chunks split them', async () => {
+    const withHeaderBlock = (size: number): Buffer => {
+      const disposition = 'Content-Disposition: form-data; name=""'
+      return buildBody(boundary, [[disposition.replace('""', `"${'a'.repeat(size - disposition.length)}"`), '', 'v']])
+    }
+
+    const atLimit = withHeaderBlock(16 * 1024)
+    const terminator = atLimit.indexOf('\r\n\r\n')
+
+    // Chunks ending inside the terminator must not count its first bytes against the limit
+    for (const chunkSize of [997, terminator + 1, terminator + 2, terminator + 3, atLimit.length]) {
+      expect(await collect(atLimit, boundary, chunkSize)).toHaveLength(1)
+      await expect(collect(withHeaderBlock(16 * 1024 + 1), boundary, chunkSize)).rejects.toThrow('maximum allowed size')
+    }
+
+    const oversized = withHeaderBlock(60 * 1024)
+    await expect(collect(oversized, boundary, oversized.length)).rejects.toThrow('maximum allowed size')
+  })
+
   it('tolerates leniencies other parsers disagree on', async () => {
     // Space before the header colon, accepted by the standard parser
     const spacedColon = buildBody(boundary, [['Content-Disposition : form-data; name="a"', '', 'va']])
@@ -214,6 +242,10 @@ describe('parseMultipart', () => {
     // A boundary match without a delimiter tail rejects rather than complicating the parse
     const garbageAfterBoundary = Buffer.from(`--${boundary}!!\r\n--${boundary}--\r\n`)
     await expect(collect(garbageAfterBoundary, boundary, 3)).rejects.toThrow('expected CRLF')
+
+    // The dashes of a close delimiter follow the boundary directly, never the transport padding
+    const paddedCloseDelimiter = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="a"\r\n\r\nv\r\n--${boundary} \t--\r\n`)
+    await expect(collect(paddedCloseDelimiter, boundary, 3)).rejects.toThrow('expected CRLF')
 
     const falseDelimiterInBody = buildBody(boundary, [
       ['Content-Disposition: form-data; name="a"', '', `content\r\n--${boundary}Xtail`],
@@ -342,6 +374,12 @@ describe('parseHeaderParameters', () => {
     expect(parseHeaderParameters('form-data; x; name=a')).toEqual(new Map([['name', 'a']]))
     expect(parseHeaderParameters('form-data; name=a; trailing')).toEqual(new Map([['name', 'a']]))
     expect(parseHeaderParameters('form-data; only')).toEqual(new Map())
+  })
+
+  it('stays linear on a long run of parameters without values', () => {
+    // Searching past each semicolon for an equals sign would not finish at this size
+    expect(parseHeaderParameters(`form-data${'; x'.repeat(256 * 1024)}; name=a`)).toEqual(new Map([['name', 'a']]))
+    expect(parseHeaderParameters(`form-data${';'.repeat(1024 * 1024)}`)).toEqual(new Map())
   })
 
   it('returns nothing without parameters and survives malformed input', () => {
