@@ -1,11 +1,9 @@
+import type { MultipartPart } from './multipart'
 import { Buffer } from 'node:buffer'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseHeaderParameters, parseMultipart } from './multipart'
 
-interface CollectedPart {
-  name: string
-  filename: string | undefined
-  type: string | undefined
+interface CollectedPart extends MultipartPart {
   content: Buffer
 }
 
@@ -68,9 +66,9 @@ describe('parseMultipart', () => {
       const parts = await collect(body, boundary, chunkSize)
 
       expect(parts).toHaveLength(2)
-      expect(parts[0]).toMatchObject({ name: 'field', filename: undefined, type: undefined })
+      expect(parts[0]).toMatchObject({ name: 'field', filename: undefined, type: undefined, headerSize: Buffer.byteLength('Content-Disposition: form-data; name="field"\r\n\r\n') })
       expect(parts[0]!.content.toString()).toBe('value')
-      expect(parts[1]).toMatchObject({ name: 'file', filename: 'a.txt', type: 'text/plain' })
+      expect(parts[1]).toMatchObject({ name: 'file', filename: 'a.txt', type: 'text/plain', headerSize: Buffer.byteLength('Content-Disposition: form-data; name="file"; filename="a.txt"\r\nContent-Type: text/plain\r\n\r\n') })
       expect(parts[1]!.content.toString()).toBe('file content')
     }
   })

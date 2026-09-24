@@ -74,8 +74,8 @@ const handler = new RPCHandler(router, {
     new TmpFileUploadHandlerPlugin({
       maxBodySize: {
         /**
-         * Content parsed into memory: JSON, URL-encoded forms, and the
-         * plain fields of a multipart body. Usually the lowest limit.
+         * Content parsed into memory: JSON, URL-encoded forms, and
+         * multipart fields and part headers. Usually the lowest limit.
          */
         memory: 1024 * 1024, // 1MB
 
@@ -97,7 +97,7 @@ const handler = new RPCHandler(router, {
 })
 ```
 
-A multipart body splits across the first two limits, fields against `memory` and file parts against `file`, and as a whole, framing included, it is bounded by the sum of both. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
+A multipart body splits across the first two limits, fields and part headers against `memory` and file parts against `file`, and as a whole, framing included, it is bounded by the sum of both. A declared [Content-Length](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Length) over the applicable limit rejects immediately, and enforcement continues while the body streams in, so a lying length cannot bypass it.
 
 With all three limits configured, the plugin subsumes the [Request Limit Plugin](/docs/plugins/request-limit). When the [Request Compression Plugin](/docs/plugins/request-compression) is present, limits apply to the decompressed payload rather than the compressed wire size.
 

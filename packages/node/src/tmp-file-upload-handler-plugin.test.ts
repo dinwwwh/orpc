@@ -861,9 +861,70 @@ describe('tmpFileUploadHandlerPlugin', () => {
   })
 
   describe('kind-aware size limits', () => {
-    function expectPayloadTooLarge(error: unknown): void {
+    function expectPayloadTooLarge(error: unknown): boolean {
       expect(error).toBeInstanceOf(ORPCError)
       expect((error as ORPCError<string, unknown>).code).toBe('PAYLOAD_TOO_LARGE')
+      return true
+    }
+
+    const boundary = 'X-TEST-BOUNDARY'
+    const multipartHeaders = { 'content-type': `multipart/form-data; boundary=${boundary}` }
+
+    /**
+     * Serializes parts by hand, so each part's exact cost is known.
+     */
+    function createMultipartBody(parts: Array<{ header: string, content?: string }>): { body: Buffer, headerSizes: number[], contentSizes: number[] } {
+      const headerBlocks = parts.map(part => `${part.header}\r\n\r\n`)
+      const contents = parts.map(part => part.content ?? '')
+
+      return {
+        body: Buffer.from(`${parts.map((_, i) => `--${boundary}\r\n${headerBlocks[i]}${contents[i]}\r\n`).join('')}--${boundary}--\r\n`),
+        headerSizes: headerBlocks.map(block => Buffer.byteLength(block)),
+        contentSizes: contents.map(content => Buffer.byteLength(content)),
+      }
+    }
+
+    function sum(values: number[]): number {
+      return values.reduce((total, value) => total + value, 0)
+    }
+
+    /**
+     * Counts the tmp files a rejected request created, before cleanup removes them.
+     */
+    async function countTmpFilesWhenRejected(limits: { memory?: number, file?: number }, body: Buffer): Promise<number> {
+      const plugin = new TmpFileUploadHandlerPlugin({
+        tmpDir,
+        maxBodySize: {
+          memory: limits.memory ?? Number.POSITIVE_INFINITY,
+          file: limits.file ?? Number.POSITIVE_INFINITY,
+          stream: Number.POSITIVE_INFINITY,
+        },
+      })
+      let count = 0
+
+      await plugin.init({}).routingInterceptors![0]!({
+        context: {},
+        prefix: undefined,
+        request: {
+          method: 'POST',
+          url: '/upload',
+          headers: multipartHeaders,
+          resolveBody: async () => toStream(body),
+        },
+        next: async (nextOptions) => {
+          await expect(nextOptions!.request.resolveBody()).rejects.toSatisfy(expectPayloadTooLarge)
+
+          for (const requestDir of readdirSync(tmpDir)) {
+            count += readdirSync(path.join(tmpDir, requestDir)).length
+          }
+
+          return { matched: false }
+        },
+      })
+
+      expect(readdirSync(tmpDir)).toHaveLength(0)
+
+      return count
     }
 
     it('limits json bodies against maxBodySize.memory', async () => {
@@ -884,10 +945,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
         headers: { 'content-type': 'application/json' },
         body: Buffer.from(JSON.stringify({ padding: 'x'.repeat(64) })),
         inspect: () => {},
-      })).rejects.toSatisfy((error) => {
-        expectPayloadTooLarge(error)
-        return true
-      })
+      })).rejects.toSatisfy(expectPayloadTooLarge)
 
       // Under the limit the body parses normally
       await runThroughPlugin({
@@ -906,10 +964,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body: Buffer.from(`key=${'v'.repeat(64)}`),
         inspect: () => {},
-      })).rejects.toSatisfy((error) => {
-        expectPayloadTooLarge(error)
-        return true
-      })
+      })).rejects.toSatisfy(expectPayloadTooLarge)
 
       await runThroughPlugin({
         limits: { memory: 1024 },
@@ -941,89 +996,117 @@ describe('tmpFileUploadHandlerPlugin', () => {
         headers: { 'content-type': 'application/octet-stream', 'standard-server': 'file' },
         body: Buffer.alloc(4096, 7),
         inspect: () => {},
-      })).rejects.toSatisfy((error) => {
-        expectPayloadTooLarge(error)
-        return true
-      })
+      })).rejects.toSatisfy(expectPayloadTooLarge)
 
       expect(readdirSync(tmpDir)).toHaveLength(0)
     })
 
     it('limits multipart fields and files against their own categories', async () => {
-      const form = new FormData()
-      form.append('first', 'x'.repeat(6))
-      form.append('second', 'y'.repeat(6))
-      form.append('upload-1', new File(['z'.repeat(6)], 'a.bin'))
-      form.append('upload-2', new File(['w'.repeat(6)], 'b.bin'))
+      const { body, headerSizes, contentSizes } = createMultipartBody([
+        { header: 'Content-Disposition: form-data; name="first"', content: 'x'.repeat(6) },
+        { header: 'Content-Disposition: form-data; name="upload-1"; filename="a.bin"', content: 'z'.repeat(6) },
+        { header: 'Content-Disposition: form-data; name="second"', content: 'y'.repeat(6) },
+        { header: 'Content-Disposition: form-data; name="upload-2"; filename="b.bin"', content: 'w'.repeat(6) },
+      ])
+      const memoryCost = sum(headerSizes) + contentSizes[0]! + contentSizes[2]!
+      const fileCost = contentSizes[1]! + contentSizes[3]!
 
-      const response = new Response(form)
-      const headers = { 'content-type': response.headers.get('content-type')! }
-      const body = Buffer.from(await response.arrayBuffer())
+      for (const limits of [{ memory: memoryCost }, { file: fileCost }]) {
+        await runThroughPlugin({
+          limits,
+          headers: multipartHeaders,
+          body,
+          inspect: (parsed) => {
+            expect([...(parsed as FormData)]).toHaveLength(4)
+          },
+        })
+      }
 
-      // Field bytes accumulate across parts: 12 in total
-      await expect(runThroughPlugin({
-        limits: { memory: 10 },
-        headers,
-        body,
-        inspect: () => {},
-      })).rejects.toSatisfy((error) => {
-        expectPayloadTooLarge(error)
-        return true
-      })
-
-      // File bytes accumulate across parts: 12 in total
-      await expect(runThroughPlugin({
-        limits: { file: 10 },
-        headers,
-        body,
-        inspect: () => {},
-      })).rejects.toSatisfy((error) => {
-        expectPayloadTooLarge(error)
-        return true
-      })
+      for (const limits of [{ memory: memoryCost - 1 }, { file: fileCost - 1 }]) {
+        await expect(runThroughPlugin({
+          limits,
+          headers: multipartHeaders,
+          body,
+          inspect: () => {},
+        })).rejects.toSatisfy(expectPayloadTooLarge)
+      }
 
       expect(readdirSync(tmpDir)).toHaveLength(0)
+    })
 
-      // With room for the framing in the total, both categories accommodate their 12 bytes
+    it('charges file part headers against maxBodySize.memory, so even empty file parts are never free', async () => {
+      // The smallest possible file part
+      const { body, headerSizes } = createMultipartBody(Array.from({ length: 64 }, () => ({
+        header: 'Content-Disposition: form-data; name=""; filename=""',
+      })))
+      const headerCost = sum(headerSizes)
+
       await runThroughPlugin({
-        limits: { memory: 1024, file: 1024 },
-        headers,
+        limits: { memory: headerCost },
+        headers: multipartHeaders,
         body,
         inspect: (parsed) => {
-          expect([...(parsed as FormData)]).toHaveLength(4)
+          const entries = [...(parsed as FormData)]
+
+          expect(entries).toHaveLength(64)
+          expect(entries.every(([, value]) => value instanceof TmpFile && value.size === 0)).toBe(true)
         },
       })
+
+      // The part over the limit never reaches disk
+      expect(await countTmpFilesWhenRejected({ memory: headerCost - 1 }, body)).toBe(63)
+    })
+
+    it('charges field parts their headers, so long names consume maxBodySize.memory', async () => {
+      const name = 'n'.repeat(4096)
+      const { body, headerSizes } = createMultipartBody([
+        { header: `Content-Disposition: form-data; name="${name}"` },
+        { header: `Content-Disposition: form-data; name="${name}"` },
+      ])
+      const memoryCost = sum(headerSizes)
+
+      await runThroughPlugin({
+        limits: { memory: memoryCost },
+        headers: multipartHeaders,
+        body,
+        inspect: (parsed) => {
+          expect([...(parsed as FormData)]).toEqual([[name, ''], [name, '']])
+        },
+      })
+
+      await expect(runThroughPlugin({
+        limits: { memory: memoryCost - 1 },
+        headers: multipartHeaders,
+        body,
+        inspect: () => {},
+      })).rejects.toSatisfy(expectPayloadTooLarge)
     })
 
     it('limits the whole multipart body to the sum of the memory and file limits', async () => {
-      // Payload bytes are tiny, but the multipart framing pushes the raw body over the sum
-      const form = new FormData()
-      form.append('a', 'x')
-      form.append('b', new File(['y'], 'a.bin'))
+      const content = 'y'.repeat(1024)
+      const { body: parts, headerSizes, contentSizes } = createMultipartBody([
+        { header: 'Content-Disposition: form-data; name="a"', content: 'x' },
+        { header: 'Content-Disposition: form-data; name="b"; filename="a.bin"', content },
+      ])
+      // An uncharged preamble
+      const body = Buffer.concat([Buffer.from(`${'p'.repeat(510)}\r\n`), parts])
 
-      const response = new Response(form)
-      const headers = { 'content-type': response.headers.get('content-type')! }
-      const body = Buffer.from(await response.arrayBuffer())
+      const memory = sum(headerSizes) + contentSizes[0]!
+      const file = contentSizes[1]!
 
-      expect(body.length).toBeGreaterThan(64)
-
-      await expect(runThroughPlugin({
-        limits: { memory: 32, file: 32 },
-        headers,
-        body,
-        inspect: () => {},
-      })).rejects.toSatisfy((error) => {
-        expectPayloadTooLarge(error)
-        return true
-      })
+      // Crosses the sum partway through the file part
+      expect(await countTmpFilesWhenRejected({ memory, file }, body)).toBe(1)
 
       // One infinite category lifts the total bound
       await runThroughPlugin({
-        limits: { memory: 32 },
-        headers,
+        limits: { memory },
+        headers: multipartHeaders,
         body,
-        inspect: (parsed) => {
-          expect([...(parsed as FormData)]).toHaveLength(2)
+        inspect: async (parsed) => {
+          const entries = [...(parsed as FormData)]
+
+          expect(entries).toHaveLength(2)
+          expect(await (entries[1]![1] as File).text()).toBe(content)
         },
       })
     })
@@ -1039,10 +1122,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
 
           await expect((async () => {
             while (!(await reader.read()).done);
-          })()).rejects.toSatisfy((error) => {
-            expectPayloadTooLarge(error)
-            return true
-          })
+          })()).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
 
@@ -1086,10 +1166,7 @@ describe('tmpFileUploadHandlerPlugin', () => {
           await expect((async () => {
             // eslint-disable-next-line no-empty
             for await (const _ of body as AsyncIterable<unknown>) {}
-          })()).rejects.toSatisfy((error) => {
-            expectPayloadTooLarge(error)
-            return true
-          })
+          })()).rejects.toSatisfy(expectPayloadTooLarge)
         },
       })
     })
