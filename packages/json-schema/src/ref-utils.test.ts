@@ -295,6 +295,26 @@ describe('resolveJsonSchemaRootLocalRef', () => {
     })
   })
 
+  it('stops at the first repeated ref in a cycle', () => {
+    const schema: JsonSchema = {
+      $ref: '#/$defs/A',
+      description: 'root',
+      $defs: {
+        A: { $ref: '#/$defs/B', title: 'A' },
+        B: { $ref: '#/$defs/A' },
+      },
+    }
+
+    expect(resolveJsonSchemaRootLocalRef(schema)).toEqual({ ...schema, title: 'A' })
+  })
+
+  it('follows chained refs through the $defs arg', () => {
+    expect(resolveJsonSchemaRootLocalRef({ $ref: '#/$defs/outer' }, {
+      outer: { $ref: '#/$defs/inner', title: 'outer' },
+      inner: { type: 'string' },
+    })).toEqual({ type: 'string', title: 'outer' })
+  })
+
   it('prefer $defs arg over schema.$defs even undefined', () => {
     const schema: JsonSchema = {
       $ref: '#/$defs/branch',
