@@ -106,7 +106,6 @@ export class OpenAPIComponentRegistry {
     }
 
     for (const { cleanSchema, componentName } of pendingSchemas) {
-      // Use setOwn so a component named __proto__ doesn't re-parent the document's schemas.
       setOwn(componentsSchemas, componentName, rewriteComponentSchemaRefs(cleanSchema, renameMap))
     }
 

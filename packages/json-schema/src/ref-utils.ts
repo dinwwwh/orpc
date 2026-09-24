@@ -76,7 +76,6 @@ export function mapJsonSchemaRefs(
     return value.map((item, index) => mapJsonSchemaRefs(item, map, schemaLevel, [...path, index])) as any
   }
 
-  // Use setOwn so a property or def named __proto__ stays an own key instead of re-parenting the result.
   const result: Record<string, unknown> = {}
   for (const key of Object.keys(value)) {
     const val = value[key]
