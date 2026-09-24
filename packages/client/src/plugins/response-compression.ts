@@ -74,15 +74,15 @@ export class ResponseCompressionLinkPlugin<T extends ClientContext> implements S
         ...response,
         headers: decompressedHeaders,
         async resolveBody(hint) {
-          if (encodings.length > MAX_CONTENT_ENCODINGS) {
-            throw new TypeError('Too many content encodings.')
-          }
-
           const stream = await response.resolveBody('octet-stream')
 
           // adapter might not support hint (e.g. peer adapter)
           if (!(stream instanceof ReadableStream)) {
             return stream
+          }
+
+          if (encodings.length > MAX_CONTENT_ENCODINGS) {
+            throw new TypeError('Too many content encodings.')
           }
 
           let decompressedStream = stream

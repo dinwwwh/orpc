@@ -47,15 +47,15 @@ export class RequestCompressionHandlerPlugin<T extends Context> implements Stand
           ...interceptorOptions.request,
           headers: decompressedHeaders,
           async resolveBody(hint) {
-            if (encodings.length > MAX_CONTENT_ENCODINGS) {
-              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', { message: 'Too many content encodings.' })
-            }
-
             const stream = await interceptorOptions.request.resolveBody('octet-stream')
 
             // adapter might not support hint (e.g peer adapter)
             if (!(stream instanceof ReadableStream)) {
               return stream
+            }
+
+            if (encodings.length > MAX_CONTENT_ENCODINGS) {
+              throw new ORPCError('UNSUPPORTED_MEDIA_TYPE', { message: 'Too many content encodings.' })
             }
 
             let decompressedStream = stream
