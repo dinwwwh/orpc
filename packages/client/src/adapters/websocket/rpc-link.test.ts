@@ -1,4 +1,4 @@
-import { promiseWithResolvers } from '@orpc/shared'
+import { AbortError, promiseWithResolvers } from '@orpc/shared'
 import { decodePeerMessage, encodePeerMessage } from '@standard-server/peer'
 import { createORPCClient } from '../../client'
 import { RPCLink } from './rpc-link'
@@ -258,6 +258,38 @@ describe('rpcLink', () => {
     const orpc = createORPCClient(new RPCLink({ connect: () => Promise.reject(error) })) as any
 
     await expect(orpc.ping('input')).rejects.toBe(error)
+  })
+
+  it('rejects calls after the socket closes when reconnect is disabled', async () => {
+    const ws = createWs()
+    const connect = vi.fn(() => ws)
+    const orpc = createORPCClient(new RPCLink({ connect })) as any
+
+    const firstCall = orpc.ping('first')
+
+    await vi.waitFor(() => expect(ws.send).toHaveBeenCalledTimes(1))
+    const firstRequest = getSentRequest(ws)
+    await ws.receive(await createResponseMessage({ id: firstRequest.message.id }))
+    await expect(firstCall).resolves.toEqual('pong')
+
+    await ws.close({ code: 4001, reason: 'server restart' })
+
+    await expect(orpc.ping('second')).rejects.toThrow(new AbortError('WebSocket closed (code 4001: server restart)'))
+    expect(ws.send).toHaveBeenCalledTimes(1)
+    expect(connect).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects calls when the socket closes before opening and reconnect is disabled', async () => {
+    const ws = createWs(WEBSOCKET_CONNECTING)
+    const orpc = createORPCClient(new RPCLink({ connect: () => ws })) as any
+
+    const promise = orpc.ping('input')
+
+    await vi.waitFor(() => expect(ws.addEventListener).toHaveBeenCalledWith('close', expect.any(Function)))
+    await ws.close()
+
+    await expect(promise).rejects.toThrow(new AbortError('WebSocket closed (code 1006: )'))
+    expect(ws.send).toHaveBeenCalledTimes(0)
   })
 
   it('stops retrying after the configured reconnect attempts', async () => {
