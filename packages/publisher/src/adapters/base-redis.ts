@@ -8,14 +8,15 @@ import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
 import { Publisher } from '../publisher'
 
 /**
- * Appends `ARGV[1]` to the stream at `KEYS[1]`, optionally trims entries below `ARGV[3]`
- * (`ARGV[2]` exactness) and sets a TTL of `ARGV[4]` seconds, then publishes the entry with
- * its ID to the channel of the same name, as `stringifyJSON({ data, id })` would.
+ * Appends `ARGV[2]` to the stream at `KEYS[1]`, optionally trims entries below `ARGV[4]`
+ * (`ARGV[3]` exactness) and sets a TTL of `ARGV[5]` seconds, then publishes the entry with
+ * its ID to channel `ARGV[1]`, as `stringifyJSON({ data, id })` would. The channel is an
+ * argument rather than `KEYS[1]` because clients may prefix keys but not channels.
  * Adding and publishing atomically keeps Pub/Sub delivery in stream order across
  * concurrent publishers, so a subscriber resuming from its last received ID skips nothing.
  * Kept on one line because `EVAL` sends it with every call.
  */
-const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[1]) if ARGV[2] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[2],ARGV[3]) redis.call('EXPIRE',KEYS[1],ARGV[4]) end redis.call('PUBLISH',KEYS[1],'{"data":'..ARGV[1]..',"id":"'..id..'"}')`
+const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[2]) if ARGV[3] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[3],ARGV[4]) redis.call('EXPIRE',KEYS[1],ARGV[5]) end redis.call('PUBLISH',ARGV[1],'{"data":'..ARGV[2]..',"id":"'..id..'"}')`
 
 /**
  * Options shared by every Redis-backed publisher adapter.
@@ -170,7 +171,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
       }
     }
 
-    const args = [stringifyJSON(data)]
+    const args = [channel, stringifyJSON(data)]
 
     if (!this.lastTrimTimes.has(channel)) {
       this.lastTrimTimes.set(channel, now)

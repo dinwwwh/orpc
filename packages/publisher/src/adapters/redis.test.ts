@@ -237,6 +237,41 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     await unsubscribe()
   })
 
+  it('delivers live and resumed events when the client has a keyPrefix', async ({ onTestFinished }) => {
+    // node-redis prefixes keys but not Pub/Sub channels.
+    const prefixedRedis = createClient({ url: REDIS_URL, keyPrefix: `key-prefix:${crypto.randomUUID()}:` })
+    onTestFinished(() => {
+      prefixedRedis.destroy()
+    })
+    const publisher = createTestingPublisher({
+      resume: { enabled: true, seconds: 10 },
+    }, { useRedis: prefixedRedis })
+    const event = 'orders'
+    const listener = vi.fn()
+
+    const unsubscribe = await publisher.subscribe(event, listener)
+
+    await publisher.publish(event, { order: 1 })
+    await publisher.publish(event, { order: 2 })
+
+    await vi.waitFor(() => {
+      expect(listener).toHaveBeenCalledTimes(2)
+    })
+
+    await unsubscribe()
+
+    const resumed = vi.fn()
+    const unsubscribeResumed = await publisher.subscribe(event, resumed, {
+      lastEventId: getEventMeta(listener.mock.calls[0]![0])?.id,
+    })
+
+    expect(resumed).toHaveBeenCalledTimes(1)
+    expect(resumed).toHaveBeenCalledWith({ order: 2 })
+
+    await unsubscribeResumed()
+    ;(publisher as any).subscriber.destroy()
+  })
+
   it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
     const prefix = `retention:${crypto.randomUUID()}:`
     const event = 'orders'
