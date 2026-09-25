@@ -292,6 +292,44 @@ describe('rpcLink', () => {
     expect(ws.send).toHaveBeenCalledTimes(0)
   })
 
+  it.each([
+    ['closing', WEBSOCKET_CLOSING],
+    ['closed', WEBSOCKET_CLOSED],
+  ] as const)('rejects calls when connect returns an already %s socket and reconnect is disabled', async (_, readyState) => {
+    const ws = createWs(readyState)
+    const connect = vi.fn(() => ws)
+    const orpc = createORPCClient(new RPCLink({ connect })) as any
+
+    await expect(orpc.ping('first')).rejects.toThrow(new AbortError('WebSocket is already closing or closed'))
+    await expect(orpc.ping('second')).rejects.toThrow(new AbortError('WebSocket is already closing or closed'))
+    expect(ws.send).toHaveBeenCalledTimes(0)
+    expect(connect).toHaveBeenCalledTimes(1)
+  })
+
+  it('reconnects when connect returns an already closed socket', async () => {
+    const closedSocket = createWs(WEBSOCKET_CLOSED)
+    const openSocket = createWs()
+    const connect = vi.fn()
+      .mockImplementationOnce(() => closedSocket)
+      .mockImplementationOnce(() => openSocket)
+    const orpc = createORPCClient(new RPCLink({
+      connect,
+      reconnect: { enabled: true, delay: () => 0 },
+    })) as any
+
+    const promise = orpc.ping('input')
+
+    await vi.waitFor(() => expect(openSocket.send).toHaveBeenCalledTimes(1))
+    expect(connect).toHaveBeenNthCalledWith(2, { totalAttempt: 2, attempt: 2 })
+    expect(closedSocket.send).toHaveBeenCalledTimes(0)
+    expect(closedSocket.addEventListener).toHaveBeenCalledTimes(0)
+
+    const request = getSentRequest(openSocket)
+    await openSocket.receive(await createResponseMessage({ id: request.message.id }))
+
+    await expect(promise).resolves.toEqual('pong')
+  })
+
   it('stops retrying after the configured reconnect attempts', async () => {
     const delay = vi.fn(() => 0)
     const connect = vi.fn(() => Promise.reject(new Error('temporary outage')))

@@ -182,6 +182,10 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       await sleep(this.reconnectDelay(info))
       const websocket = await this.connect(info)
 
+      if (websocket.readyState !== WEBSOCKET_CONNECTING && websocket.readyState !== WEBSOCKET_OPEN) {
+        throw new AbortError('WebSocket is already closing or closed')
+      }
+
       let closeReason: undefined | AbortError
 
       const peer = new ClientPeer(async (message) => {
