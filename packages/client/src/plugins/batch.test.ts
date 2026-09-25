@@ -961,6 +961,75 @@ describe('batchLinkPlugin', () => {
     })
   })
 
+  describe('batch option failures', () => {
+    it.each(['maxSize', 'url', 'headers', 'mode', 'mapSubrequest'] as const)('rejects every subrequest when %s throws', async (option) => {
+      const error = new Error('option failed')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], [option]: () => { throw error } })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).rejects.toBe(error),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toBe(error),
+      ])
+
+      expect(transport.send).not.toHaveBeenCalled()
+    })
+
+    it('rejects every subrequest when an option throws for a batch split by maxUrlLength', async () => {
+      const error = new Error('option failed')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path) => ({
+        method: 'GET',
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: {},
+        body: undefined,
+      }))
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          maxUrlLength: 1,
+          url: vi.fn().mockReturnValueOnce('/__batch__').mockImplementation(() => { throw error }),
+        })],
+      })
+
+      await Promise.all(['a', 'b', 'c', 'd'].map(path =>
+        expect(link.call([path], {}, { context: {} })).rejects.toBe(error),
+      ))
+
+      expect(transport.send).not.toHaveBeenCalled()
+    })
+
+    it('rejects the remaining subrequests when mapSubresponse throws for an error batch response', async () => {
+      const error = new Error('option failed')
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async () => {
+        return { status: 502, headers: {}, resolveBody: async () => 'Bad Gateway' }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mapSubresponse: vi.fn().mockImplementationOnce(subResponse => subResponse).mockImplementation(() => { throw error }),
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {} })).resolves.toBe('Bad Gateway'),
+        expect(link.call(['b'], {}, { context: {} })).rejects.toBe(error),
+        expect(link.call(['c'], {}, { context: {} })).rejects.toBe(error),
+      ])
+    })
+  })
+
   describe('method GET batch URL handling', () => {
     it('splits GET batches when URL exceeds maxUrlLength', async () => {
       const codec = makeCodec()
