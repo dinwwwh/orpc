@@ -10,7 +10,10 @@ export default [
     "link": "https://screenshotone.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "",
     "tierTitle": "Special Sponsor",
-    "tierLevel": 5
+    "tierLevel": 5,
+    "amount": 1000,
+    "createdAt": "2026-03-15T14:00:10Z",
+    "type": "Organization"
   },
   {
     "name": "Guillermo Rauch",
@@ -19,7 +22,10 @@ export default [
     "link": "http://twitter.com/rauchg?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Special Sponsor",
-    "tierLevel": 5
+    "tierLevel": 5,
+    "amount": 1000,
+    "createdAt": "2026-09-09T19:11:39Z",
+    "type": "User"
   },
   {
     "name": "Yuzu",
@@ -28,7 +34,10 @@ export default [
     "link": "https://yuzu.health/careers?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Premium Sponsor",
-    "tierLevel": 4
+    "tierLevel": 4,
+    "amount": 500,
+    "createdAt": "2026-08-31T14:58:49Z",
+    "type": "Organization"
   },
   {
     "name": "MisskeyHQ",
@@ -37,7 +46,10 @@ export default [
     "link": "https://misskey.io/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Premium Sponsor",
-    "tierLevel": 4
+    "tierLevel": 4,
+    "amount": 200,
+    "createdAt": "2025-03-24T15:22:59Z",
+    "type": "User"
   },
   {
     "name": "Nexa",
@@ -46,7 +58,10 @@ export default [
     "link": "https://github.com/nexa-ca?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Premium Sponsor",
-    "tierLevel": 4
+    "tierLevel": 4,
+    "amount": 200,
+    "createdAt": "2026-09-21T17:06:10Z",
+    "type": "Organization"
   },
   {
     "name": "LN Markets",
@@ -55,7 +70,10 @@ export default [
     "link": "https://lnmarkets.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Organization Sponsor",
-    "tierLevel": 3
+    "tierLevel": 3,
+    "amount": 50,
+    "createdAt": "2025-10-24T13:08:54Z",
+    "type": "Organization"
   },
   {
     "name": "Reece McDonald",
@@ -64,7 +82,10 @@ export default [
     "link": "https://github.com/hrmcdonald?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 25,
+    "createdAt": "2025-05-12T16:00:19Z",
+    "type": "User"
   },
   {
     "name": "あわわわとーにゅ",
@@ -73,7 +94,10 @@ export default [
     "link": "https://soymilk.party/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-03-23T23:18:55Z",
+    "type": "User"
   },
   {
     "name": "nk",
@@ -82,7 +106,10 @@ export default [
     "link": "https://github.com/nicognaW?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-04-16T10:25:27Z",
+    "type": "User"
   },
   {
     "name": "supastarter",
@@ -91,7 +118,10 @@ export default [
     "link": "https://supastarter.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-04-16T15:07:31Z",
+    "type": "Organization"
   },
   {
     "name": "Dexter Miguel",
@@ -100,7 +130,10 @@ export default [
     "link": "https://github.com/divmgl?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-05-02T03:29:29Z",
+    "type": "User"
   },
   {
     "name": "herrfugbaum",
@@ -109,7 +142,10 @@ export default [
     "link": "https://github.com/herrfugbaum?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-05-05T11:22:30Z",
+    "type": "User"
   },
   {
     "name": "Ryota Murakami",
@@ -118,7 +154,10 @@ export default [
     "link": "https://laststance.io/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-05-13T10:18:05Z",
+    "type": "User"
   },
   {
     "name": "David Cramer",
@@ -127,7 +166,10 @@ export default [
     "link": "https://cra.mr/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-05-16T04:26:52Z",
+    "type": "User"
   },
   {
     "name": "Valerii Petryniak",
@@ -136,7 +178,10 @@ export default [
     "link": "https://valerii15298.github.io/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-05-22T21:44:12Z",
+    "type": "User"
   },
   {
     "name": "Valerii Strilets",
@@ -145,7 +190,10 @@ export default [
     "link": "https://letstri.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-10-10T12:34:54Z",
+    "type": "User"
   },
   {
     "name": "Kyle Mistele",
@@ -154,7 +202,10 @@ export default [
     "link": "https://blacklight.sh/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-10-19T00:51:05Z",
+    "type": "User"
   },
   {
     "name": "christ12938",
@@ -163,7 +214,10 @@ export default [
     "link": "https://github.com/christ12938?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2025-10-30T02:44:00Z",
+    "type": "User"
   },
   {
     "name": "Ryan Soderberg",
@@ -172,7 +226,10 @@ export default [
     "link": "https://github.com/Ryanjso?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2026-01-30T23:33:16Z",
+    "type": "User"
   },
   {
     "name": "shota",
@@ -181,7 +238,10 @@ export default [
     "link": "https://github.com/itigoore01?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2026-05-21T00:28:12Z",
+    "type": "User"
   },
   {
     "name": "Ellis Driscoll",
@@ -190,7 +250,10 @@ export default [
     "link": "https://github.com/ellis-driscoll?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2026-07-30T02:53:37Z",
+    "type": "User"
   },
   {
     "name": "Hoang Nguyen",
@@ -199,7 +262,10 @@ export default [
     "link": "https://github.com/hoangbn?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2026-08-13T15:18:49Z",
+    "type": "User"
   },
   {
     "name": "Orestis Ioannou",
@@ -208,7 +274,10 @@ export default [
     "link": "https://opencollective.com/guest-ac41de3b?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2026-08-25T08:43:42.803Z",
+    "type": "User"
   },
   {
     "name": "Stefan Smiljkovic",
@@ -217,7 +286,10 @@ export default [
     "link": "https://automatio.ai/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Sponsor",
-    "tierLevel": 2
+    "tierLevel": 2,
+    "amount": 10,
+    "createdAt": "2026-09-08T14:51:48Z",
+    "type": "User"
   },
   {
     "name": "David Walsh",
@@ -226,7 +298,10 @@ export default [
     "link": "https://github.com/rhinodavid?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 8,
+    "createdAt": "2025-08-07T03:26:10Z",
+    "type": "User"
   },
   {
     "name": "IPv4Addr",
@@ -235,7 +310,10 @@ export default [
     "link": "https://github.com/IPv4Addr?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-03-12T10:09:06Z",
+    "type": "User"
   },
   {
     "name": "Robbe Vaes",
@@ -244,7 +322,10 @@ export default [
     "link": "https://robbevaes.be/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-04-12T08:00:55Z",
+    "type": "User"
   },
   {
     "name": "Aidan Sunbury",
@@ -253,7 +334,10 @@ export default [
     "link": "https://github.com/aidansunbury?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-05-20T05:38:01Z",
+    "type": "User"
   },
   {
     "name": "soonoo",
@@ -262,7 +346,10 @@ export default [
     "link": "https://github.com/soonoo?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-06-01T14:24:29Z",
+    "type": "User"
   },
   {
     "name": "Kevin Porten",
@@ -271,7 +358,10 @@ export default [
     "link": "https://kevinporten.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-10-03T12:33:00Z",
+    "type": "User"
   },
   {
     "name": "Denis",
@@ -280,7 +370,10 @@ export default [
     "link": "https://github.com/pumpkinlink?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-10-07T14:47:51Z",
+    "type": "User"
   },
   {
     "name": "Christopher Kapic",
@@ -289,7 +382,10 @@ export default [
     "link": "https://github.com/christopher-kapic?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-10-24T04:00:19Z",
+    "type": "User"
   },
   {
     "name": "Tom Ballinger",
@@ -298,7 +394,10 @@ export default [
     "link": "http://ballingt.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-10-24T18:29:25Z",
+    "type": "User"
   },
   {
     "name": "Sam",
@@ -307,7 +406,10 @@ export default [
     "link": "https://lee-sam.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2025-11-18T05:36:22Z",
+    "type": "User"
   },
   {
     "name": "Titoine",
@@ -316,7 +418,10 @@ export default [
     "link": "https://github.com/Titoine?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-01-09T14:08:34Z",
+    "type": "User"
   },
   {
     "name": "Igor Makowski",
@@ -325,7 +430,10 @@ export default [
     "link": "https://rigtch.fm/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-01-19T21:33:37Z",
+    "type": "User"
   },
   {
     "name": "hanayashiki",
@@ -334,7 +442,10 @@ export default [
     "link": "https://blog.cwang.io/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-04-04T08:42:19Z",
+    "type": "User"
   },
   {
     "name": "Lev Dubinets",
@@ -343,7 +454,10 @@ export default [
     "link": "https://dubinets.io/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-06-08T03:38:25Z",
+    "type": "User"
   },
   {
     "name": "Kelly Peilin Chan",
@@ -352,7 +466,10 @@ export default [
     "link": "https://kellychan.im/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-06-13T15:03:13Z",
+    "type": "User"
   },
   {
     "name": "Guy Ariely",
@@ -361,7 +478,10 @@ export default [
     "link": "https://guyariely.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-08-01T14:25:58Z",
+    "type": "User"
   },
   {
     "name": "PaulSenon",
@@ -370,7 +490,10 @@ export default [
     "link": "https://paulsenon.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 5,
+    "createdAt": "2026-08-30T03:12:32Z",
+    "type": "User"
   },
   {
     "name": "Alex",
@@ -379,7 +502,10 @@ export default [
     "link": "https://piscis.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 1,
+    "createdAt": "2025-04-30T09:57:34Z",
+    "type": "User"
   },
   {
     "name": "Andrey Gubanov",
@@ -388,7 +514,10 @@ export default [
     "link": "https://opensource.gubanov.eu/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Backer",
-    "tierLevel": 1
+    "tierLevel": 1,
+    "amount": 1,
+    "createdAt": "2026-05-29T20:29:45Z",
+    "type": "User"
   },
   {
     "name": "Maxie",
@@ -397,7 +526,10 @@ export default [
     "link": "https://maxie.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-03-11T02:22:27Z",
+    "type": "User"
   },
   {
     "name": "Zuplo",
@@ -406,7 +538,10 @@ export default [
     "link": "https://zuplo.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-04-02T05:15:32Z",
+    "type": "Organization"
   },
   {
     "name": "motopods",
@@ -415,7 +550,10 @@ export default [
     "link": "https://github.com/motopods?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-04-09T14:23:49Z",
+    "type": "User"
   },
   {
     "name": "Francisco Hermida",
@@ -424,7 +562,10 @@ export default [
     "link": "https://github.com/franciscohermida?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-05-02T01:10:38Z",
+    "type": "User"
   },
   {
     "name": "Théo LUDWIG",
@@ -433,7 +574,10 @@ export default [
     "link": "https://theoludwig.fr/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-05-09T13:11:36Z",
+    "type": "User"
   },
   {
     "name": "Abhay Ramesh",
@@ -442,7 +586,10 @@ export default [
     "link": "https://abhayramesh.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-05-10T17:41:05Z",
+    "type": "User"
   },
   {
     "name": "shr.ink oü",
@@ -451,7 +598,10 @@ export default [
     "link": "https://github.com/shr-ink?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-05-11T15:27:14Z",
+    "type": "Organization"
   },
   {
     "name": "0x4e32",
@@ -460,7 +610,10 @@ export default [
     "link": "https://0x4e32.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-05-13T05:53:13Z",
+    "type": "User"
   },
   {
     "name": "ryuz",
@@ -469,7 +622,10 @@ export default [
     "link": "https://github.com/ryuzdev?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-06-15T15:08:09Z",
+    "type": "User"
   },
   {
     "name": "happyboy",
@@ -478,7 +634,10 @@ export default [
     "link": "https://github.com/happyboy2022?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-07-01T16:25:19Z",
+    "type": "User"
   },
   {
     "name": "yicchi",
@@ -487,7 +646,10 @@ export default [
     "link": "https://github.com/YiCChi?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-07-17T02:52:53Z",
+    "type": "User"
   },
   {
     "name": "Saksham",
@@ -496,7 +658,10 @@ export default [
     "link": "https://saksham.work/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-07-22T21:32:51Z",
+    "type": "User"
   },
   {
     "name": "Roman Hrynevych",
@@ -505,7 +670,10 @@ export default [
     "link": "https://hrynevych.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-07-23T12:14:14Z",
+    "type": "User"
   },
   {
     "name": "rokitg",
@@ -514,7 +682,10 @@ export default [
     "link": "https://github.com/rokitgg?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-08-06T09:38:53Z",
+    "type": "User"
   },
   {
     "name": "Omar Khatib",
@@ -523,7 +694,10 @@ export default [
     "link": "http://khatib.gg/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-08-14T10:39:47Z",
+    "type": "User"
   },
   {
     "name": "Yu-Sabo",
@@ -532,7 +706,10 @@ export default [
     "link": "https://github.com/YuSabo90002?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-08-20T12:50:33Z",
+    "type": "User"
   },
   {
     "name": "Bapusaheb Patil",
@@ -541,7 +718,10 @@ export default [
     "link": "https://bapspatil.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-09T05:39:47Z",
+    "type": "User"
   },
   {
     "name": "grim",
@@ -550,7 +730,10 @@ export default [
     "link": "https://github.com/ripgrim?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-11T03:34:04Z",
+    "type": "User"
   },
   {
     "name": "Nelson Lai",
@@ -559,7 +742,10 @@ export default [
     "link": "https://nelsonlai.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-12T11:26:42Z",
+    "type": "User"
   },
   {
     "name": "Lê Cao Nguyên",
@@ -568,7 +754,10 @@ export default [
     "link": "https://github.com/nguyenlc1993?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-22T09:23:09Z",
+    "type": "User"
   },
   {
     "name": "Robert Soriano",
@@ -577,7 +766,10 @@ export default [
     "link": "https://robsoriano.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-25T02:59:20Z",
+    "type": "User"
   },
   {
     "name": "Andrew Peters",
@@ -586,7 +778,10 @@ export default [
     "link": "https://github.com/andrewpeters9?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-26T03:26:25Z",
+    "type": "User"
   },
   {
     "name": "Ryan Vogel",
@@ -595,7 +790,10 @@ export default [
     "link": "https://ryan.ceo/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-26T15:57:48Z",
+    "type": "User"
   },
   {
     "name": "SKostyukovich",
@@ -604,7 +802,10 @@ export default [
     "link": "https://github.com/SKostyukovich?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-10-27T04:21:43Z",
+    "type": "User"
   },
   {
     "name": "Peter Adam",
@@ -613,7 +814,10 @@ export default [
     "link": "https://github.com/peter-adam-dy?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-11-02T13:17:28Z",
+    "type": "User"
   },
   {
     "name": "Fabworks",
@@ -622,7 +826,10 @@ export default [
     "link": "https://fabworks.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-11-04T17:26:27Z",
+    "type": "Organization"
   },
   {
     "name": "Novak Antonijevic",
@@ -631,7 +838,10 @@ export default [
     "link": "https://github.com/NovakAnton?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-11-15T10:28:15Z",
+    "type": "User"
   },
   {
     "name": "Laduni Estu Syalwa",
@@ -640,7 +850,10 @@ export default [
     "link": "https://dun.gg/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-11-17T14:33:48Z",
+    "type": "User"
   },
   {
     "name": "Chen, Zhi-Yuan",
@@ -649,7 +862,10 @@ export default [
     "link": "https://github.com/yukimotochern?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-12-06T01:58:38Z",
+    "type": "User"
   },
   {
     "name": "Illarion Koperski",
@@ -658,7 +874,10 @@ export default [
     "link": "https://illarionvk.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-01-19T11:54:08Z",
+    "type": "User"
   },
   {
     "name": "Anees Iqbal",
@@ -667,7 +886,10 @@ export default [
     "link": "https://aneesiqbal.ai/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-01-28T05:37:06Z",
+    "type": "User"
   },
   {
     "name": "Sefa Eyeoglu",
@@ -676,7 +898,10 @@ export default [
     "link": "https://scrumplex.net/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-02-19T13:13:45Z",
+    "type": "User"
   },
   {
     "name": "natt",
@@ -685,7 +910,10 @@ export default [
     "link": "https://natt.so/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-04-23T23:23:31Z",
+    "type": "User"
   },
   {
     "name": "Adam Tkaczyk",
@@ -694,7 +922,10 @@ export default [
     "link": "https://tkaczyk.dev/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-05-15T07:51:35Z",
+    "type": "User"
   },
   {
     "name": "plancraft",
@@ -703,7 +934,10 @@ export default [
     "link": "https://plancraft.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-05-18T11:16:16Z",
+    "type": "Organization"
   },
   {
     "name": "Nicholas",
@@ -712,6 +946,9 @@ export default [
     "link": "https://github.com/Nic13Gamer?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
-    "tierLevel": 0
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2026-06-28T20:17:54Z",
+    "type": "User"
   }
 ]

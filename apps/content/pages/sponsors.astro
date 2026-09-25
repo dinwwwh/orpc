@@ -1,0 +1,46 @@
+---
+import PageLayout from 'blume/components/layout/PageLayout.astro'
+import data from 'blume:data'
+import { pastSponsors, sponsorTiers } from '../sponsors/data'
+import Footer from './_home/Footer.astro'
+import Intro from './_sponsors/Intro.astro'
+import Join from './_sponsors/Join.astro'
+import PastSponsors from './_sponsors/PastSponsors.astro'
+import SponsorTable from './_sponsors/SponsorTable.astro'
+
+export const prerender = true
+
+const { config } = data
+
+const description
+  = 'Everyone who funds oRPC, what each sponsor pledges per month, and the past sponsors who helped get it here.'
+
+const tiers = sponsorTiers()
+const past = pastSponsors()
+---
+
+<PageLayout
+  site={{ title: config.title, description: config.description }}
+  logo={config.logo}
+  banner={config.banner}
+  analytics={config.analytics}
+  navigation={data.navigation}
+  favicon={config.favicon}
+  fontCssVars={data.fontCssVars}
+  themeMode={config.theme.mode}
+  searchEnabled={config.search.enabled}
+  siteUrl={config.site}
+  ogEnabled={config.og.enabled}
+  page={{ title: `Sponsors - ${config.title}`, description, route: '/sponsors' }}
+  x={config.x}
+>
+  <Intro tiers={tiers} past={past} />
+  {tiers.length > 0 && <SponsorTable tiers={tiers} />}
+  {past.length > 0 && <PastSponsors sponsors={past} />}
+  <Join />
+  <Footer slot="footer" />
+</PageLayout>
+
+<script>
+  import '../sponsors/avatar-fallback'
+</script>

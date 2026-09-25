@@ -1,0 +1,108 @@
+---
+import type { Sponsor, SponsorTier } from '../../sponsors/data'
+import Icon from 'blume/components/Icon.astro'
+import { avatarSrc, GITHUB_SPONSORS_URL, OPEN_COLLECTIVE_URL } from '../../sponsors/data'
+import { monthYear, usd } from './format'
+
+interface Props {
+  tiers: SponsorTier[]
+  past: Sponsor[]
+}
+
+const { tiers, past } = Astro.props
+
+const active = tiers.flatMap(tier => tier.sponsors)
+const amounts = active.map(sponsor => sponsor.amount).sort((a, b) => a - b)
+const middle = Math.floor(amounts.length / 2)
+
+// The median needs at least one active sponsor.
+const stats = active.length === 0
+  ? []
+  : [
+      { value: usd(tiers.reduce((sum, tier) => sum + tier.total, 0)), label: 'Pledged each month' },
+      { value: active.length, label: 'Active sponsors' },
+      {
+        value: usd(amounts.length % 2 === 1 ? amounts[middle]! : (amounts[middle - 1]! + amounts[middle]!) / 2),
+        label: 'Median pledge',
+      },
+      {
+        value: active.length + past.length,
+        label: `Sponsors since ${monthYear([...active, ...past].map(sponsor => sponsor.createdAt).sort()[0]!)}`,
+      },
+    ]
+---
+
+<section class="relative isolate overflow-hidden border-b border-border">
+  <div aria-hidden="true" class="orpc-dots"></div>
+
+  <div class="relative mx-auto max-w-6xl px-6 pt-16 pb-14 sm:pt-24 sm:pb-20">
+    <div class="mx-auto max-w-3xl text-center">
+      {
+        active.length > 0 && (
+          <a
+            href="#sponsors"
+            class="inline-flex max-w-full items-center gap-2.5 rounded-full border border-border bg-background/60 py-1 pr-3 pl-1 text-xs font-medium text-muted-foreground backdrop-blur transition-colors hover:border-foreground/25 hover:text-foreground"
+          >
+            <span aria-hidden="true" class="flex flex-none -space-x-1.5">
+              {active.slice(0, 5).map(sponsor => (
+                <img
+                  alt=""
+                  class:list={[
+                    'size-5 bg-muted object-cover ring-2 ring-background',
+                    sponsor.type === 'Organization' ? 'rounded-[0.3rem]' : 'rounded-full',
+                  ]}
+                  data-monogram={sponsor.name}
+                  data-no-zoom
+                  height="20"
+                  src={avatarSrc(sponsor.avatar, 20)}
+                  width="20"
+                />
+              ))}
+            </span>
+            <span class="truncate">This month's sponsors</span>
+            <Icon name="arrow-down" size={12} class="flex-none" />
+          </a>
+        )
+      }
+
+      <h1
+        class="font-display mt-7 text-4xl leading-[1.05] font-bold tracking-[-0.045em] text-balance sm:text-6xl"
+      >
+        The people who<br class="hidden sm:block" /> keep oRPC going.
+      </h1>
+
+      <p class="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-balance text-muted-foreground sm:text-lg">
+        oRPC is MIT licensed and built in the open. These sponsors pay for the time that goes
+        into it: fixes, features, reviews, and the docs you are reading.
+      </p>
+
+      <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <a class="orpc-btn orpc-btn-primary" href={GITHUB_SPONSORS_URL} rel="noopener" target="_blank">
+          <Icon name="heart" size={15} />
+          Sponsor on GitHub
+        </a>
+        <a class="orpc-btn orpc-btn-ghost" href={OPEN_COLLECTIVE_URL} rel="noopener" target="_blank">
+          <Icon name="hand-coins" size={15} />
+          Open Collective
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {
+    stats.length > 0 && (
+      <div class="relative border-t border-border">
+        <ul class="orpc-stats mx-auto max-w-6xl px-6" style={`--orpc-stat-count:${stats.length}`}>
+          {stats.map(stat => (
+            <li class="orpc-stat">
+              <div>
+                <span class="orpc-stat-value">{stat.value}</span>
+                <span class="orpc-stat-label">{stat.label}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+</section>

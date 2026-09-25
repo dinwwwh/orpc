@@ -178,7 +178,7 @@ Like what we build over at [middleapi](https://github.com/middleapi)? You can he
   </tr>
 </table>
 
-With thanks to [36 past sponsors](https://htmlpreview.github.io/?https://github.com/middleapi/static/blob/main/sponsors.svg) who helped get oRPC here.
+With thanks to [36 past sponsors](https://orpc.dev/sponsors#past-sponsors) who helped get oRPC here.
 
 ## References
 
