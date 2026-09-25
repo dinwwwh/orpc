@@ -182,9 +182,15 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       await sleep(this.reconnectDelay(info))
       const websocket = await this.connect(info)
 
+      let closeReason: undefined | AbortError
+
       const peer = new ClientPeer(async (message) => {
+        // `send` silently discards data once the socket is closed, so requests would never settle
+        if (closeReason) {
+          throw closeReason
+        }
+
         const encoded = await encodePeerMessage(message, this.encodePeerMessageOptions)
-        // WebSocket throws on non-open state, so no manual readyState check needed
         return websocket.send(encoded)
       })
 
@@ -212,6 +218,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
       }))
 
       websocket.addEventListener('close', async (event) => {
+        closeReason = new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)
         connectingResolvers?.resolve()
 
         if (this.reconnectOnCloseEnabled) {
@@ -220,8 +227,7 @@ export class WebSocketLinkTransport<T extends ClientContext> implements Standard
             .catch(() => {})
         }
 
-        const reason = new AbortError(`WebSocket closed (code ${event.code}: ${event.reason})`)
-        await peer.close(reason)
+        await peer.close(closeReason)
       })
 
       await connectingResolvers?.promise
