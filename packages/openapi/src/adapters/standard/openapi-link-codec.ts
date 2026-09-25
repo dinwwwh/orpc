@@ -508,7 +508,7 @@ function encodeDelimitedArray(serializedValues: unknown[], encodedDelimiter: str
 
 function encodeDelimitedObject(entries: [string, unknown][], encodedDelimiter: string): string | undefined {
   const strings = entries
-    .filter(([v]) => v !== null && v !== undefined)
+    .filter(([, v]) => v !== null && v !== undefined)
     .map(([k, v]) => [k, String(v)]) as [string, string][]
 
   if (!strings.length) {

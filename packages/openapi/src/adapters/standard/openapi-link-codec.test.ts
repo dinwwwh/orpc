@@ -426,6 +426,43 @@ describe('openAPILinkCodec', () => {
         expect(request.url).toBe('/api/search')
       })
 
+      it('omits null and undefined members for delimiter-based query styles', async () => {
+        const codec = new OpenAPILinkCodec({
+          search: oc.meta(openapi({
+            method: 'GET',
+            queryStyles: {
+              commaArray: 'comma-delimited-array',
+              commaObject: 'comma-delimited-object',
+              spaceArray: 'space-delimited-array',
+              spaceObject: 'space-delimited-object',
+              pipeArray: 'pipe-delimited-array',
+              pipeObject: 'pipe-delimited-object',
+              emptyObject: 'comma-delimited-object',
+            },
+          })),
+        }, { url: '/api', serializer })
+
+        const request = await codec.encodeInput({
+          commaArray: [undefined, '1', null],
+          commaObject: { a: undefined, b: '1', c: null },
+          spaceArray: [undefined, '1', null],
+          spaceObject: { a: undefined, b: '1', c: null },
+          pipeArray: [undefined, '1', null],
+          pipeObject: { a: undefined, b: '1', c: null },
+          emptyObject: { a: undefined, b: null },
+        }, ['search'], { context: {} })
+
+        const searchParams = new URL(request.url, 'http://localhost').searchParams
+
+        expect(searchParams.get('commaArray')).toBe('1')
+        expect(searchParams.get('commaObject')).toBe('b,1')
+        expect(searchParams.get('spaceArray')).toBe('1')
+        expect(searchParams.get('spaceObject')).toBe('b 1')
+        expect(searchParams.get('pipeArray')).toBe('1')
+        expect(searchParams.get('pipeObject')).toBe('b|1')
+        expect(searchParams.has('emptyObject')).toBe(false)
+      })
+
       it('serializes compact GET input as a query when no explicit query styles are defined', async () => {
         const codec = new OpenAPILinkCodec({
           list: oc.meta(openapi({ method: 'GET' })),
