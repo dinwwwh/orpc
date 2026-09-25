@@ -258,5 +258,30 @@ describe('memoryPublisher', () => {
 
       await unsub2()
     })
+
+    it('delivers to every listener even when one unsubscribes itself while receiving', async () => {
+      const publisher = new MemoryPublisher<TestEvents>()
+
+      let unsubscribeFirst: () => Promise<void>
+      const first = vi.fn(() => {
+        void unsubscribeFirst()
+      })
+      const second = vi.fn()
+
+      unsubscribeFirst = await publisher.subscribe('message', first)
+      const unsubscribeSecond = await publisher.subscribe('message', second)
+
+      await publisher.publish('message', { text: 'first' })
+
+      expect(first).toHaveBeenCalledTimes(1)
+      expect(second).toHaveBeenCalledTimes(1)
+
+      await publisher.publish('message', { text: 'second' })
+
+      expect(first).toHaveBeenCalledTimes(1)
+      expect(second).toHaveBeenCalledTimes(2)
+
+      await unsubscribeSecond()
+    })
   })
 })
