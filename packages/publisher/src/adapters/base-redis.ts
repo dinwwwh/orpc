@@ -8,12 +8,9 @@ import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
 import { Publisher } from '../publisher'
 
 /**
- * Appends `ARGV[2]` to the stream at `KEYS[1]`, optionally trims entries below `ARGV[4]`
- * (`ARGV[3]` exactness) and sets a TTL of `ARGV[5]` seconds, then publishes the entry with
- * its ID to channel `ARGV[1]`, as `stringifyJSON({ data, id })` would. The channel is an
- * argument rather than `KEYS[1]` because clients may prefix keys but not channels.
- * Adding and publishing atomically keeps Pub/Sub delivery in stream order across
- * concurrent publishers, so a subscriber resuming from its last received ID skips nothing.
+ * Adds `ARGV[2]` to stream `KEYS[1]` and publishes it with its ID to channel `ARGV[1]`,
+ * trimming and setting a TTL when `ARGV[3..5]` are given. One script keeps Pub/Sub order
+ * equal to stream order. The channel is not `KEYS[1]` because clients may prefix keys only.
  * Kept on one line because `EVAL` sends it with every call.
  */
 const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[2]) if ARGV[3] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[3],ARGV[4]) redis.call('EXPIRE',KEYS[1],ARGV[5]) end redis.call('PUBLISH',ARGV[1],'{"data":'..ARGV[2]..',"id":"'..id..'"}')`
@@ -165,10 +162,13 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
     const now = Date.now()
     const windowMs = this.resumeSeconds * 1000
 
+    // Entries are inserted in time order, so expired ones come first.
     for (const [trimmedChannel, trimTime] of this.lastTrimTimes) {
-      if (trimTime + windowMs < now) {
-        this.lastTrimTimes.delete(trimmedChannel)
+      if (trimTime + windowMs >= now) {
+        break
       }
+
+      this.lastTrimTimes.delete(trimmedChannel)
     }
 
     const args = [channel, stringifyJSON(data)]

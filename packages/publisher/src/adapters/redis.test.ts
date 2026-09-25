@@ -240,11 +240,14 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
   it('delivers live and resumed events when the client has a keyPrefix', async ({ onTestFinished }) => {
     // node-redis prefixes keys but not Pub/Sub channels.
     const prefixedRedis = createClient({ url: REDIS_URL, keyPrefix: `key-prefix:${crypto.randomUUID()}:` })
+    const subscriber = prefixedRedis.duplicate()
     onTestFinished(() => {
       prefixedRedis.destroy()
+      subscriber.destroy()
     })
     const publisher = createTestingPublisher({
       resume: { enabled: true, seconds: 10 },
+      subscriber,
     }, { useRedis: prefixedRedis })
     const event = 'orders'
     const listener = vi.fn()
@@ -269,7 +272,6 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     expect(resumed).toHaveBeenCalledWith({ order: 2 })
 
     await unsubscribeResumed()
-    ;(publisher as any).subscriber.destroy()
   })
 
   it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
