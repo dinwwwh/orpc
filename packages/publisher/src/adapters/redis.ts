@@ -22,6 +22,12 @@ export interface RedisPublisherOptions extends BaseRedisPublisherOptions {
 export class RedisPublisher<T extends Record<string, object>> extends BaseRedisPublisher<T> {
   private readonly subscriber: Exclude<RedisPublisherOptions['subscriber'], undefined>
 
+  /**
+   * node-redis applies `keyPrefix` to keys but not channels, while the publish script
+   * publishes on its key, so channels need the same prefix.
+   */
+  private readonly channelPrefix: string
+
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
     { subscriber, ...options }: RedisPublisherOptions = {},
@@ -29,19 +35,22 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     super(options)
 
     this.subscriber = subscriber ?? redis.duplicate()
+    this.channelPrefix = String(redis.options?.keyPrefix ?? '')
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
     await connectIfNeeded(this.redis)
-    await this.redis.publish(channel, message)
+    await this.redis.publish(`${this.channelPrefix}${channel}`, message)
   }
 
   protected async subscribeChannel(channel: string, listener: (message: unknown) => void): Promise<() => Promise<void>> {
+    const prefixedChannel = `${this.channelPrefix}${channel}`
+
     await connectIfNeeded(this.subscriber)
-    await this.subscriber.subscribe(channel, listener)
+    await this.subscriber.subscribe(prefixedChannel, listener)
 
     return async () => {
-      await this.subscriber.unsubscribe(channel, listener)
+      await this.subscriber.unsubscribe(prefixedChannel, listener)
     }
   }
 

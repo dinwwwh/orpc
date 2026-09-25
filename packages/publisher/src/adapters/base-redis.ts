@@ -8,12 +8,11 @@ import { getEventMeta, unwrapEvent, withEventMeta } from '@standard-server/core'
 import { Publisher } from '../publisher'
 
 /**
- * Adds `ARGV[2]` to stream `KEYS[1]` and publishes it with its ID to channel `ARGV[1]`,
- * trimming and setting a TTL when `ARGV[3..5]` are given. One script keeps Pub/Sub order
- * equal to stream order. The channel is not `KEYS[1]` because clients may prefix keys only.
- * Kept on one line because `EVAL` sends it with every call.
+ * Adds `ARGV[1]` to stream `KEYS[1]` and publishes it with its ID to the channel of the same name,
+ * trimming and setting a TTL when `ARGV[2..4]` are given. One script keeps Pub/Sub order
+ * equal to stream order. Kept on one line because `EVAL` sends it with every call.
  */
-const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[2]) if ARGV[3] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[3],ARGV[4]) redis.call('EXPIRE',KEYS[1],ARGV[5]) end redis.call('PUBLISH',ARGV[1],'{"data":'..ARGV[2]..',"id":"'..id..'"}')`
+const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[1]) if ARGV[2] then redis.call('XTRIM',KEYS[1],'MINID',ARGV[2],ARGV[3]) redis.call('EXPIRE',KEYS[1],ARGV[4]) end redis.call('PUBLISH',KEYS[1],'{"data":'..ARGV[1]..',"id":"'..id..'"}')`
 
 /**
  * Options shared by every Redis-backed publisher adapter.
@@ -22,7 +21,8 @@ const PUBLISH_SCRIPT = `local id=redis.call('XADD',KEYS[1],'*','data',ARGV[2]) i
  */
 export interface BaseRedisPublisherOptions extends PublisherOptions {
   /**
-   * The prefix to use for Redis keys.
+   * The prefix to use for Redis keys and Pub/Sub channels.
+   * Set it to isolate events when several apps share one Redis instance.
    *
    * @default ''
    */
@@ -142,6 +142,8 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
   /**
    * Runs a Lua script (`EVAL script numkeys key [key ...] arg [arg ...]`) and resolves with its reply.
+   * The publish script also uses its key as the Pub/Sub channel, so a client that prefixes
+   * keys must prefix channels the same way.
    */
   protected abstract evalScript(script: string, keys: string[], args: string[]): Promise<unknown>
 
@@ -171,7 +173,7 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
       this.lastTrimTimes.delete(trimmedChannel)
     }
 
-    const args = [channel, stringifyJSON(data)]
+    const args = [stringifyJSON(data)]
 
     if (!this.lastTrimTimes.has(channel)) {
       this.lastTrimTimes.set(channel, now)
