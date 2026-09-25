@@ -295,18 +295,22 @@ describe('dedupeLinkPlugin', () => {
     expect(resolveBody).toHaveBeenCalledTimes(1)
   })
 
-  it('reuses the resolved body for repeated reads of the same replicated response', async () => {
+  it('reuses the resolved body for repeated and concurrent reads of the same replicated response', async () => {
     const codec: StandardLinkCodec<TestContext> = {
       ...makeCodec(),
       decodeResponse: vi.fn(async (response) => {
-        const firstBody = await response.resolveBody()
-        const secondBody = await response.resolveBody()
+        const [firstBody, concurrentBody] = await Promise.all([
+          response.resolveBody(),
+          response.resolveBody(),
+        ])
+        const laterBody = await response.resolveBody()
 
-        expect(secondBody).toBe(firstBody)
+        expect(concurrentBody).toBe(firstBody)
+        expect(laterBody).toBe(firstBody)
 
         return {
           kind: 'output' as const,
-          output: secondBody,
+          output: firstBody,
         }
       }),
     }
