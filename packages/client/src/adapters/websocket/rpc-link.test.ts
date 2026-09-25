@@ -347,6 +347,80 @@ describe('rpcLink', () => {
     expect(connect).toHaveBeenCalledTimes(1)
   })
 
+  it('fails every call waiting on a reconnect cycle that gives up', async () => {
+    const connect = vi.fn(() => Promise.reject(new Error('temporary outage')))
+    const orpc = createORPCClient(new RPCLink({
+      connect,
+      reconnect: { enabled: true, delay: () => 0, maxAttempt: 3 },
+    })) as any
+
+    await Promise.all(['first', 'second', 'third'].map(input => expect(orpc.ping(input)).rejects.toMatchObject({
+      message: 'WebSocket reconnect failed after 3 attempt(s)',
+      cause: { message: 'temporary outage' },
+    })))
+    expect(connect).toHaveBeenCalledTimes(3)
+  })
+
+  it.each([
+    ['connect throws', () => Promise.reject(new Error('temporary outage')), 'temporary outage'],
+    ['socket closes before opening', () => {
+      const ws = createWs(WEBSOCKET_CONNECTING)
+      setTimeout(() => ws.close())
+      return ws
+    }, 'WebSocket closed (code 1006: )'],
+  ])('starts a new reconnect cycle on the next call after giving up (%s)', async (_, fail, cause) => {
+    const recoveredSocket = createWs()
+    const connect = vi.fn()
+      .mockImplementationOnce(fail)
+      .mockImplementationOnce(fail)
+      .mockImplementationOnce(() => recoveredSocket)
+    const orpc = createORPCClient(new RPCLink({
+      connect,
+      reconnect: { enabled: true, delay: () => 0, maxAttempt: 2 },
+    })) as any
+
+    await expect(orpc.ping('first')).rejects.toMatchObject({
+      message: 'WebSocket reconnect failed after 2 attempt(s)',
+      cause: { message: cause },
+    })
+    expect(connect).toHaveBeenCalledTimes(2)
+
+    const secondCall = orpc.ping('second')
+
+    await vi.waitFor(() => expect(recoveredSocket.send).toHaveBeenCalledTimes(1))
+    expect(connect).toHaveBeenNthCalledWith(3, { totalAttempt: 3, attempt: 1 })
+
+    const request = getSentRequest(recoveredSocket)
+    await recoveredSocket.receive(await createResponseMessage({ id: request.message.id, body: { json: 'recovered' } }))
+    await expect(secondCall).resolves.toEqual('recovered')
+  })
+
+  it('stops connecting once maxTotalAttempt is reached, successful attempts included', async () => {
+    const firstSocket = createWs()
+    const connect = vi.fn()
+      .mockImplementationOnce(() => firstSocket)
+      .mockRejectedValue(new Error('temporary outage'))
+    const orpc = createORPCClient(new RPCLink({
+      connect,
+      reconnect: { enabled: true, delay: () => 0, maxTotalAttempt: 3 },
+    })) as any
+
+    const firstCall = orpc.ping('first')
+
+    await vi.waitFor(() => expect(firstSocket.send).toHaveBeenCalledTimes(1))
+    await firstSocket.receive(await createResponseMessage({ id: getSentRequest(firstSocket).message.id }))
+    await expect(firstCall).resolves.toEqual('pong')
+
+    await firstSocket.close()
+
+    const error = new AbortError('WebSocket reconnect stopped after 3 total attempt(s)')
+    await Promise.all(['second', 'third'].map(input => expect(orpc.ping(input)).rejects.toThrow(error)))
+    expect(connect).toHaveBeenCalledTimes(3)
+
+    await expect(orpc.ping('fourth')).rejects.toThrow(error)
+    expect(connect).toHaveBeenCalledTimes(3)
+  })
+
   it('uses the default reconnect backoff before retrying a transient connection failure', async ({ onTestFinished }) => {
     vi.useFakeTimers()
     onTestFinished(() => {
@@ -486,5 +560,33 @@ describe('rpcLink', () => {
 
     await vi.waitFor(() => expect(connect).toHaveBeenCalledTimes(2))
     expect(unhandledRejectionHandler).toHaveBeenCalledTimes(0) // no background error
+  })
+
+  it('stops proactive reconnects once a reconnect cycle gives up', async ({ onTestFinished }) => {
+    vi.useFakeTimers()
+    onTestFinished(() => {
+      vi.useRealTimers()
+    })
+
+    const firstSocket = createWs()
+    const connect = vi.fn(() => {
+      const ws = createWs(WEBSOCKET_CONNECTING)
+      setTimeout(() => ws.close())
+      return ws
+    }).mockImplementationOnce(() => firstSocket)
+
+    createORPCClient(new RPCLink({
+      connect,
+      connectOnInit: true,
+      reconnect: { enabled: true, delay: () => 0, maxAttempt: 2, onClose: { enabled: true } },
+    }))
+
+    await vi.advanceTimersByTimeAsync(0)
+    expect(connect).toHaveBeenCalledTimes(1)
+
+    await firstSocket.close()
+    await vi.advanceTimersByTimeAsync(10_000)
+
+    expect(connect).toHaveBeenCalledTimes(3)
   })
 })
