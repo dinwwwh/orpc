@@ -295,7 +295,29 @@ describe('dedupeLinkPlugin', () => {
     expect(resolveBody).toHaveBeenCalledTimes(1)
   })
 
-  it('reuses the resolved body for repeated and concurrent reads of the same replicated response', async () => {
+  it.each([
+    [
+      'readable-stream',
+      () => new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1, 2]))
+          controller.enqueue(new Uint8Array([3, 4]))
+          controller.close()
+        },
+      }),
+      (output: unknown) => readAllStream(output as ReadableStream<Uint8Array>),
+      [new Uint8Array([1, 2]), new Uint8Array([3, 4])],
+    ],
+    [
+      'async-iterator',
+      async function* () {
+        yield 'first'
+        yield 'second'
+      },
+      (output: unknown) => readAllAsync(output as AsyncIterable<string>),
+      ['first', 'second'],
+    ],
+  ])('reuses the resolved %s body for repeated and concurrent reads of the same replicated response', async (_name, createBody, readAll, expected) => {
     const codec: StandardLinkCodec<TestContext> = {
       ...makeCodec(),
       decodeResponse: vi.fn(async (response) => {
@@ -314,11 +336,7 @@ describe('dedupeLinkPlugin', () => {
         }
       }),
     }
-    const resolveBody = vi.fn(async () => new ReadableStream({ start(controller) {
-      controller.enqueue(new Uint8Array([1, 2]))
-      controller.enqueue(new Uint8Array([3, 4]))
-      controller.close()
-    } }))
+    const resolveBody = vi.fn(async () => createBody())
     const transport = makeTransport(resolveBody)
 
     const link = new StandardLink(codec, transport, {
@@ -332,14 +350,8 @@ describe('dedupeLinkPlugin', () => {
       link.call(['GET', 'planet'], { value: 1 }, { context: {} }),
     ])
 
-    await expect(readAllStream(output1 as ReadableStream<Uint8Array>)).resolves.toEqual([
-      new Uint8Array([1, 2]),
-      new Uint8Array([3, 4]),
-    ])
-    await expect(readAllStream(output2 as ReadableStream<Uint8Array>)).resolves.toEqual([
-      new Uint8Array([1, 2]),
-      new Uint8Array([3, 4]),
-    ])
+    await expect(readAll(output1)).resolves.toEqual(expected)
+    await expect(readAll(output2)).resolves.toEqual(expected)
     expect(resolveBody).toHaveBeenCalledTimes(1)
   })
 
