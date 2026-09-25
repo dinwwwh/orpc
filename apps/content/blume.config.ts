@@ -52,14 +52,13 @@ export default defineConfig({
       { label: 'Blog', path: '/blog', href: '/blog' },
       { label: 'Comparison', path: '/docs', href: '/docs/comparison' },
       { label: 'From V1', path: '/docs', href: '/docs/migrations/from-v1' },
+      { label: 'Sponsors', path: '/sponsors', href: '/sponsors' },
       {
         label: 'More',
         path: '',
         items: [
           { label: 'Releases', path: 'https://github.com/middleapi/orpc/releases' },
           { label: 'Discussions', path: 'https://github.com/middleapi/orpc/discussions' },
-          { label: 'GitHub Sponsors', path: 'https://github.com/sponsors/dinwwwh' },
-          { label: 'Open Collective', path: 'https://opencollective.com/middleapi' },
           { label: 'LLM Context', path: 'https://orpc.dev/llms.txt' },
           { label: 'LLM Context (Full)', path: 'https://orpc.dev/llms-full.txt' },
           { label: 'V1 Documentation', path: 'https://v1.orpc.dev' },

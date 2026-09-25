@@ -692,20 +692,20 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
     border-inline-start: 0;
   }
 
-  .orpc-stat > a {
+  .orpc-stat > :is(a, div) {
     padding-inline: 1.5rem;
   }
 
-  .orpc-stat:first-child > a {
+  .orpc-stat:first-child > :is(a, div) {
     padding-inline-start: 0;
   }
 
-  .orpc-stat:last-child > a {
+  .orpc-stat:last-child > :is(a, div) {
     padding-inline-end: 0;
   }
 }
 
-.orpc-stat > a {
+.orpc-stat > :is(a, div) {
   display: block;
   padding: 2rem 1.5rem;
   transition: background-color 0.15s ease;
@@ -713,14 +713,14 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 
 /* Align the first value in each row with the section gutter above it. Scoped to
    the two-column tier: these selectors outrank the wider tier's plain
-   `.orpc-stat > a` padding, so unscoped they would strip the inner padding off
-   the third and fourth cells there too. */
+   `.orpc-stat > :is(a, div)` padding, so unscoped they would strip the inner
+   padding off the third and fourth cells there too. */
 @media (max-width: 63.9375rem) {
-  .orpc-stat:nth-child(odd) > a {
+  .orpc-stat:nth-child(odd) > :is(a, div) {
     padding-inline-start: 0;
   }
 
-  .orpc-stat:nth-child(even) > a {
+  .orpc-stat:nth-child(even) > :is(a, div) {
     padding-inline-end: 0;
   }
 }
@@ -818,6 +818,111 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 
 .orpc-compare td {
   text-align: center;
+}
+
+/* Separate, not collapsed: a collapsed border stays behind when the header
+   row sticks. */
+.orpc-sponsors {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.orpc-sponsors :is(th, td) {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--blume-border);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.orpc-sponsors th {
+  font-weight: 400;
+}
+
+.orpc-sponsors thead th {
+  padding-block: 0.625rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--blume-muted-foreground);
+  white-space: nowrap;
+}
+
+.orpc-sponsors .orpc-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.orpc-sponsors-band :is(th, td) {
+  padding-block: 0.5rem;
+  background: var(--blume-muted);
+  font-family: var(--blume-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--blume-muted-foreground);
+}
+
+.orpc-sponsors tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.orpc-sponsors tbody tr:is(:hover, :focus-within) {
+  background: color-mix(in oklch, var(--blume-muted) 60%, transparent);
+}
+
+.orpc-sponsors tfoot :is(th, td) {
+  padding-block: 0.875rem;
+  border-bottom: 0;
+  background: var(--blume-muted);
+  font-weight: 600;
+}
+
+/* Any overflow hidden/auto ancestor silently disables the sticky header. */
+@media (min-width: 48rem) {
+  .orpc-sponsors thead th {
+    position: sticky;
+    top: var(--docs-header-height);
+    z-index: 1;
+    background: var(--blume-background);
+  }
+
+  /* `scroll-padding-top` only clears the site header, not this one. */
+  .orpc-sponsors tbody a {
+    scroll-margin-top: 2.5rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .orpc-sponsors :is(th, td) {
+    padding-inline: 1.25rem;
+  }
+}
+
+/* Validated ordinal ramp (monotone lightness, >= 0.06 apart, every step >= 2:1
+   on the page and the muted band); re-check before changing a step. */
+:root {
+  --orpc-tier-1: oklch(0.45 0.17 359);
+  --orpc-tier-2: oklch(0.53 0.19 359);
+  --orpc-tier-3: oklch(0.61 0.17 359);
+  --orpc-tier-4: oklch(0.68 0.145 359);
+  --orpc-tier-5: oklch(0.75 0.11 359);
+}
+
+:root[data-theme='dark'] {
+  --orpc-tier-1: oklch(0.82 0.105 359);
+  --orpc-tier-2: oklch(0.74 0.16 359);
+  --orpc-tier-3: oklch(0.66 0.17 359);
+  --orpc-tier-4: oklch(0.58 0.16 359);
+  --orpc-tier-5: oklch(0.5 0.14 359);
+}
+
+@media (forced-colors: active) {
+  .orpc-tier-swatch {
+    forced-color-adjust: none;
+  }
 }
 
 /* Star count riding inside the GitHub CTA, split off by a hairline. */

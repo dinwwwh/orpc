@@ -1,0 +1,60 @@
+---
+import type { Sponsor } from '../../sponsors/data'
+import { relAttribute } from '../../sponsors/ads'
+import { avatarSrc } from '../../sponsors/data'
+
+interface Props {
+  sponsors: Sponsor[]
+}
+
+const { sponsors } = Astro.props
+---
+
+<section id="past-sponsors" aria-labelledby="past-sponsors-heading" class="border-b border-border">
+  <div class="mx-auto max-w-6xl px-6 py-20 sm:py-28">
+    <p class="font-mono text-[0.6875rem] tracking-[0.18em] text-muted-foreground uppercase">
+      Past sponsors
+    </p>
+    <h2
+      id="past-sponsors-heading"
+      class="font-display mt-4 max-w-2xl text-3xl font-semibold tracking-[-0.03em] text-balance sm:text-4xl"
+    >
+      They helped get oRPC here.
+    </h2>
+    <p class="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
+      Sponsorships end, but the work they paid for ships in every release. Thank you to the{' '}
+      {sponsors.length} people and teams who sponsored oRPC before.
+    </p>
+
+    <ul class="mt-12 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-3 lg:grid-cols-4">
+      {
+        sponsors.map(sponsor => (
+          <li class="min-w-0">
+            <a
+              class="flex min-h-11 items-center gap-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              href={sponsor.link}
+              rel={relAttribute(sponsor.rel)}
+              target="_blank"
+            >
+              <img
+                alt=""
+                class:list={[
+                  'size-7 flex-none bg-muted object-cover ring-1 ring-border',
+                  sponsor.type === 'Organization' ? 'rounded-md' : 'rounded-full',
+                ]}
+                data-monogram={sponsor.name}
+                data-no-zoom
+                decoding="async"
+                height="28"
+                loading="lazy"
+                src={avatarSrc(sponsor.avatar, 28)}
+                width="28"
+              />
+              <bdi class="line-clamp-2 min-w-0 leading-snug break-words">{sponsor.name}</bdi>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</section>
