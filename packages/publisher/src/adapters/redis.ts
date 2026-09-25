@@ -34,8 +34,14 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
   ) {
     super(options)
 
+    const keyPrefix = redis.options?.keyPrefix
+
+    if (keyPrefix !== undefined && typeof keyPrefix !== 'string') {
+      throw new TypeError('RedisPublisher only supports a string keyPrefix on the Redis client.')
+    }
+
     this.subscriber = subscriber ?? redis.duplicate()
-    this.channelPrefix = String(redis.options?.keyPrefix ?? '')
+    this.channelPrefix = keyPrefix ?? ''
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {

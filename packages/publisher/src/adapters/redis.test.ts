@@ -1,5 +1,6 @@
 import type { RedisClientType } from 'redis'
 import type { RedisPublisherOptions } from './redis'
+import { Buffer } from 'node:buffer'
 import { RPCJsonSerializer } from '@orpc/client'
 import { getOrBind, promiseWithResolvers, sleep } from '@orpc/shared'
 import { getEventMeta, withEventMeta } from '@standard-server/core'
@@ -276,6 +277,11 @@ describe.concurrent('redisPublisher', { skip: !REDIS_URL, timeout: 20_000 }, () 
     expect(resumed).toHaveBeenCalledWith({ order: 2 })
 
     await unsubscribeResumed()
+  })
+
+  it('rejects a client whose keyPrefix is not a string', () => {
+    expect(() => new RedisPublisher(createClient({ keyPrefix: Buffer.from('app:') })))
+      .toThrow('RedisPublisher only supports a string keyPrefix on the Redis client.')
   })
 
   it('trims stale resume history on the next publish and lets Redis expire the stream key', async () => {
