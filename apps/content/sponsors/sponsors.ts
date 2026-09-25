@@ -463,7 +463,7 @@ export default [
     "tierLevel": 0
   },
   {
-    "name": "Ryuz",
+    "name": "ryuz",
     "login": "ryuzdev",
     "avatar": "https://avatars.githubusercontent.com/u/196539378?u=d38374588d219b6748b16406982f6559411466d4&v=4",
     "link": "https://github.com/ryuzdev?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
