@@ -82,7 +82,6 @@ export class ZodToJsonSchemaConverter implements JsonSchemaConverter {
       ...this.toJSONSchemaParams,
       target: 'draft-2020-12',
       io: direction,
-      // Zod calls this as a method of its conversion context, which is what `this` refers to
       unrepresentable(this: ToJSONSchemaContext, info) {
         return convertNativeType(this, info.zodSchema, info.path)
           ?? (typeof unrepresentable === 'function' ? unrepresentable(info) : unrepresentable)
