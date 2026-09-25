@@ -207,31 +207,23 @@ function replicateLazyResponse(response: StandardLazyResponse, count: number): S
   let replicatedReadableStream: ReadableStream[] | undefined
 
   for (let i = 0; i < count; i++) {
-    let resolvedBody: { body: StandardBody } | undefined
-
     replicated.push({
       ...response,
       resolveBody: async (hint) => {
-        if (resolvedBody) {
-          return resolvedBody.body
-        }
-
         bodyPromise ??= response.resolveBody(hint)
         const body = await bodyPromise
 
         if (isAsyncIteratorObject(body)) {
           replicatedAsyncIterators ??= replicateAsyncIterator(body, count)
-          resolvedBody = { body: replicatedAsyncIterators.pop() }
-        }
-        else if (body instanceof ReadableStream) {
-          replicatedReadableStream ??= replicateReadableStream(body, count)
-          resolvedBody = { body: replicatedReadableStream.pop() }
-        }
-        else {
-          resolvedBody = { body }
+          return replicatedAsyncIterators[i]
         }
 
-        return resolvedBody.body
+        if (body instanceof ReadableStream) {
+          replicatedReadableStream ??= replicateReadableStream(body, count)
+          return replicatedReadableStream[i]
+        }
+
+        return body
       },
     })
   }
