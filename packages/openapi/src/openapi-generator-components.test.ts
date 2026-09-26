@@ -177,6 +177,15 @@ describe('openAPIComponentRegistry', () => {
       expect(doc.components?.schemas).toEqual({ World: { type: 'number' } })
     })
 
+    it('keeps the JSON Pointer tail of refs into a def', () => {
+      const { doc, registry } = createRegistry()
+      const Planet: JsonSchema = { type: 'object', properties: { 'a/b': { type: 'string' } } }
+
+      expect(registry.hoistDefs({ $ref: '#/$defs/domain~1Planet/properties/a~1b', $defs: { 'domain/Planet': Planet } }))
+        .toEqual({ $ref: '#/components/schemas/domain~1Planet/properties/a~1b' })
+      expect(doc.components?.schemas).toEqual({ 'domain/Planet': Planet })
+    })
+
     it('leaves dangling local refs untouched', () => {
       const { doc, registry } = createRegistry()
 
@@ -340,6 +349,21 @@ describe('openAPIComponentRegistry', () => {
 
       expect(result).toEqual({ $ref: `#/components/schemas/${expected}` })
       expect(Object.keys(doc.components?.schemas ?? {}).sort()).toEqual(Object.keys(schemas).sort())
+    })
+
+    it('reuses a renamed component whose refs point inside it', () => {
+      const { doc, registry } = createRegistry({ schemas: { Node: { type: 'string' } } })
+      const schema: JsonSchema = {
+        $ref: '#/$defs/Node',
+        $defs: { Node: { anyOf: [{ type: 'array', items: { $ref: '#/$defs/Node/anyOf/0' } }, { type: 'number' }] } },
+      }
+
+      expect(registry.hoistDefs(structuredClone(schema), 'output')).toEqual({ $ref: '#/components/schemas/NodeOutput' })
+      expect(registry.hoistDefs(structuredClone(schema), 'output')).toEqual({ $ref: '#/components/schemas/NodeOutput' })
+      expect(doc.components?.schemas).toEqual({
+        Node: { type: 'string' },
+        NodeOutput: { anyOf: [{ type: 'array', items: { $ref: '#/components/schemas/NodeOutput/anyOf/0' } }, { type: 'number' }] },
+      })
     })
 
     it('reuses mutually recursive sibling defs', () => {

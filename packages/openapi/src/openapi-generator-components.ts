@@ -8,6 +8,9 @@ import {
 } from '@orpc/json-schema'
 import { get, getOwn, isDeepEqual, setOwn } from '@orpc/shared'
 
+const DEFS_REF_PREFIX = '#/$defs/'
+const COMPONENTS_REF_PREFIX = '#/components/schemas/'
+
 /**
  * Collects reusable schemas into `doc.components.schemas`.
  *
@@ -37,7 +40,7 @@ export class OpenAPIComponentRegistry {
 
     return this.hoistDefs({
       $defs: { ...$defs, [defName]: body },
-      $ref: `#/$defs/${encodeJsonPointerSegment(defName)}`,
+      $ref: `${DEFS_REF_PREFIX}${encodeJsonPointerSegment(defName)}`,
     })
   }
 
@@ -299,16 +302,17 @@ function areSchemasEquivalentForReuse(
   })
 }
 
-function parseComponentRefName(ref: string): string | undefined {
-  if (!ref.startsWith('#/components/schemas/')) {
+/**
+ * Splits a `<prefix><name>[/<pointer>]` ref into its decoded name and pointer segments.
+ */
+function parseNamedRef(ref: string, prefix: string): { name: string, pointer: string[] } | undefined {
+  if (!ref.startsWith(prefix)) {
     return undefined
   }
 
-  return ref
-    .slice('#/components/schemas/'.length)
-    .split('/')
-    .map(decodeJsonPointerSegment)
-    .join('/')
+  const [name, ...pointer] = ref.slice(prefix.length).split('/').map(decodeJsonPointerSegment)
+
+  return { name: name!, pointer }
 }
 
 function resolveSchemaComparisonRef(
@@ -316,10 +320,10 @@ function resolveSchemaComparisonRef(
   rootSchema: JsonSchema,
   componentsSchemas: Record<string, any>,
 ): { schema: JsonSchema, rootSchema: JsonSchema } | undefined {
-  const localDefName = parseLocalDefRefName(ref)
+  const localDefRef = parseNamedRef(ref, DEFS_REF_PREFIX)
 
-  if (localDefName !== undefined) {
-    const localDef = get(rootSchema, ['$defs', localDefName]) as JsonSchema | undefined
+  if (localDefRef !== undefined) {
+    const localDef = get(rootSchema, ['$defs', localDefRef.name, ...localDefRef.pointer]) as JsonSchema | undefined
 
     if (localDef !== undefined) {
       return {
@@ -329,14 +333,15 @@ function resolveSchemaComparisonRef(
     }
   }
 
-  const componentName = parseComponentRefName(ref)
+  const componentRef = parseNamedRef(ref, COMPONENTS_REF_PREFIX)
 
-  if (componentName !== undefined) {
-    const componentSchema = getOwn(componentsSchemas, componentName)
+  if (componentRef !== undefined) {
+    const componentSchema = getOwn(componentsSchemas, componentRef.name)
+    const schema = get(componentSchema, componentRef.pointer) as JsonSchema | undefined
 
-    if (componentSchema !== undefined) {
+    if (schema !== undefined) {
       return {
-        schema: componentSchema,
+        schema,
         rootSchema: componentSchema,
       }
     }
@@ -356,8 +361,8 @@ function areSchemaRefsEquivalentForReuse(
   existingToCandidateComponentNames: Map<string, string>,
   visited: WeakMap<object, WeakSet<object>>,
 ): boolean {
-  const candidateComponentName = parseComponentRefName(candidateRef)
-  const existingComponentName = parseComponentRefName(existingRef)
+  const candidateComponentName = parseNamedRef(candidateRef, COMPONENTS_REF_PREFIX)?.name
+  const existingComponentName = parseNamedRef(existingRef, COMPONENTS_REF_PREFIX)?.name
 
   if ((candidateComponentName === undefined) !== (existingComponentName === undefined)) {
     return false
@@ -400,32 +405,20 @@ function areSchemaRefsEquivalentForReuse(
   )
 }
 
-function parseLocalDefRefName(ref: string): string | undefined {
-  if (!ref.startsWith('#/$defs/')) {
-    return undefined
-  }
-
-  return ref
-    .slice('#/$defs/'.length)
-    .split('/')
-    .map(decodeJsonPointerSegment)
-    .join('/')
-}
-
 function rewriteComponentSchemaRefs(schema: JsonSchema, renameMap: ReadonlyMap<string, string>): JsonSchema {
   return mapJsonSchemaRefs(schema, (ref) => {
-    const refName = parseLocalDefRefName(ref)
+    const localDefRef = parseNamedRef(ref, DEFS_REF_PREFIX)
 
-    if (refName === undefined) {
+    if (localDefRef === undefined) {
       return ref
     }
 
-    const renamedName = renameMap.get(refName)
+    const renamedName = renameMap.get(localDefRef.name)
 
     if (renamedName === undefined) {
       return ref
     }
 
-    return `#/components/schemas/${encodeJsonPointerSegment(renamedName)}`
+    return COMPONENTS_REF_PREFIX + [renamedName, ...localDefRef.pointer].map(encodeJsonPointerSegment).join('/')
   })
 }
