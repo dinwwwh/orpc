@@ -49,6 +49,15 @@ export interface BatchLinkPluginOptions<T extends ClientContext> {
   maxSize?: Value<Promisable<number>, [subOptionsList: [StandardLinkTransportInterceptorOptions<T>, ...StandardLinkTransportInterceptorOptions<T>[]]]>
 
   /**
+   * How long (in ms) to wait for more requests before sending the batch,
+   * counted from the first queued request.
+   * With `0`, only requests made in the same event loop tick are batched.
+   *
+   * @default 0
+   */
+  wait?: number
+
+  /**
    * The batch response mode.
    *
    * @default 'streaming'
@@ -109,6 +118,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
   private readonly groups: BatchLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<BatchLinkPluginOptions<T>['filter'], undefined>
   private readonly maxSize: Exclude<BatchLinkPluginOptions<T>['maxSize'], undefined>
+  private readonly wait: Exclude<BatchLinkPluginOptions<T>['wait'], undefined>
   private readonly mode: Exclude<BatchLinkPluginOptions<T>['mode'], undefined>
   private readonly batchUrl: Exclude<BatchLinkPluginOptions<T>['url'], undefined>
   private readonly maxUrlLength: Exclude<BatchLinkPluginOptions<T>['maxUrlLength'], undefined>
@@ -129,6 +139,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
     this.groups = options.groups
     this.filter = options.filter ?? (() => true)
     this.maxSize = options.maxSize ?? 10
+    this.wait = options.wait ?? 0
     this.mode = options.mode ?? 'streaming'
     this.batchUrl = options.url ?? ((options) => {
       const [pathname] = parseStandardUrl(options[0].request.url)
@@ -197,13 +208,18 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       }
 
       return new Promise((resolve, reject) => {
-        const queue = this.queue.get(group) ?? []
-        if (!this.queue.has(group)) {
+        // Schedule only for the first queued request, so later ones cannot extend or split the wait.
+        if (!this.queue.size) {
+          defer(() => this.processPendingBatches(), this.wait)
+        }
+
+        let queue = this.queue.get(group)
+        if (!queue) {
+          queue = []
           this.queue.set(group, queue)
         }
 
         queue.push([interceptorOptions, resolve, reject])
-        defer(() => this.processPendingBatches())
       })
     }
 
@@ -268,16 +284,34 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
       const controller = new AbortController()
       const pendingMessages: ClientPeerSendMessage[] = []
+      const subrequests = groupItems.map(([subOptions]) => this.mapSubrequest(subOptions, { url, headers }))
+      const sentRequestIds = new Set<string>()
       let batchResponse: StandardLazyResponse
 
-      const peer = new ClientPeer(async (message) => {
-        pendingMessages.push(message)
+      /**
+       * The batch is sent once every subrequest has either sent its request or been aborted before it.
+       * The peer sends nothing for an already aborted subrequest, and only a cancel for one aborted
+       * while its body is encoding, so waiting for one request per subrequest could wait forever.
+       */
+      let unsentCount = subrequests.filter(subrequest => !subrequest.signal?.aborted).length
+      let activeCount = unsentCount
 
-        if (message.kind === 'cancel' && pendingMessages.filter(m => m.kind === 'cancel').length === groupItems.length) {
+      const peer = new ClientPeer(async (message) => {
+        const isUnsentCancel = message.kind === 'cancel' && !sentRequestIds.has(message.id)
+
+        if (!isUnsentCancel) {
+          pendingMessages.push(message)
+        }
+
+        if (message.kind === 'request') {
+          sentRequestIds.add(message.id)
+        }
+
+        if (message.kind === 'cancel' && --activeCount === 0) {
           controller.abort()
         }
 
-        if (message.kind === 'request' && pendingMessages.filter(m => m.kind === 'request').length === groupItems.length) {
+        if ((message.kind === 'request' || isUnsentCancel) && --unsentCount === 0 && activeCount > 0) {
           // DON'T await this to avoid blocking the peer's message sending process.
           ;(async () => {
             try {
@@ -367,9 +401,9 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
         }
       })
 
-      groupItems.forEach(([subOptions, resolve, reject]) => {
+      groupItems.forEach(([subOptions, resolve, reject], index) => {
         peer
-          .request(this.mapSubrequest(subOptions, { url, headers }))
+          .request(subrequests[index]!)
           .then(subResponse => resolve(this.mapSubresponse(subResponse, batchResponse, subOptions)))
           .catch((error) => {
             if (!suppressErrorFromCurrentBatch) {
