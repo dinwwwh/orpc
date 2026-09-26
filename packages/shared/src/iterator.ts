@@ -223,12 +223,8 @@ export function consumeAsyncIterator<T, TReturn, TError = ThrowableError>(
           options.onEvent(value)
         }
         catch (error) {
-          // Close the source like `for await` does, keeping the onEvent error
-          try {
-            await resolvedIterator.return?.()
-          }
-          catch {}
-
+          // Close the source before reporting the onEvent error
+          await resolvedIterator.return?.()
           throw error
         }
       }

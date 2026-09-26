@@ -512,12 +512,12 @@ describe('consumeAsyncIterator', () => {
     expect(onSuccess).toHaveBeenCalledTimes(0)
   })
 
-  it('reports the onEvent error when closing the iterator also fails', async () => {
-    const error = new Error('TEST')
+  it('reports the return error when closing the iterator fails', async () => {
+    const returnError = new Error('RETURN')
     const iterator: AsyncIterator<number> = {
       next: async () => ({ done: false, value: 1 }),
       return: vi.fn(async () => {
-        throw new Error('RETURN')
+        throw returnError
       }),
     }
 
@@ -526,7 +526,7 @@ describe('consumeAsyncIterator', () => {
 
     void consumeAsyncIterator(iterator, {
       onEvent: () => {
-        throw error
+        throw new Error('TEST')
       },
       onError,
       onFinish,
@@ -538,8 +538,8 @@ describe('consumeAsyncIterator', () => {
 
     expect(iterator.return).toHaveBeenCalledTimes(1)
     expect(onError).toHaveBeenCalledTimes(1)
-    expect(onError).toHaveBeenNthCalledWith(1, error)
-    expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+    expect(onError).toHaveBeenNthCalledWith(1, returnError)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [returnError, undefined, false])
   })
 
   it('unsubscribe', async () => {
