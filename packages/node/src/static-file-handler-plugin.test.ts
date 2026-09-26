@@ -707,6 +707,22 @@ describe('staticFileHandlerPlugin', () => {
       expect(allowedRes.status).toBe(200)
       expect(allowedRes.body).toEqual(Buffer.from('dotfile'))
     })
+
+    it('refuses 8.3 short names that can alias dotfiles', async () => {
+      // A refused path falls through before the fallback, while an allowed missing one is answered by it
+      const agent = createStaticAgent({ fallbackFile: 'hello.txt' })
+
+      for (const url of ['/ENV~1', '/env~1', '/HTACCE~1', '/ENV~1.LOC', '/ENV~1.', '/ENV~1::$DATA', '/GIT~1/config', '/nested/GIT~1/HEAD']) {
+        expect((await agent.get(url)).status, url).toBe(404)
+      }
+
+      // A tilde that cannot be the numeric tail of a short name is an ordinary character
+      for (const url of ['/vendors~main~1a2b.js', '/index.html~', '/~user', '/a.b~1']) {
+        expect((await agent.get(url)).status, url).toBe(200)
+      }
+
+      expect((await createStaticAgent({ fallbackFile: 'hello.txt', dotfiles: true }).get('/ENV~1')).status).toBe(200)
+    })
   })
 
   describe('mounting', () => {
