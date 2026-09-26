@@ -21,6 +21,17 @@ import mime from 'mime'
  */
 const TEXT_CONTENT_TYPE_REGEX = /^text\//
 
+/**
+ * NTFS and FAT give every name that breaks 8.3 rules, a leading dot included, a short alias that
+ * opens the same entry, so `ENV~1` reads `.env` and `GIT~1/config` reads `.git/config` on any OS.
+ * A generated alias ends its base of at most eight characters with a `~` numeric tail, and only
+ * that prefix is matched, so suffixes the filesystem strips or ignores, like a trailing dot or a
+ * `::$DATA` stream, are covered too.
+ *
+ * @see https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file#short-vs-long-names
+ */
+const SHORT_NAME_ALIAS_REGEX = /^[^.]{0,6}~\d/
+
 const PRECOMPRESSED_ENCODINGS: [encoding: string, extension: string][] = [
   ['br', '.br'],
   ['zstd', '.zst'],
@@ -67,6 +78,8 @@ export interface StaticFileHandlerPluginOptions {
 
   /**
    * Whether files and directories whose name starts with a dot can be served.
+   * When disabled, 8.3 short names like `ENV~1` are refused too, since NTFS and FAT
+   * resolve them to dotfiles.
    *
    * @default false
    */
@@ -292,7 +305,7 @@ export class StaticFileHandlerPlugin<T extends Context> implements StandardHandl
         return undefined
       }
 
-      if (!this.dotfiles && segment.startsWith('.')) {
+      if (!this.dotfiles && (segment.startsWith('.') || SHORT_NAME_ALIAS_REGEX.test(segment))) {
         return undefined
       }
 
