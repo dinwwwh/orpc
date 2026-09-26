@@ -321,6 +321,7 @@ describe('batchHandlerPlugin', () => {
           await waitForAbort(signal!)
         }
         finally {
+          await new Promise(resolve => setTimeout(resolve)) // async cleanup
           stopped(signal!.aborted)
         }
       }),
@@ -347,7 +348,7 @@ describe('batchHandlerPlugin', () => {
       await vi.waitFor(() => expect(started).toHaveBeenCalledTimes(2))
       await response!.body!.cancel()
 
-      await vi.waitFor(() => expect(stopped.mock.calls).toEqual([[true], [true]]))
+      expect(stopped.mock.calls).toEqual([[true], [true]])
     })
 
     it.each(['buffered', 'streaming'] as const)('aborts %s sub-requests when the batch request is already aborted', async (mode) => {

@@ -333,10 +333,9 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
           streamController = controller
           scheduleKeepAlive()
         },
-        cancel(reason) {
+        async cancel(reason) {
           clearKeepAlive()
-          // Not awaited: subrequests that ignore their signal must not block the cancellation.
-          peer.close(reason)
+          await peer.close(reason)
         },
       })
 
