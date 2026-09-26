@@ -53,6 +53,7 @@ export default defineConfig({
       { label: 'Comparison', path: '/docs', href: '/docs/comparison' },
       { label: 'From V1', path: '/docs', href: '/docs/migrations/from-v1' },
       { label: 'Sponsors', path: '/sponsors', href: '/sponsors' },
+      { label: 'Experts', path: '/experts', href: '/experts' },
       {
         label: 'More',
         path: '',

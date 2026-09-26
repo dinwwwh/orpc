@@ -298,19 +298,6 @@ aside[class~='bg-accent/10'] [class~='text-accent'] {
   border-color: var(--blume-border);
 }
 
-/* Between md and lg the header shows the tab bar, the hamburger, and
-   the search box at once: collapse search to its icon so nothing wraps. */
-@media (min-width: 48rem) and (max-width: 63.9375rem) {
-  [data-blume-search-open] {
-    min-width: 0;
-  }
-
-  [data-blume-search-open] > span,
-  [data-blume-search-open] > kbd {
-    display: none;
-  }
-}
-
 /* The page-actions popovers (Export, Connect to MCP) are up to 22rem
    wide but live inside the scrollable TOC rail, which clips anything
    wider than the rail. Size them to the rail instead. */
@@ -335,9 +322,9 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 }
 
 /* ---------------------------------------------------------------- */
-/* Landing page (pages/index.astro + pages/_home/*)                 */
-/* Its code panes live outside `.prose`, so the dual-theme Shiki     */
-/* variables and the pane chrome are re-declared here.               */
+/* Custom pages (pages/*.astro): landing, experts, sponsors         */
+/* The landing code panes live outside `.prose`, so the dual-theme  */
+/* Shiki variables and the pane chrome are re-declared here.        */
 /* ---------------------------------------------------------------- */
 
 /* Dot field behind the hero and the closing CTA, faded out with a
@@ -355,6 +342,14 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 
 .orpc-dots-bottom {
   mask-image: radial-gradient(ellipse 75% 60% at 50% 100%, #000 10%, transparent 70%);
+}
+
+/* Inner pages (experts, sponsors) keep their text on the left, so the field
+   fades in from the top-right corner instead, anchored there so the dots keep
+   the same inset from a panel's border at every width. */
+.orpc-dots-corner {
+  background-position: right top;
+  mask-image: radial-gradient(ellipse 60% 100% at 100% 0%, #000 10%, transparent 70%);
 }
 
 /* Buttons */
@@ -377,8 +372,8 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 }
 
 .orpc-btn-primary {
-  background: var(--blume-accent);
-  color: var(--blume-accent-foreground);
+  background: var(--blume-action);
+  color: var(--blume-action-foreground);
 }
 
 .orpc-btn-primary:hover {
@@ -692,20 +687,20 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
     border-inline-start: 0;
   }
 
-  .orpc-stat > :is(a, div) {
+  .orpc-stat > a {
     padding-inline: 1.5rem;
   }
 
-  .orpc-stat:first-child > :is(a, div) {
+  .orpc-stat:first-child > a {
     padding-inline-start: 0;
   }
 
-  .orpc-stat:last-child > :is(a, div) {
+  .orpc-stat:last-child > a {
     padding-inline-end: 0;
   }
 }
 
-.orpc-stat > :is(a, div) {
+.orpc-stat > a {
   display: block;
   padding: 2rem 1.5rem;
   transition: background-color 0.15s ease;
@@ -713,14 +708,14 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 
 /* Align the first value in each row with the section gutter above it. Scoped to
    the two-column tier: these selectors outrank the wider tier's plain
-   `.orpc-stat > :is(a, div)` padding, so unscoped they would strip the inner
+   `.orpc-stat > a` padding, so unscoped they would strip the inner
    padding off the third and fourth cells there too. */
 @media (max-width: 63.9375rem) {
-  .orpc-stat:nth-child(odd) > :is(a, div) {
+  .orpc-stat:nth-child(odd) > a {
     padding-inline-start: 0;
   }
 
-  .orpc-stat:nth-child(even) > :is(a, div) {
+  .orpc-stat:nth-child(even) > a {
     padding-inline-end: 0;
   }
 }
@@ -902,7 +897,8 @@ body > aside[data-blume-nav-drawer]:not([data-orpc-drawer]) {
 }
 
 /* Validated ordinal ramp (monotone lightness, >= 0.06 apart, every step >= 2:1
-   on the page and the muted band); re-check before changing a step. */
+   on the page and the muted band); re-check before changing a step. Hue 359 is
+   the brand accent in blume.config.ts; re-validate if it changes. */
 :root {
   --orpc-tier-1: oklch(0.45 0.17 359);
   --orpc-tier-2: oklch(0.53 0.19 359);
