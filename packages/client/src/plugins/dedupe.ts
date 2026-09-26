@@ -29,6 +29,15 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
    * @default ({ request }) => request.method === 'GET' || request.method === 'QUERY'
    */
   filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
+
+  /**
+   * How long (in ms) to wait for more identical requests before sending,
+   * counted from the first queued request.
+   * With `0`, only requests made in the same event loop tick are deduplicated.
+   *
+   * @default 0
+   */
+  wait?: number
 }
 
 /**
@@ -43,12 +52,14 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
   private readonly groups: DedupeLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<DedupeLinkPluginOptions<T>['filter'], undefined>
+  private readonly wait: Exclude<DedupeLinkPluginOptions<T>['wait'], undefined>
 
-  private readonly queue: Map<DedupeLinkPluginGroup<T>, PendingDedupeRequest<T>[]> = new Map()
+  private readonly queue: Map<DedupeLinkPluginGroup<T>, Map<string, PendingDedupeRequest<T>>> = new Map()
 
   constructor(options: NoInfer<DedupeLinkPluginOptions<T>>) {
     this.groups = options.groups
     this.filter = options.filter ?? (({ request }) => request.method === 'GET' || request.method === 'QUERY')
+    this.wait = options.wait ?? 0
   }
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
@@ -64,11 +75,12 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
       }
 
       return new Promise((resolve, reject) => {
-        this.enqueue(group, interceptorOptions, resolve, reject)
+        // Schedule only for the first queued request, so later ones cannot extend or split the wait.
+        if (!this.queue.size) {
+          defer(() => this.processPendingRequests(), this.wait)
+        }
 
-        defer(() => {
-          this.processPendingRequests()
-        })
+        this.enqueue(group, interceptorOptions, resolve, reject)
       })
     }
 
@@ -87,12 +99,12 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
     let queue = this.queue.get(group)
 
     if (!queue) {
-      queue = []
+      queue = new Map()
       this.queue.set(group, queue)
     }
 
     const requestKey = createRequestKey(options.path, options.request)
-    const matched = queue.find(item => item.requestKey === requestKey)
+    const matched = queue.get(requestKey)
 
     if (matched) {
       matched.matchedOptions.push(options)
@@ -102,8 +114,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
       return
     }
 
-    queue.push({
-      requestKey,
+    queue.set(requestKey, {
       options,
       matchedOptions: [options],
       signals: [options.request.signal],
@@ -119,7 +130,7 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
     const executions: Promise<void>[] = []
 
     for (const [group, items] of pending) {
-      for (const item of items) {
+      for (const item of items.values()) {
         executions.push(this.execute(group, item))
       }
     }
@@ -167,7 +178,6 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 }
 
 type PendingDedupeRequest<T extends ClientContext> = {
-  requestKey: string
   options: InterceptorOptions<StandardLinkTransportInterceptorOptions<T>, Promise<StandardLazyResponse>>
   matchedOptions: [
     StandardLinkTransportInterceptorOptions<T>,

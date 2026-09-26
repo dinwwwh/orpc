@@ -44,6 +44,7 @@ function makeTransport(
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 describe('dedupeLinkPlugin', () => {
@@ -462,6 +463,42 @@ describe('dedupeLinkPlugin', () => {
     ])
 
     expect(output1).not.toBe(output2)
+    expect(transport.send).toHaveBeenCalledTimes(2)
+  })
+
+  it('dedupes identical requests made within `wait`, counted from the first queued request', async () => {
+    vi.useFakeTimers()
+
+    const codec = makeCodec()
+    const transport = makeTransport()
+
+    const link = new StandardLink(codec, transport, {
+      plugins: [new DedupeLinkPlugin({
+        wait: 100,
+        groups: [{ condition: () => true, context: {} }],
+      })],
+    })
+
+    const promise1 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+    await vi.advanceTimersByTimeAsync(60)
+    const promise2 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+
+    await vi.advanceTimersByTimeAsync(39)
+    expect(transport.send).toHaveBeenCalledTimes(0)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(promise1).resolves.toEqual({ value: '__body__' })
+    await expect(promise2).resolves.toEqual({ value: '__body__' })
+    expect(transport.send).toHaveBeenCalledTimes(1)
+
+    // A request made after the deduped one is sent starts a new wait
+    const promise3 = link.call(['GET', 'planet'], { value: 1 }, { context: {} })
+
+    await vi.advanceTimersByTimeAsync(99)
+    expect(transport.send).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(promise3).resolves.toEqual({ value: '__body__' })
     expect(transport.send).toHaveBeenCalledTimes(2)
   })
 })

@@ -544,6 +544,172 @@ describe('batchLinkPlugin', () => {
 
       await promise
     })
+
+    it('batches requests made within `wait`, counted from the first queued request', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered', wait: 100 })],
+      })
+
+      const promise1 = link.call(['a'], {}, { context: {} })
+      await vi.advanceTimersByTimeAsync(60)
+      const promise2 = link.call(['b'], {}, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(39)
+      expect(transport.send).toHaveBeenCalledTimes(0)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(promise1).resolves.toBe('result-0')
+      await expect(promise2).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      // Requests made after the batch is sent start a new wait
+      const promise3 = link.call(['c'], {}, { context: {} })
+      const promise4 = link.call(['d'], {}, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(99)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(promise3).resolves.toBe('result-0')
+      await expect(promise4).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it('rejects requests aborted while queued without stalling the rest of the batch', async () => {
+      vi.useFakeTimers()
+
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered', wait: 100 })],
+      })
+
+      const controller = new AbortController()
+      const abortedPromise = expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT')
+      const promise2 = link.call(['b'], {}, { context: {} })
+      const promise3 = link.call(['c'], {}, { context: {} })
+
+      await vi.advanceTimersByTimeAsync(50)
+      controller.abort(new Error('TEST_ABORT'))
+      await vi.advanceTimersByTimeAsync(50)
+
+      await abortedPromise
+      await expect(promise2).resolves.toBe('result-0')
+      await expect(promise3).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0])).toHaveLength(2)
+    })
+
+    it('rejects requests aborted while batch options resolve without stalling the rest of the batch', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode: 'buffered',
+          url: async () => {
+            await sleep(50)
+            return '/__batch__' as const
+          },
+        })],
+      })
+
+      const controller = new AbortController()
+      const abortedPromise = expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT')
+      const promise2 = link.call(['b'], {}, { context: {} })
+      const promise3 = link.call(['c'], {}, { context: {} })
+
+      await sleep(10)
+      controller.abort(new Error('TEST_ABORT'))
+
+      await abortedPromise
+      await expect(promise2).resolves.toBe('result-0')
+      await expect(promise3).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0])).toHaveLength(2)
+    })
+
+    it('rejects requests aborted before the peer sends them without stalling the rest of the batch', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const controller = new AbortController()
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          mode: 'buffered',
+          mapSubrequest: ({ request }) => {
+            if (request.url === '/a') {
+              // Runs after the peer starts sending this subrequest, before its request message
+              queueMicrotask(() => controller.abort(new Error('TEST_ABORT')))
+            }
+
+            return request
+          },
+        })],
+      })
+
+      const abortedPromise = expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT')
+      const promise2 = link.call(['b'], {}, { context: {} })
+      const promise3 = link.call(['c'], {}, { context: {} })
+
+      await abortedPromise
+      await expect(promise2).resolves.toBe('result-0')
+      await expect(promise3).resolves.toBe('result-1')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      // The cancel of the never-sent subrequest is not forwarded
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0]).map(m => m.kind)).toEqual(['request', 'request'])
+    })
+
+    it('aborts the batch request once every subrequest is aborted, including ones aborted before sending', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(transport.send).mockImplementation(async (request) => {
+        await sleep(50)
+        request.signal?.throwIfAborted()
+
+        return {
+          status: 207,
+          headers: {},
+          resolveBody: async () => [],
+        }
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'streaming', wait: 20 })],
+      })
+
+      const controller1 = new AbortController()
+      const controller2 = new AbortController()
+      const controller3 = new AbortController()
+
+      const promise = Promise.all([
+        expect(link.call(['a'], {}, { context: {}, signal: controller1.signal })).rejects.toThrow('aborted'),
+        expect(link.call(['b'], {}, { context: {}, signal: controller2.signal })).rejects.toThrow('aborted'),
+        expect(link.call(['c'], {}, { context: {}, signal: controller3.signal })).rejects.toThrow('aborted'),
+      ])
+
+      await sleep(10)
+      controller1.abort() // aborted while queued, so it is never sent
+      await sleep(20)
+      expect(transport.send).toHaveBeenCalledTimes(1)
+
+      controller2.abort()
+      controller3.abort()
+      await sleep(10)
+      expect(vi.mocked(transport.send).mock.calls[0]![0].signal?.aborted).toBe(true)
+
+      await promise
+    })
   })
 
   describe('batch response decoding', () => {

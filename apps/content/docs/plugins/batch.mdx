@@ -186,6 +186,29 @@ const link = new RPCLink({
 })
 ```
 
+## Wait Time
+
+By default, only requests made in the same [event loop](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Execution_model#job_queue_and_event_loop) tick are batched together. Set `wait` to keep collecting requests for a number of milliseconds, trading a little latency for fewer, larger batches.
+
+```ts
+const link = new RPCLink({
+  url: '/rpc',
+  plugins: [
+    new BatchLinkPlugin({
+      wait: 10, // ms
+      groups: [
+        {
+          condition: () => true,
+          context: {},
+        },
+      ],
+    }),
+  ],
+})
+```
+
+The wait starts when the first request is queued, so no request waits longer than `wait`, even while more keep arriving.
+
 ## Learn More
 
 See the [BatchHandlerPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/server/src/plugins/batch.ts) and the [BatchLinkPlugin source code](https://github.com/middleapi/orpc/blob/main/packages/client/src/plugins/batch.ts) for implementation details.
