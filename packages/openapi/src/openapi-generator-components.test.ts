@@ -25,7 +25,7 @@ describe('openAPIComponentRegistry', () => {
       expect(doc.components).toBeUndefined()
     })
 
-    it('hoists defs into components and rewrites refs, including JSON Pointer encoded names', () => {
+    it('hoists defs into components and rewrites refs, including JSON Pointer encoded names and tails', () => {
       const { doc, registry } = createRegistry()
 
       const result = registry.hoistDefs({
@@ -33,10 +33,11 @@ describe('openAPIComponentRegistry', () => {
         properties: {
           planet: { $ref: '#/$defs/Planet' },
           domain: { $ref: '#/$defs/domain~1Planet' },
+          tail: { $ref: '#/$defs/domain~1Planet/properties/a~1b' },
         },
         $defs: {
           'Planet': { type: 'string' },
-          'domain/Planet': { type: 'number' },
+          'domain/Planet': { type: 'object', properties: { 'a/b': { type: 'number' } } },
         },
       })
 
@@ -45,11 +46,12 @@ describe('openAPIComponentRegistry', () => {
         properties: {
           planet: { $ref: '#/components/schemas/Planet' },
           domain: { $ref: '#/components/schemas/domain~1Planet' },
+          tail: { $ref: '#/components/schemas/domain~1Planet/properties/a~1b' },
         },
       })
       expect(doc.components?.schemas).toEqual({
         'Planet': { type: 'string' },
-        'domain/Planet': { type: 'number' },
+        'domain/Planet': { type: 'object', properties: { 'a/b': { type: 'number' } } },
       })
     })
 
@@ -177,15 +179,6 @@ describe('openAPIComponentRegistry', () => {
       expect(doc.components?.schemas).toEqual({ World: { type: 'number' } })
     })
 
-    it('keeps the JSON Pointer tail of refs into a def', () => {
-      const { doc, registry } = createRegistry()
-      const Planet: JsonSchema = { type: 'object', properties: { 'a/b': { type: 'string' } } }
-
-      expect(registry.hoistDefs({ $ref: '#/$defs/domain~1Planet/properties/a~1b', $defs: { 'domain/Planet': Planet } }))
-        .toEqual({ $ref: '#/components/schemas/domain~1Planet/properties/a~1b' })
-      expect(doc.components?.schemas).toEqual({ 'domain/Planet': Planet })
-    })
-
     it('leaves dangling local refs untouched', () => {
       const { doc, registry } = createRegistry()
 
@@ -282,7 +275,7 @@ describe('openAPIComponentRegistry', () => {
         },
       },
       {
-        name: 'refs resolved against nested local defs',
+        name: 'local refs into nested defs by exact ref equality',
         schema: {
           type: 'object',
           properties: { x: { $ref: '#/$defs/Inner' } },
@@ -301,7 +294,7 @@ describe('openAPIComponentRegistry', () => {
       expect(Object.keys(doc.components?.schemas ?? {})).toEqual(['Wrapped'])
     })
 
-    it('compares refs to components hoisted in earlier calls by exact ref equality', () => {
+    it('reuses components whose refs point at components hoisted in earlier calls', () => {
       const { doc, registry } = createRegistry()
 
       registry.hoistDefs({ $ref: '#/$defs/Data', $defs: { Data: { type: 'string' } } })
@@ -358,12 +351,35 @@ describe('openAPIComponentRegistry', () => {
         $defs: { Node: { anyOf: [{ type: 'array', items: { $ref: '#/$defs/Node/anyOf/0' } }, { type: 'number' }] } },
       }
 
-      expect(registry.hoistDefs(structuredClone(schema), 'output')).toEqual({ $ref: '#/components/schemas/NodeOutput' })
-      expect(registry.hoistDefs(structuredClone(schema), 'output')).toEqual({ $ref: '#/components/schemas/NodeOutput' })
+      expect(registry.hoistDefs(structuredClone(schema))).toEqual({ $ref: '#/components/schemas/Node2' })
+      expect(registry.hoistDefs(structuredClone(schema))).toEqual({ $ref: '#/components/schemas/Node2' })
       expect(doc.components?.schemas).toEqual({
         Node: { type: 'string' },
-        NodeOutput: { anyOf: [{ type: 'array', items: { $ref: '#/components/schemas/NodeOutput/anyOf/0' } }, { type: 'number' }] },
+        Node2: { anyOf: [{ type: 'array', items: { $ref: '#/components/schemas/Node2/anyOf/0' } }, { type: 'number' }] },
       })
+    })
+
+    it.each(['', '/anyOf/0'])('compares a ref to a sibling by its own body when the sibling reuses another def name (pointer "%s")', (pointer) => {
+      const { doc, registry } = createRegistry({
+        schemas: {
+          Post2: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+          Other: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+          Wrapper: { items: { $ref: `#/components/schemas/Other${pointer}` } },
+        },
+      })
+
+      const result = registry.hoistDefs({
+        $ref: '#/$defs/Wrapper',
+        $defs: {
+          // reuses the existing Post2, while the def named Post2 (equal to Other) is minted as Post22
+          Post: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+          Post2: { anyOf: [{ type: 'boolean' }, { type: 'null' }] },
+          Wrapper: { items: { $ref: `#/$defs/Post${pointer}` } },
+        },
+      })
+
+      expect(result).toEqual({ $ref: '#/components/schemas/Wrapper2' })
+      expect(doc.components?.schemas?.Wrapper2).toEqual({ items: { $ref: `#/components/schemas/Post2${pointer}` } })
     })
 
     it('reuses mutually recursive sibling defs', () => {

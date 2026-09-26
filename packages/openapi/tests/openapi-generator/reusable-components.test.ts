@@ -121,6 +121,27 @@ describe('openAPIGenerator e2e: reusable component schemas', () => {
     })
   })
 
+  it('keeps a root-recursive union whole when its file branch is split out', async () => {
+    const Node: z.ZodTypeAny = z.union([
+      z.object({ get children() { return z.array(Node) } }),
+      z.file().mime('image/png'),
+    ])
+
+    const doc = await generator.generate({
+      upload: oc.meta(openapi({ method: 'POST', path: '/nodes' })).input(Node),
+    })
+
+    const content = (doc.paths?.['/nodes']?.post?.requestBody as any).content
+    expect(content['multipart/form-data'].schema.properties.children.items).toEqual({ $ref: '#/components/schemas/__schema0' })
+    expect(content['image/png'].schema).toEqual(expect.objectContaining({ contentMediaType: 'image/png' }))
+    expect(doc.components?.schemas?.__schema0).toEqual({
+      anyOf: [
+        expect.objectContaining({ properties: { children: { type: 'array', items: { $ref: '#/components/schemas/__schema0' } } } }),
+        expect.objectContaining({ contentMediaType: 'image/png' }),
+      ],
+    })
+  })
+
   it('keeps strict entities direction-specific instead of altering their semantics', async () => {
     // a plain z.object accepts unknown keys on input but strips them from its output,
     // so its input and output json schemas genuinely differ (additionalProperties: false)
