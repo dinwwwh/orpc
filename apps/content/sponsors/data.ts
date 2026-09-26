@@ -31,7 +31,7 @@ export interface Sponsor {
   tierTitle: string
   /** Higher is a bigger tier; `0` marks a lapsed sponsor. */
   tierLevel: number
-  /** Monthly amount in USD; `-1` once the sponsorship has ended. */
+  /** Amount in USD this month; `-1` once the sponsorship has ended. */
   amount: number
   createdAt: string
   type: string

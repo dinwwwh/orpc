@@ -1,9 +1,8 @@
+const wholeUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 })
+const centsUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+
 export function usd(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
-  }).format(value)
+  return (Number.isInteger(value) ? wholeUsd : centsUsd).format(value)
 }
 
 // UTC, or a sponsorship that started near midnight lands in a different month

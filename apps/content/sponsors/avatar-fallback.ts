@@ -1,5 +1,5 @@
 // Open Collective's image host answers some visitors with a bot challenge
-// instead of the image, so a broken sponsor avatar becomes a first-letter tile
+// instead of the image, so a broken avatar becomes a first-letter tile
 // built from its `data-monogram` name.
 
 function monogram(name: string): string {
