@@ -465,6 +465,83 @@ describe('consumeAsyncIterator', () => {
     })
   })
 
+  it('closes the iterator when onEvent throws', async () => {
+    const error = new Error('TEST')
+    let cleanup = false
+    const iterator = (async function* () {
+      try {
+        yield 1
+        yield 2
+        return 3
+      }
+      finally {
+        cleanup = true
+      }
+    }())
+
+    const onEvent = vi.fn(() => {
+      throw error
+    })
+    const onError = vi.fn()
+    const onSuccess = vi.fn()
+    let cleanupBeforeFinish: boolean | undefined
+    const onFinish = vi.fn(() => {
+      cleanupBeforeFinish = cleanup
+    })
+
+    void consumeAsyncIterator(iterator, {
+      onEvent,
+      onError,
+      onSuccess,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+
+    expect(cleanupBeforeFinish).toBe(true)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+
+    expect(onEvent).toHaveBeenCalledTimes(1)
+    expect(onEvent).toHaveBeenNthCalledWith(1, 1)
+
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenNthCalledWith(1, error)
+
+    expect(onSuccess).toHaveBeenCalledTimes(0)
+  })
+
+  it('reports the onEvent error when closing the iterator also fails', async () => {
+    const error = new Error('TEST')
+    const iterator: AsyncIterator<number> = {
+      next: async () => ({ done: false, value: 1 }),
+      return: vi.fn(async () => {
+        throw new Error('RETURN')
+      }),
+    }
+
+    const onError = vi.fn()
+    const onFinish = vi.fn()
+
+    void consumeAsyncIterator(iterator, {
+      onEvent: () => {
+        throw error
+      },
+      onError,
+      onFinish,
+    })
+
+    await vi.waitFor(() => {
+      expect(onFinish).toHaveBeenCalledTimes(1)
+    })
+
+    expect(iterator.return).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenNthCalledWith(1, error)
+    expect(onFinish).toHaveBeenNthCalledWith(1, [error, undefined, false])
+  })
+
   it('unsubscribe', async () => {
     let cleanup = false
     const iterator = (async function* () {
