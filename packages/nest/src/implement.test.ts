@@ -3,6 +3,7 @@ import type { Request as ExpressRequest } from 'express'
 import type { FastifyReply } from 'fastify'
 import type { NestStandardLazyRequest } from './module'
 import { Buffer } from 'node:buffer'
+import { once } from 'node:events'
 import { request as httpRequest } from 'node:http'
 import FastifyCookie from '@fastify/cookie'
 import { Controller, HttpException, Req, Res, SetMetadata, StreamableFile, UseGuards, UseInterceptors } from '@nestjs/common'
@@ -13,10 +14,10 @@ import { meta, oc } from '@orpc/contract'
 import { openapi } from '@orpc/openapi'
 import { implement, ORPCError, os, Procedure } from '@orpc/server'
 import { RequestLimitHandlerPlugin } from '@orpc/server/plugins'
-import { getOrBind } from '@orpc/shared'
+import { AsyncIteratorClass, getOrBind } from '@orpc/shared'
 import { catchError, tap } from 'rxjs'
 import supertest from 'supertest'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
 import { Implement } from './implement'
 import { ORPCModule } from './module'
@@ -545,7 +546,7 @@ describe('routing', () => {
 describe('response status, headers and body should follow standard-server', () => {
   const contract = oc.meta(openapi({ outputStructure: 'detailed', path: '/response' }))
 
-  const handler = vi.fn(() => ({}))
+  const handler = vi.fn((_options: { signal?: AbortSignal }) => ({}))
 
   @Controller()
   class ImplController {
@@ -553,6 +554,20 @@ describe('response status, headers and body should follow standard-server', () =
     response() {
       return implement(contract).handler(handler)
     }
+  }
+
+  function createPendingStream(cancel: () => void) {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('first chunk'))
+      },
+      cancel,
+    })
+  }
+
+  // like a publisher subscription that never publishes
+  function createPendingIterator(cleanup: () => Promise<void>) {
+    return new AsyncIteratorClass(() => new Promise<never>(() => {}), cleanup)
   }
 
   describe.each([
@@ -576,11 +591,11 @@ describe('response status, headers and body should follow standard-server', () =
         )
       }
     }())
-    await app.init()
+    await app.listen(0, '127.0.0.1')
 
-    if (adapter) {
-      await app.getHttpAdapter().getInstance().ready()
-    }
+    afterAll(async () => {
+      await app.close()
+    })
 
     const httpServer = app.getHttpServer()
 
@@ -921,6 +936,54 @@ describe('response status, headers and body should follow standard-server', () =
         expect(res.body.toString()).toContain('chunk3')
 
         expect(returnedValueSPy).toHaveBeenCalledWith(expect.any(StreamableFile))
+      })
+    })
+
+    describe('streaming response body is canceled when the client disconnects', () => {
+      function sendRequest() {
+        const port = (httpServer.address() as { port: number }).port
+        const req = httpRequest({ hostname: '127.0.0.1', port, path: '/response', method: 'POST' })
+        req.on('error', () => {})
+        req.end()
+        return req
+      }
+
+      async function readFirstChunkThenDisconnect() {
+        const req = sendRequest()
+        const [res] = await once(req, 'response')
+        res.on('error', () => {})
+        await once(res, 'data')
+        req.destroy()
+      }
+
+      it('event iterator', async () => {
+        const cleanup = vi.fn()
+        handler.mockResolvedValueOnce({ body: createPendingIterator(cleanup) })
+
+        await readFirstChunkThenDisconnect()
+        await vi.waitFor(() => expect(cleanup).toHaveBeenCalledWith({ kind: 'cancelled' }))
+      })
+
+      it('readableStream', async () => {
+        const cancel = vi.fn()
+        handler.mockResolvedValueOnce({ body: createPendingStream(cancel) })
+
+        await readFirstChunkThenDisconnect()
+        await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1))
+      })
+
+      it('when the client disconnects before the handler returns', async () => {
+        const cleanup = vi.fn()
+        handler.mockImplementationOnce(async ({ signal }) => {
+          await new Promise(resolve => signal?.addEventListener('abort', resolve, { once: true }))
+          return { body: createPendingIterator(cleanup) }
+        })
+
+        const req = sendRequest()
+        await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1))
+        req.destroy()
+
+        await vi.waitFor(() => expect(cleanup).toHaveBeenCalledWith({ kind: 'cancelled' }))
       })
     })
   })
