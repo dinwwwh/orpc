@@ -228,11 +228,11 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     const parsed: Record<string, unknown> = { ...params }
 
     Object.entries(styles).forEach(([key, hint]) => {
-      if (hint === undefined || hint === 'primitive') {
+      const value = getOwn(params, key)
+
+      if (hint === undefined || hint === 'primitive' || value === undefined) {
         return
       }
-
-      const value = params[key]
 
       if (hint === 'comma-delimited-array') {
         parsed[key] = decodeDelimitedArray(value, ',')

@@ -196,6 +196,38 @@ describe('openAPIHandlerCodec', () => {
           page: '2',
         })
       })
+
+      it('ignores paramsStyles keys that are not path params of the matched route', async () => {
+        const base = os.meta(openapi({ paramsStyles: { tags: 'comma-delimited-array', filters: 'comma-delimited-object' } }))
+        const codec = new OpenAPIHandlerCodec({
+          list: base.meta(openapi({ method: 'GET', path: '/items/{category}' })).handler(vi.fn()),
+          create: base.meta(openapi({ method: 'POST', path: '/items/{category}' })).handler(vi.fn()),
+          detailed: base.meta(openapi({ method: 'PUT', path: '/items/{category}', inputStructure: 'detailed' })).handler(vi.fn()),
+        })
+
+        const list = await codec.resolveProcedure(createRequest({
+          method: 'GET',
+          url: '/items/books?tags=a&tags=b',
+        }), options as any)
+
+        await expect(list!.decodeInput()).resolves.toEqual({ category: 'books', tags: ['a', 'b'] })
+
+        const create = await codec.resolveProcedure(createRequest({
+          method: 'POST',
+          url: '/items/books',
+          resolveBody: vi.fn().mockResolvedValueOnce({ tags: ['a', 'b'] }),
+        }), options as any)
+
+        await expect(create!.decodeInput()).resolves.toEqual({ category: 'books', tags: ['a', 'b'] })
+
+        const detailed = await codec.resolveProcedure(createRequest({
+          method: 'PUT',
+          url: '/items/books',
+        }), options as any)
+
+        const input = await detailed!.decodeInput() as any
+        expect(Object.keys(input.params)).toEqual(['category'])
+      })
     })
 
     describe('compact non-GET input', () => {
