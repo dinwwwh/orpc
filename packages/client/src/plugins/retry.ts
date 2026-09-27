@@ -116,7 +116,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
 
         while (true) {
           const updatedCallOptions = { ...callOptions, lastEventId }
-          let retryDelayMs: number | undefined
+          let retryDelayMs = 0
 
           if (currentError) {
             if (attempt > maxAttempts) {
@@ -144,7 +144,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           }
 
           try {
-            if (retryDelayMs !== undefined) {
+            if (currentError) {
               await sleep(retryDelayMs, { signal: updatedCallOptions.signal })
 
               attempt++
