@@ -187,15 +187,14 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
   init(options: StandardLinkOptions<T>): StandardLinkOptions<T> {
     const transportInterceptor: StandardLinkTransportInterceptor<T> = async (interceptorOptions) => {
-    /**
-     * Only apply batching to requests with undefined or JSON-serializable bodies.
-     * Other body types  are not suitable for batching.
-     */
+      const { body, signal } = interceptorOptions.request
+
       if (
-        interceptorOptions.request.body instanceof Blob
-        || interceptorOptions.request.body instanceof ReadableStream
-        || isAsyncIteratorObject(interceptorOptions.request.body)
-        || interceptorOptions.request.signal?.aborted
+        body instanceof Blob
+        || body instanceof FormData
+        || body instanceof ReadableStream
+        || isAsyncIteratorObject(body)
+        || signal?.aborted
         || !value(this.filter, interceptorOptions)
       ) {
         return interceptorOptions.next()
