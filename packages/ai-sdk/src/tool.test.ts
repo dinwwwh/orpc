@@ -84,8 +84,8 @@ describe('implementToolFactory', () => {
       const combined = tool.inputSchema as any
 
       /**
-       * Both schemas strip the fragment declared by the other, so they must each validate the
-       * original value instead of what the previous one returned.
+       * Both schemas strip the fragment declared by the other, so each must see the original value,
+       * not only what the previous one returned.
        */
       await expect(
         combined['~standard'].validate({ name: 'Alice', age: 18, unknown: true }),
@@ -114,6 +114,19 @@ describe('implementToolFactory', () => {
           query: { page: 1 },
         },
       })
+    })
+
+    it('keeps earlier transforms when a later input schema passes the raw values through', async () => {
+      const contract = oc
+        .input(z.object({ id: z.coerce.number() }))
+        .input(z.looseObject({ name: z.string() }))
+
+      const tool = implementToolFactory()(contract)
+      const combined = tool.inputSchema as any
+
+      await expect(
+        combined['~standard'].validate({ id: '5', name: 'NAME' }),
+      ).resolves.toEqual({ value: { id: 5, name: 'NAME' } })
     })
 
     it('combines non-object input schemas by piping validation in order', async () => {
