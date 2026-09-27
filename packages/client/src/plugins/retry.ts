@@ -116,6 +116,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
 
         while (true) {
           const updatedCallOptions = { ...callOptions, lastEventId }
+          let retryDelayMs: number | undefined
 
           if (currentError) {
             if (attempt > maxAttempts) {
@@ -138,19 +139,12 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
               throw currentError.error
             }
 
+            retryDelayMs = await value(retryDelay, attemptOptions)
             callback = onRetry?.(attemptOptions)
           }
 
           try {
-            if (currentError) {
-              const retryDelayMs = await value(retryDelay, {
-                ...updatedCallOptions,
-                attempt,
-                error: currentError.error,
-                lastEventRetry,
-              })
-
-              // can throw if signal is aborted while sleeping
+            if (retryDelayMs !== undefined) {
               await sleep(retryDelayMs, { signal: updatedCallOptions.signal })
 
               attempt++
