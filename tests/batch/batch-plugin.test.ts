@@ -209,6 +209,23 @@ describe.each([
     expect(eventProcedure).toHaveBeenCalledTimes(1)
     expect(fetchSpy).toHaveBeenCalledTimes(1) // ensure batch was used
   })
+
+  it('sends file uploads outside the batch', async () => {
+    const router = {
+      upload: os.input(z.object({ file: z.file() })).handler(({ input }) => input.file.text()),
+      echo: os.input(z.string()).handler(({ input }) => `echo:${input}`),
+    }
+
+    const { client, fetchSpy } = createClientServer(router, { method: 'POST' })
+
+    await Promise.all([
+      expect(client.upload({ file: new File(['hello'], 'a.txt') })).resolves.toBe('hello'),
+      expect(client.echo('alpha')).resolves.toBe('echo:alpha'),
+      expect(client.echo('beta')).resolves.toBe('echo:beta'),
+    ])
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2) // the upload plus one batch for both echoes
+  })
 })
 
 describe('batch plugin: QUERY over node-http', () => {

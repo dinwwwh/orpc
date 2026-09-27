@@ -186,6 +186,32 @@ describe('batchLinkPlugin', () => {
       expect(transport.send).toHaveBeenCalledTimes(2)
     })
 
+    it('skips batching for requests with FormData body', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+
+      vi.mocked(codec.encodeInput).mockResolvedValueOnce({
+        method: 'POST',
+        url: '/upload',
+        headers: {},
+        body: new FormData(),
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+        })],
+      })
+
+      await Promise.all([
+        expect(link.call(['upload'], {}, { context: {} })).resolves.toBe('not-batched'),
+        expect(link.call(['ping'], {}, { context: {} })).resolves.toBe('result-0'),
+        expect(link.call(['ping'], {}, { context: {} })).resolves.toBe('result-1'),
+      ])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
     it('skips batching for requests with ReadableStream body', async () => {
       const codec = makeCodec()
       const transport = makeTransport()
