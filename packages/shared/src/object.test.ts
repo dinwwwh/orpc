@@ -1,7 +1,7 @@
 import * as a from 'arktype'
 import * as v from 'valibot'
 import z from 'zod'
-import { bindMethods, clone, copyOnWrite, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, set, setOwn } from './object'
+import { bindMethods, clone, copyOnWrite, findDeepMatches, get, getConstructor, getConstructors, getOwn, isPlainObject, isPropertyKey, mergeTwoLevels, NullProtoObj, omit, pick, set, setOwn } from './object'
 
 it('findDeepMatches', () => {
   const { maps, values } = findDeepMatches(v => typeof v === 'string', {
@@ -421,6 +421,28 @@ describe('omit', () => {
     expect(omit({ a: 1, b: 2, c: 3 }, ['a', 'c'])).toEqual({
       b: 2,
     })
+  })
+})
+
+describe('pick', () => {
+  it('picks specified keys', () => {
+    expect(pick({ a: 1, b: 2, c: 3 }, ['a', 'c'])).toEqual({
+      a: 1,
+      c: 3,
+    })
+  })
+
+  it('keeps keys explicitly set to undefined', () => {
+    const result = pick({ a: undefined, b: 2 } as { a?: number, b: number }, ['a'])
+
+    expect(result).toEqual({ a: undefined })
+    expect(Object.hasOwn(result, 'a')).toBe(true)
+  })
+
+  it('skips missing and inherited keys', () => {
+    const obj = Object.create({ inherited: 1 }) as { inherited?: number, missing?: number }
+
+    expect(Object.keys(pick(obj, ['inherited', 'missing']))).toEqual([])
   })
 })
 

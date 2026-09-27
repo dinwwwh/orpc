@@ -176,6 +176,21 @@ export function omit<T extends object, K extends keyof T>(
   return result
 }
 
+export function pick<T extends object, K extends keyof T>(
+  obj: T,
+  keys: readonly K[],
+): Pick<T, K> {
+  const result = {} as Pick<T, K>
+
+  for (const key of keys) {
+    if (Object.hasOwn(obj, key)) {
+      result[key] = obj[key]
+    }
+  }
+
+  return result
+}
+
 /**
  * Deep clones arrays and plain objects, leaving every other value as is.
  * Circular and shared references are preserved in the copy.
