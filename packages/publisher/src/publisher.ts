@@ -188,9 +188,9 @@ export abstract class Publisher<T extends Record<string, object>> {
           return { done: true, value: undefined }
         }
 
-        if (bufferedEvents.length > 0) {
-          const value = bufferedEvents.shift()!
+        const value = bufferedEvents.shift()
 
+        if (value !== undefined) {
           if (bufferedEvents.length < bufferFloor) {
             bufferFloor = bufferedEvents.length
             bufferLimit = bufferFloor + maxBufferedEvents
@@ -215,7 +215,7 @@ export abstract class Publisher<T extends Record<string, object>> {
 /**
  * FIFO queue with O(1) `shift`, since `Array.prototype.shift` copies large arrays on every call.
  */
-class Queue<T> {
+class Queue<T extends object> {
   private readonly items: (T | undefined)[] = []
   private head = 0
 
