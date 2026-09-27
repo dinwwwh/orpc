@@ -252,20 +252,20 @@ export class ImplementInterceptor implements NestInterceptor {
 
         if (body instanceof ReadableStream) {
           httpAdapter.setHeader(res, 'standard-server', 'octet-stream' satisfies StandardBodyHint)
-          return new StreamableFile(Readable.fromWeb(body), {
+          return toStreamableFile(Readable.fromWeb(body), standardRequest.signal, {
             type: flattenStandardHeader(result.response.headers['content-type']) ?? 'application/octet-stream',
           })
         }
 
         if (isAsyncIteratorObject(body)) {
-          return new StreamableFile(toEventStream(body, this.config.toNestResponse?.eventStream), {
+          return toStreamableFile(toEventStream(body, this.config.toNestResponse?.eventStream), standardRequest.signal, {
             type: 'text/event-stream',
           })
         }
 
         if (body instanceof Blob) {
           httpAdapter.setHeader(res, 'standard-server', 'file' satisfies StandardBodyHint) // A File is also a Blob
-          return new StreamableFile(Readable.fromWeb(body.stream()), {
+          return toStreamableFile(Readable.fromWeb(body.stream()), standardRequest.signal, {
             type: body.type,
             disposition: flattenStandardHeader(result.response.headers['content-disposition']) ?? generateContentDisposition(body instanceof File ? body.name : 'blob'),
             // BunS3 can use NaN for the size
@@ -275,7 +275,7 @@ export class ImplementInterceptor implements NestInterceptor {
 
         if (body instanceof FormData) {
           const response = new Response(body)
-          return new StreamableFile(Readable.fromWeb(response.body!), {
+          return toStreamableFile(Readable.fromWeb(response.body!), standardRequest.signal, {
             type: response.headers.get('content-type')!,
           })
         }
@@ -309,6 +309,21 @@ export class ImplementInterceptor implements NestInterceptor {
       }),
     )
   }
+}
+
+/**
+ * Destroys the stream once the request is aborted, because Nest's Express adapter only pipes a StreamableFile
+ * and never destroys it on client disconnect, which would leave the underlying event iterator or stream uncanceled.
+ */
+function toStreamableFile(stream: Readable, signal: AbortSignal | undefined, options: StreamableFile['options']): StreamableFile {
+  if (signal?.aborted) {
+    stream.destroy()
+  }
+  else {
+    signal?.addEventListener('abort', () => stream.destroy(), { once: true })
+  }
+
+  return new StreamableFile(stream, options)
 }
 
 function flattenParamValue(value: string | string[]): string {
