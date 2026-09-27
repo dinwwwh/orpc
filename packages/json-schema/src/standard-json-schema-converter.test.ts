@@ -79,6 +79,27 @@ describe('standardJsonSchemaConverter', () => {
     ])
   })
 
+  it('does not leak a rejection when async standard validation fails on undefined', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    const schema = withStandardOverrides(z.string(), {
+      validate: () => Promise.reject(new Error('validate failed')),
+    })
+
+    expect(converter.convert(schema, 'input')).toEqual([
+      expect.objectContaining({ type: 'string' }),
+      false,
+    ])
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+  })
+
   it('falls back to an empty optional schema when json schema generation throws', () => {
     const schema = withStandardOverrides(z.string(), {
       jsonSchema: {
