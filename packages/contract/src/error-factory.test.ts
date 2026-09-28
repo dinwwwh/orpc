@@ -212,20 +212,25 @@ describe('createORPCErrorConstructorMap', () => {
     expect(e.defined).toBe(true)
   })
 
-  it('not proxy when access with symbol', () => {
-    // @ts-expect-error - invalid access
-    expect(constructors[Symbol('something')]).toBeUndefined()
-  })
-
   it('in operator works', () => {
     expect('BAD_GATEWAY' in constructors).toBe(true)
     expect('ANY_THING' in constructors).toBe(false)
   })
 
-  it('does not resolve error codes through Object.prototype', () => {
-    const e = (constructors as any).toString()
+  it('not proxy on symbol and unwrap keys', async () => {
+    const map = constructors as any
+    expect(map[Symbol('something')]).toBeUndefined()
+    expect(map.then).toBeUndefined()
+    expect(await map).toBe(map)
+    expect(map.toString).toBe(Object.prototype.toString)
+    expect(map.valueOf).toBe(Object.prototype.valueOf)
+    expect(map.toJSON).toBeUndefined()
+  })
 
-    expect(e.code).toEqual('toString')
+  it('does not resolve error codes through Object.prototype', () => {
+    const e = (constructors as any).constructor()
+
+    expect(e.code).toEqual('constructor')
     expect(e.defined).toEqual(false)
   })
 })
