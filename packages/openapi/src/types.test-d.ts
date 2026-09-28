@@ -46,6 +46,18 @@ describe('JsonifiedValue', () => {
       { a: number, b: string, c: [string, 1, 2, 3, ...string[]], g: unknown }[]
     >()
   })
+
+  it('interface', () => {
+    interface User { id: number, createdAt: Date, tags?: Set<string> }
+    interface Callable { (): void, a: number }
+
+    expectTypeOf<JsonifiedValue<User>>().toEqualTypeOf<{ id: number, createdAt: string, tags?: string[] }>()
+    expectTypeOf<JsonifiedValue<{ user: User, users: User[] }>>().toEqualTypeOf<{
+      user: { id: number, createdAt: string, tags?: string[] }
+      users: { id: number, createdAt: string, tags?: string[] }[]
+    }>()
+    expectTypeOf<JsonifiedValue<Callable>>().toEqualTypeOf<unknown>()
+  })
 })
 
 describe('JsonifiedClient', () => {
@@ -54,6 +66,16 @@ describe('JsonifiedClient', () => {
       Client<{ cache?: boolean }, { now: Date }, { b: Set<Date> }, Error | ORPCError<string, { a: Date }>>
     >>().toEqualTypeOf<
       Client<{ cache?: boolean }, { now: Date }, { b: string[] }, Error | ORPCError<string, { a: string }>>
+    >()
+  })
+
+  it('interface output', () => {
+    interface Output { now: Date }
+
+    expectTypeOf<JsonifiedClient<
+      Client<{ cache?: boolean }, { now: Date }, Output, Error>
+    >>().toEqualTypeOf<
+      Client<{ cache?: boolean }, { now: Date }, { now: string }, Error>
     >()
   })
 
