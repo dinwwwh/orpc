@@ -3,7 +3,7 @@ import type { MaybeOptionalOptions, Writable } from '@orpc/shared'
 import type { ErrorMap, ErrorMapItem } from './error'
 import type { AnySchema, InferSchemaInput, Schema } from './schema'
 
-import { ORPCError } from '@orpc/client'
+import { ORPCError, RECURSIVE_CLIENT_UNWRAP_KEYS } from '@orpc/client'
 import { getOwn, resolveMaybeOptionalOptions } from '@orpc/shared'
 import { ValidationError } from './error'
 import { type } from './schema-utils'
@@ -156,7 +156,7 @@ export type ORPCErrorConstructorMap<T extends ErrorMap> = {
 export function createORPCErrorConstructorMap<T extends ErrorMap>(errorMap: T): ORPCErrorConstructorMap<T> {
   const proxy = new Proxy(errorMap, {
     get(target, code) {
-      if (typeof code !== 'string') {
+      if (typeof code !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(code)) {
         return Reflect.get(target, code)
       }
 
