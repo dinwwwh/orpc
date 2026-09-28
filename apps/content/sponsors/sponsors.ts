@@ -124,18 +124,6 @@ export default [
     "type": "Organization"
   },
   {
-    "name": "Dexter Miguel",
-    "login": "divmgl",
-    "avatar": "https://avatars.githubusercontent.com/u/5452298?u=645993204be8696c085ecf0d228c3062efe2ed65&v=4",
-    "link": "https://github.com/divmgl?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
-    "rel": "sponsored",
-    "tierTitle": "Sponsor",
-    "tierLevel": 2,
-    "amount": 10,
-    "createdAt": "2025-05-02T03:29:29Z",
-    "type": "User"
-  },
-  {
     "name": "herrfugbaum",
     "login": "herrfugbaum",
     "avatar": "https://avatars.githubusercontent.com/u/12859776?u=644dc1666d0220bc0468eb0de3c56b919f635b16&v=4",
@@ -568,6 +556,18 @@ export default [
     "type": "User"
   },
   {
+    "name": "Dexter Miguel",
+    "login": "divmgl",
+    "avatar": "https://avatars.githubusercontent.com/u/5452298?u=645993204be8696c085ecf0d228c3062efe2ed65&v=4",
+    "link": "https://github.com/divmgl?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
+    "rel": "sponsored",
+    "tierTitle": "Past Sponsor",
+    "tierLevel": 0,
+    "amount": -1,
+    "createdAt": "2025-05-02T03:29:29Z",
+    "type": "User"
+  },
+  {
     "name": "Théo LUDWIG",
     "login": "theoludwig",
     "avatar": "https://avatars.githubusercontent.com/u/25207499?u=a6a9653725a2f574c07893748806668e0598cdbe&v=4",
@@ -702,7 +702,7 @@ export default [
   {
     "name": "Yu-Sabo",
     "login": "YuSabo90002",
-    "avatar": "https://avatars.githubusercontent.com/u/13120582?v=4",
+    "avatar": "https://avatars.githubusercontent.com/u/13120582?u=992c15f5438a3120e01f0497d45efb9e85c4994d&v=4",
     "link": "https://github.com/YuSabo90002?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
     "tierTitle": "Past Sponsor",
