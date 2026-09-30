@@ -896,6 +896,26 @@ describe('batchLinkPlugin', () => {
       await sleep(0)
       expect(signal.aborted).toBe(false)
     })
+
+    it('treats a server cancel as the end of a subrequest, but not a stream/cancel', async () => {
+      const { outputA, outputB, idA, idB, signal, push } = await startStreamingBatch()
+
+      await push({ kind: 'response', id: idA, json: { headers: { 'standard-server': 'event-stream' } } })
+      await push({ kind: 'response', id: idB, json: { headers: { 'standard-server': 'event-stream' } } })
+      const iteratorA = await outputA as AsyncIteratorObject<unknown>
+      const iteratorB = await outputB as AsyncIteratorObject<unknown>
+
+      await iteratorB.return?.()
+      await push({ kind: 'stream/cancel', id: idA })
+      await push({ kind: 'event-stream', id: idA, json: { data: 'a1' } })
+      await expect(iteratorA.next()).resolves.toEqual({ value: 'a1', done: false })
+      expect(signal.aborted).toBe(false)
+
+      await push({ kind: 'cancel', id: idA })
+      await expect(iteratorA.next()).rejects.toThrow('Server canceled the request')
+      await sleep(0)
+      expect(signal.aborted).toBe(true)
+    })
   })
 
   describe('batch response decoding', () => {
