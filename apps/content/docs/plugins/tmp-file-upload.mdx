@@ -88,9 +88,10 @@ const handler = new RPCHandler(router, {
         /**
          * Content consumed as a stream: event streams and raw binary
          * streams, enforced while the stream is consumed. Usually the
-         * highest limit.
+         * highest limit, but keep it finite so no client can stream
+         * indefinitely.
          */
-        stream: Number.POSITIVE_INFINITY,
+        stream: 1024 * 1024 * 1024, // 1GB
       },
     }),
   ],
@@ -114,7 +115,7 @@ const handler = new RPCHandler(router, {
         file: context.user === undefined
           ? 10 * 1024 * 1024 // 10MB for guests
           : 2 * 1024 * 1024 * 1024, // 2GB for authenticated users
-        stream: Number.POSITIVE_INFINITY,
+        stream: 1024 * 1024 * 1024, // 1GB
       }),
     }),
   ],
