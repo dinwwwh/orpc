@@ -91,7 +91,7 @@ const handler = new RPCHandler(router, {
          * highest limit, but keep it finite so no client can stream
          * indefinitely.
          */
-        stream: 1024 * 1024 * 1024, // 1GB
+        stream: 500 * 1024 * 1024, // 500MB
       },
     }),
   ],
