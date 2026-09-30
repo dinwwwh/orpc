@@ -1,5 +1,6 @@
 import type { StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { sleep } from '@orpc/shared'
 import { encodePeerMessage } from '@standard-server/peer'
 import { StandardLink } from '../adapters/standard'
@@ -1338,6 +1339,101 @@ describe('batchLinkPlugin', () => {
       const sentRequest = vi.mocked(transport.send).mock.calls[0]![0]
       expect(sentRequest.url).toContain('/custom-no-hash/__batch__?existing=1&data=')
       expect(sentRequest.url).not.toContain('#')
+    })
+  })
+
+  describe('async context', () => {
+    const storage = new AsyncLocalStorage<string>()
+
+    function makeUserCodec(method: 'GET' | 'POST' = 'GET'): StandardLinkCodec<TestContext> {
+      const codec = makeCodec()
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path) => ({
+        method: path[0] === 'post' ? 'POST' : method,
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: {},
+        body: undefined,
+      }))
+      return codec
+    }
+
+    function makeUserTransport(): StandardLinkTransport<TestContext> {
+      return {
+        send: vi.fn(async (request) => {
+          const user = storage.getStore()
+
+          if (request.headers['orpc-batch']) {
+            return makeBufferedBatchResponseFromRequest(request, () => user)
+          }
+
+          return { status: 200, headers: {}, resolveBody: async () => user }
+        }),
+      }
+    }
+
+    it('sends a request sent alone in its caller\'s async context', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await expect(Promise.all([
+        storage.run('alice', () => link.call(['get'], {}, { context: {} })),
+        storage.run('bob', () => link.call(['post'], {}, { context: {} })),
+      ])).resolves.toEqual(['alice', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it.each([
+      ['maxSize', { maxSize: 1 }],
+      ['maxUrlLength', { maxUrlLength: 1 }],
+    ] as const)('sends each part of a batch split by %s in the async context of its first request', async (_, options) => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], ...options })],
+      })
+
+      const users = ['alice', 'bob', 'carol', 'dave']
+      await expect(Promise.all(users.map(user =>
+        storage.run(user, () => link.call(['get'], {}, { context: {} })),
+      ))).resolves.toEqual(users)
+
+      expect(transport.send).toHaveBeenCalledTimes(4)
+    })
+
+    it('batches only requests with the same scope', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({
+          groups: [defaultGroup],
+          scope: () => storage.getStore(),
+          headers: () => ({ 'x-user': storage.getStore() }),
+        })],
+      })
+
+      await expect(Promise.all(['alice', 'bob', 'alice', 'bob'].map(user =>
+        storage.run(user, () => link.call(['get'], {}, { context: {} })),
+      ))).resolves.toEqual(['alice', 'bob', 'alice', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+      expect(vi.mocked(transport.send).mock.calls.map(([request]) => request.headers)).toEqual([
+        { 'x-user': 'alice', 'orpc-batch': 'streaming' },
+        { 'x-user': 'bob', 'orpc-batch': 'streaming' },
+      ])
+    })
+
+    it('sends a batch in the async context of its first request when no scope is set', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeUserCodec(), transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup] })],
+      })
+
+      await expect(Promise.all([
+        storage.run('alice', () => link.call(['get'], {}, { context: {} })),
+        storage.run('bob', () => link.call(['get'], {}, { context: {} })),
+      ])).resolves.toEqual(['alice', 'alice'])
+
+      expect(transport.send).toHaveBeenCalledTimes(1)
     })
   })
 })
