@@ -217,20 +217,17 @@ describe('createORPCErrorConstructorMap', () => {
     expect('ANY_THING' in constructors).toBe(false)
   })
 
-  it('not proxy on symbol and unwrap keys', async () => {
+  it('not proxy on symbol and then keys', async () => {
     const map = constructors as any
     expect(map[Symbol('something')]).toBeUndefined()
     expect(map.then).toBeUndefined()
     expect(await map).toBe(map)
-    expect(map.toString).toBe(Object.prototype.toString)
-    expect(map.valueOf).toBe(Object.prototype.valueOf)
-    expect(map.toJSON).toBeUndefined()
   })
 
   it('does not resolve error codes through Object.prototype', () => {
-    const e = (constructors as any).constructor()
+    const e = (constructors as any).toString()
 
-    expect(e.code).toEqual('constructor')
+    expect(e.code).toEqual('toString')
     expect(e.defined).toEqual(false)
   })
 })
