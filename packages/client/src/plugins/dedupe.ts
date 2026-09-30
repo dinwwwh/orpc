@@ -2,7 +2,7 @@ import type { AsyncIteratorClass, InterceptorOptions, Value } from '@orpc/shared
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
-import { allAbortSignal, defer, isAsyncIteratorObject, replicateAsyncIterator, replicateReadableStream, runWithSignal, stringifyJSON, throwIfAborted, toArray, value, wrapAsyncIterator } from '@orpc/shared'
+import { allAbortSignal, captureAsyncContext, defer, isAsyncIteratorObject, replicateAsyncIterator, replicateReadableStream, runWithSignal, stringifyJSON, throwIfAborted, toArray, value, wrapAsyncIterator } from '@orpc/shared'
 
 export interface DedupeLinkPluginGroup<T extends ClientContext> {
   condition: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
@@ -31,6 +31,14 @@ export interface DedupeLinkPluginOptions<T extends ClientContext> {
   filter?: Value<boolean, [options: StandardLinkTransportInterceptorOptions<T>]>
 
   /**
+   * Only requests with the same scope are deduplicated together.
+   * On the server, return a value unique to the incoming request so different users never share a response.
+   *
+   * @default () => undefined
+   */
+  scope?: (options: StandardLinkTransportInterceptorOptions<T>) => unknown
+
+  /**
    * How long (in ms) to wait for more identical requests before sending,
    * counted from the first queued request.
    * With `0`, only requests made in the same event loop tick are deduplicated.
@@ -52,13 +60,15 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
   private readonly groups: DedupeLinkPluginOptions<T>['groups']
   private readonly filter: Exclude<DedupeLinkPluginOptions<T>['filter'], undefined>
+  private readonly scope: Exclude<DedupeLinkPluginOptions<T>['scope'], undefined>
   private readonly wait: Exclude<DedupeLinkPluginOptions<T>['wait'], undefined>
 
-  private readonly queue: Map<DedupeLinkPluginGroup<T>, Map<string, DedupeCaller<T>[]>> = new Map()
+  private readonly queue: Map<unknown, Map<DedupeLinkPluginGroup<T>, Map<string, DedupeCaller<T>[]>>> = new Map()
 
   constructor(options: NoInfer<DedupeLinkPluginOptions<T>>) {
     this.groups = options.groups
     this.filter = options.filter ?? (({ request }) => request.method === 'GET' || request.method === 'QUERY')
+    this.scope = options.scope ?? (() => undefined)
     this.wait = options.wait ?? 0
   }
 
@@ -74,13 +84,15 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
         return interceptorOptions.next()
       }
 
+      const scope = this.scope(interceptorOptions)
+
       return runWithSignal(interceptorOptions.request.signal, () => new Promise((resolve, reject) => {
         // Schedule only for the first queued request, so later ones cannot extend or split the wait.
         if (!this.queue.size) {
           defer(() => this.processPendingRequests(), this.wait)
         }
 
-        this.enqueue(group, { options: interceptorOptions, resolve, reject })
+        this.enqueue(scope, group, { options: interceptorOptions, resolve, reject, runInOwnContext: captureAsyncContext() })
       }))
     }
 
@@ -90,12 +102,19 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
     }
   }
 
-  private enqueue(group: DedupeLinkPluginGroup<T>, caller: DedupeCaller<T>): void {
-    let queue = this.queue.get(group)
+  private enqueue(scope: unknown, group: DedupeLinkPluginGroup<T>, caller: DedupeCaller<T>): void {
+    let groups = this.queue.get(scope)
+
+    if (!groups) {
+      groups = new Map()
+      this.queue.set(scope, groups)
+    }
+
+    let queue = groups.get(group)
 
     if (!queue) {
       queue = new Map()
-      this.queue.set(group, queue)
+      groups.set(group, queue)
     }
 
     const requestKey = createRequestKey(caller.options.path, caller.options.request)
@@ -110,14 +129,22 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
   }
 
   private async processPendingRequests(): Promise<void> {
-    const pending = new Map(this.queue)
+    const pending = [...this.queue.values()]
     this.queue.clear()
 
     const executions: Promise<void>[] = []
 
-    for (const [group, items] of pending) {
-      for (const callers of items.values()) {
-        executions.push(this.execute(group, callers))
+    for (const groups of pending) {
+      for (const [group, items] of groups) {
+        for (const callers of items.values()) {
+          const activeCallers = callers.filter(caller => !caller.options.request.signal?.aborted)
+          const [first] = activeCallers
+
+          if (first) {
+            // Send in the first active caller's async context instead of the timer's, so the transport sees its request state.
+            executions.push(first.runInOwnContext(() => this.execute(group, activeCallers)))
+          }
+        }
       }
     }
 
@@ -126,15 +153,9 @@ export class DedupeLinkPlugin<T extends ClientContext> implements StandardLinkPl
 
   private async execute(
     group: DedupeLinkPluginGroup<T>,
-    callers: DedupeCaller<T>[],
+    activeCallers: DedupeCaller<T>[],
   ): Promise<void> {
-    const activeCallers = callers.filter(caller => !caller.options.request.signal?.aborted)
-    const [first] = activeCallers
-
-    if (!first) {
-      return
-    }
-
+    const first = activeCallers[0]!
     const matchedOptions = activeCallers.map(caller => caller.options)
 
     try {
@@ -175,6 +196,7 @@ type DedupeCaller<T extends ClientContext> = {
   options: InterceptorOptions<StandardLinkTransportInterceptorOptions<T>, Promise<StandardLazyResponse>>
   resolve: (response: StandardLazyResponse) => void
   reject: (error: unknown) => void
+  runInOwnContext: ReturnType<typeof captureAsyncContext>
 }
 
 function canDedupeRequest(request: StandardRequest): boolean {

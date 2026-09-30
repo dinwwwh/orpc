@@ -1,5 +1,6 @@
 import type { StandardBody, StandardLazyResponse, StandardRequest } from '@standard-server/core'
 import type { StandardLinkCodec, StandardLinkTransport } from '../adapters/standard'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { getEventListeners } from 'node:events'
 import * as SharedExperimentalV2Module from '@orpc/shared'
 import { AsyncIteratorClass, asyncIteratorToStream, promiseWithResolvers, sleep } from '@orpc/shared'
@@ -766,6 +767,71 @@ describe('dedupeLinkPlugin', () => {
     await vi.advanceTimersByTimeAsync(1)
     await expect(promise3).resolves.toEqual({ value: '__body__' })
     expect(transport.send).toHaveBeenCalledTimes(2)
+  })
+
+  describe('async context', () => {
+    const storage = new AsyncLocalStorage<string>()
+
+    function makeUserTransport(): StandardLinkTransport<TestContext> {
+      return {
+        send: vi.fn(async () => {
+          const user = storage.getStore()
+          return { status: 200, headers: {}, resolveBody: async () => user }
+        }),
+      }
+    }
+
+    it('sends each request in its first caller\'s async context', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeCodec(), transport, {
+        plugins: [new DedupeLinkPlugin({ groups: [{ condition: () => true, context: {} }] })],
+      })
+
+      await expect(Promise.all([
+        storage.run('alice', () => link.call(['GET', 'a'], {}, { context: {} })),
+        storage.run('bob', () => link.call(['GET', 'b'], {}, { context: {} })),
+        storage.run('carol', () => link.call(['GET', 'b'], {}, { context: {} })),
+      ])).resolves.toEqual(['alice', 'bob', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
+
+    it('sends in the async context of the first caller that is not aborted', async () => {
+      vi.useFakeTimers()
+
+      const controller = new AbortController()
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeCodec(), transport, {
+        plugins: [new DedupeLinkPlugin({ wait: 100, groups: [{ condition: () => true, context: {} }] })],
+      })
+
+      const alice = storage.run('alice', () => link.call(['GET', 'me'], {}, { context: {}, signal: controller.signal }))
+      const bob = storage.run('bob', () => link.call(['GET', 'me'], {}, { context: {} }))
+
+      await vi.advanceTimersByTimeAsync(10)
+      controller.abort()
+      await expect(alice).rejects.toBe(controller.signal.reason)
+
+      await vi.advanceTimersByTimeAsync(90)
+      await expect(bob).resolves.toBe('bob')
+      expect(transport.send).toHaveBeenCalledTimes(1)
+    })
+
+    it('dedupes only requests with the same scope', async () => {
+      const transport = makeUserTransport()
+      const link = new StandardLink(makeCodec(), transport, {
+        plugins: [new DedupeLinkPlugin({
+          groups: [{ condition: () => true, context: {} }],
+          scope: () => storage.getStore(),
+        })],
+      })
+
+      await expect(Promise.all(['alice', 'bob', 'alice', 'bob'].map(user =>
+        storage.run(user, () => link.call(['GET', 'me'], {}, { context: {} })),
+      ))).resolves.toEqual(['alice', 'bob', 'alice', 'bob'])
+
+      expect(transport.send).toHaveBeenCalledTimes(2)
+    })
   })
 })
 
