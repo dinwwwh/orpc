@@ -75,6 +75,23 @@ describe('zodToJsonSchemaConverter', () => {
     expect(converter.convert(schema, 'input')).toEqual([{ type: 'string' }, false])
   })
 
+  it('does not leak a rejection when async standard validation fails while checking optionality', async ({ onTestFinished }) => {
+    const unhandledRejectionHandler = vi.fn()
+    process.on('unhandledRejection', unhandledRejectionHandler)
+
+    onTestFinished(() => {
+      process.off('unhandledRejection', unhandledRejectionHandler)
+    })
+
+    // Zod falls back to `safeParseAsync` when the sync parse throws, which rejects with the same error.
+    const schema = z.preprocess(value => JSON.parse(value as string), z.object({ a: z.string() }))
+
+    expect(converter.convert(schema, 'input')).toEqual([expect.objectContaining({ type: 'object' }), false])
+
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(unhandledRejectionHandler).not.toHaveBeenCalled()
+  })
+
   describe('supports $ref at root level', () => {
     it('with the global metadata registry and special json pointers', () => {
       const schema = z.object({
