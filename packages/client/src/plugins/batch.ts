@@ -1,6 +1,6 @@
 import type { InterceptorOptions, Promisable, Value } from '@orpc/shared'
 import type { StandardHeaders, StandardLazyResponse, StandardRequest, StandardUrl } from '@standard-server/core'
-import type { ClientPeerSendMessage } from '@standard-server/peer'
+import type { ClientPeerSendMessage, ServerPeerSendMessage } from '@standard-server/peer'
 import type { StandardLinkOptions, StandardLinkPlugin, StandardLinkTransportInterceptor, StandardLinkTransportInterceptorOptions } from '../adapters/standard'
 import type { ClientContext } from '../types'
 import { captureAsyncContext, defer, isAsyncIteratorObject, loadBytes, once, promiseWithResolvers, safeEncodeURIComponent, splitInHalf, stringifyJSON, toArray, value } from '@orpc/shared'
@@ -307,29 +307,38 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
       const pendingMessages: ClientPeerSendMessage[] = []
       const subrequests = groupItems.map(([subOptions]) => this.mapSubrequest(subOptions, { url, headers }))
       let batchResponse: StandardLazyResponse
-      let activeCount = subrequests.length
       let markRequestSent: (() => void) | undefined
+      const openRequestIds = new Set<string>()
+      const cancelledRunningRequestIds = new Set<string>()
+      let isBatchSent = false
+
+      const abortIfOnlyCancelledRemain = () => {
+        if (openRequestIds.size === 0 && cancelledRunningRequestIds.size > 0) {
+          controller.abort()
+        }
+      }
 
       const peer = new ClientPeer(async (message) => {
         pendingMessages.push(message)
 
         if (message.kind === 'request') {
+          openRequestIds.add(message.id)
           markRequestSent?.()
         }
-
-        if (message.kind === 'cancel' && --activeCount === 0) {
-          controller.abort()
+        else if (message.kind === 'cancel' && openRequestIds.delete(message.id) && isBatchSent) {
+          cancelledRunningRequestIds.add(message.id)
+          abortIfOnlyCancelledRemain()
         }
       })
 
       /**
        * Subrequests go to the peer one at a time, so a request message always belongs to the current one.
        * A subrequest aborted before the peer starts sending its request message sends nothing, not even a
-       * cancel, so one that settles without a request message is no longer active.
+       * cancel, so settling also ends the wait for it.
        */
       for (const [index, [subOptions, resolve, reject]] of groupItems.entries()) {
-        const sent = promiseWithResolvers<boolean>()
-        markRequestSent = () => sent.resolve(true)
+        const sent = promiseWithResolvers<void>()
+        markRequestSent = sent.resolve
 
         peer
           .request(subrequests[index]!)
@@ -339,16 +348,16 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
               reject(error)
             }
           })
-          .then(() => sent.resolve(false))
+          .then(sent.resolve)
 
-        if (!await sent.promise) {
-          activeCount--
-        }
+        await sent.promise
       }
 
-      if (activeCount === 0) {
+      if (openRequestIds.size === 0) {
         return
       }
+
+      isBatchSent = true
 
       try {
         const request: StandardRequest = {
@@ -422,7 +431,15 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
           await decodeLengthPrefixedBlob(body, peer)
         }
         else if (body instanceof ReadableStream) {
-          await decodeLengthPrefixedStream(body, peer)
+          await decodeLengthPrefixedStream(body, async (message) => {
+            await peer.message(message)
+
+            if (isLastServerMessage(message)) {
+              openRequestIds.delete(message.id)
+              cancelledRunningRequestIds.delete(message.id)
+              abortIfOnlyCancelledRemain()
+            }
+          })
         }
         else {
           throw new TypeError('Invalid batch response format.')
@@ -446,6 +463,27 @@ type BatchLinkPluginItem<T extends ClientContext> = [
   reject: (e: unknown) => void,
   runInOwnContext: ReturnType<typeof captureAsyncContext>,
 ]
+
+/**
+ * Whether the server sends nothing more for the subrequest after this message.
+ */
+function isLastServerMessage(message: ServerPeerSendMessage): boolean {
+  switch (message.kind) {
+    case 'response':
+      // A body-less response with a content type or body hint is followed by stream messages
+      return message.json.body !== undefined
+        || message.binary !== undefined
+        || (message.json.headers?.['content-type'] === undefined && message.json.headers?.['standard-server'] === undefined)
+    case 'event-stream':
+      return message.json.event === 'close' || message.json.event === 'error'
+    case 'octet-stream':
+      return message.json.close === true
+    case 'cancel':
+      return true
+    default:
+      return false
+  }
+}
 
 async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<void> {
   const buffer = await loadBytes(blob)
@@ -476,7 +514,7 @@ async function decodeLengthPrefixedBlob(blob: Blob, peer: ClientPeer): Promise<v
   }
 }
 
-async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, peer: ClientPeer): Promise<void> {
+async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, receive: (message: ServerPeerSendMessage) => Promise<void>): Promise<void> {
   const reader = stream.getReader()
   let buffer = new Uint8Array(0)
 
@@ -514,7 +552,7 @@ async function decodeLengthPrefixedStream(stream: ReadableStream<Uint8Array>, pe
           throw new TypeError('Invalid batch response: invalid message.')
         }
 
-        await peer.message(result.message)
+        await receive(result.message)
       }
 
       if (done) {
