@@ -751,10 +751,18 @@ describe('batchLinkPlugin', () => {
       expect(transport.send).not.toHaveBeenCalled()
     })
 
-    it('sends the batch with the cancel of a subrequest aborted after its request message but before the batch', async () => {
+    it.each(['POST', 'GET'] as const)('leaves a subrequest aborted after its request message but before the batch out of the %s batch', async (method) => {
       const codec = makeCodec()
       const transport = makeTransport()
       const controller = new AbortController()
+
+      vi.mocked(codec.encodeInput).mockImplementation(async (_input, path, { signal }) => ({
+        method,
+        url: `/${path.join('/')}` as `/${string}`,
+        headers: {},
+        body: undefined,
+        signal,
+      }))
 
       const link = new StandardLink(codec, transport, {
         plugins: [new BatchLinkPlugin({
@@ -781,11 +789,34 @@ describe('batchLinkPlugin', () => {
       const promise2 = link.call(['b'], {}, { context: {} })
 
       await abortedPromise
-      await expect(promise2).resolves.toBe('result-2')
+      await expect(promise2).resolves.toBe('result-0')
 
       const batchRequest = vi.mocked(transport.send).mock.calls[0]![0]
+      expect(batchRequest.method).toBe(method)
       expect(batchRequest.signal?.aborted).toBe(false)
-      expect(extractBatchMessagesFromRequest(batchRequest).map(m => m.kind)).toEqual(['request', 'cancel', 'request'])
+      expect(extractBatchMessagesFromRequest(batchRequest).map(m => [m.kind, m.json?.url])).toEqual([['request', '/b']])
+    })
+
+    it('keeps the sent batch messages unchanged when a subrequest is aborted after the batch is handed to the transport', async () => {
+      const codec = makeCodec()
+      const transport = makeTransport()
+      const controller = new AbortController()
+
+      vi.mocked(transport.send).mockImplementationOnce(async (request) => {
+        controller.abort(new Error('TEST_ABORT'))
+        return makeBufferedBatchResponseFromRequest(request)
+      })
+
+      const link = new StandardLink(codec, transport, {
+        plugins: [new BatchLinkPlugin({ groups: [defaultGroup], mode: 'buffered' })],
+      })
+
+      await Promise.all([
+        expect(link.call(['a'], {}, { context: {}, signal: controller.signal })).rejects.toThrow('TEST_ABORT'),
+        expect(link.call(['b'], {}, { context: {} })).resolves.toBe('result-1'),
+      ])
+
+      expect(extractBatchMessagesFromRequest(vi.mocked(transport.send).mock.calls[0]![0]).map(m => m.kind)).toEqual(['request', 'request'])
     })
 
     it('aborts the batch request once every subrequest is aborted, including ones aborted before sending', async () => {

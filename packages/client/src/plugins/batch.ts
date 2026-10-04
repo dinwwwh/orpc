@@ -359,6 +359,12 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
       isBatchSent = true
 
+      /**
+       * Leave out subrequests aborted before the batch is sent: the server counts their request and cancel
+       * against its batch size limit and would still run calls the client already rejected.
+       */
+      const outgoingMessages = pendingMessages.filter(message => openRequestIds.has(message.id))
+
       try {
         const request: StandardRequest = {
           url,
@@ -369,7 +375,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
 
         if (method === 'GET') {
           const [pathname, search, hash] = parseStandardUrl(url)
-          const dataParam = `data=${safeEncodeURIComponent(stringifyJSON(pendingMessages))}`
+          const dataParam = `data=${safeEncodeURIComponent(stringifyJSON(outgoingMessages))}`
           const newUrl: StandardUrl = search
             ? `${pathname}${search}&${dataParam}${hash ?? ''}`
             : `${pathname}?${dataParam}${hash ?? ''}`
@@ -391,7 +397,7 @@ export class BatchLinkPlugin<T extends ClientContext> implements StandardLinkPlu
           request.url = newUrl
         }
         else {
-          request.body = pendingMessages
+          request.body = outgoingMessages
         }
 
         batchResponse = await groupItems[0]![0]!.next({
