@@ -1,3 +1,4 @@
+import { setFlagsFromString } from 'node:v8'
 import { BracketNotationSerializer } from './bracket-notation'
 
 describe('bracket notation serializer', () => {
@@ -305,62 +306,81 @@ describe('bracket notation serializer', () => {
       expect(serializer.deserialize([['a[+1]', 1]])).toEqual({ a: { '+1': 1 } })
       expect(serializer.deserialize([['a[1e3]', 1]])).toEqual({ a: { '1e3': 1 } })
       expect(serializer.deserialize([['a[1.5]', 1]])).toEqual({ a: { 1.5: 1 } })
+      expect(serializer.deserialize([['a[4294967295]', 1]])).toEqual({ a: { 4294967295: 1 } })
     })
 
-    it('fallback to object when explicit array index exceeds maxExplicitDeserializingArrayIndex (default 999)', () => {
-      expect(serializer.deserialize([
-        ['arr[1]', 1],
-        ['arr[999]', 2],
-        ['arr[1000]', 3],
-      ])).toEqual({ arr: { 1: 1, 999: 2, 1000: 3 } })
+    describe('maxDeserializingEmptySlots', () => {
+      const limited = new BracketNotationSerializer({ maxDeserializingEmptySlots: 4 })
 
-      expect(serializer.deserialize([
-        ['arr[999]', 3],
-      ])).toEqual({ arr: (() => {
-        const arr = []
-        arr[999] = 3
-        return arr
-      })() })
-
-      expect(serializer.deserialize([
-        ['arr[1000]', 3],
-      ])).toEqual({ arr: { 1000: 3 } })
-
-      // the limit not apply to push array syntax
-      expect(serializer.deserialize([
-        ['arr[999]', 3],
-        ['arr', 4],
-      ])).toEqual({
-        arr: (() => {
+      it('turns an array into an object when an index leaves more empty slots than the limit (default 1,000)', () => {
+        expect(serializer.deserialize([
+          ['arr[1000]', 3],
+        ])).toEqual({ arr: (() => {
           const arr = []
-          arr[999] = 3
-          arr[1000] = 4
+          arr[1000] = 3
           return arr
-        })(),
+        })() })
+
+        expect(serializer.deserialize([['arr[1001]', 3]])).toEqual({ arr: { 1001: 3 } })
+        expect(serializer.deserialize([['arr[1]', 1], ['arr[5000]', 2]])).toEqual({ arr: { 1: 1, 5000: 2 } })
+        expect(serializer.deserialize([['arr[4294967294]', 'x']])).toEqual({ arr: { 4294967294: 'x' } })
+
+        // sequential indexes leave no empty slots, so long arrays stay arrays
+        expect(serializer.deserialize(Array.from({ length: 2000 }, (_, i): [string, unknown] => [`arr[${i}]`, i]))).toEqual({
+          arr: Array.from({ length: 2000 }, (_, i) => i),
+        })
+
+        // repeated keys append without using the limit
+        expect(serializer.deserialize([
+          ['arr[999]', 3],
+          ['arr', 4],
+        ])).toEqual({
+          arr: (() => {
+            const arr = []
+            arr[999] = 3
+            arr[1000] = 4
+            return arr
+          })(),
+        })
       })
 
-      const customSerializer = new BracketNotationSerializer({ maxExplicitDeserializingArrayIndex: 499 })
+      it('counts the empty slots that explicit array indexes leave across the payload', () => {
+        expect(limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[2]', 3]])).toEqual({
+          a: [1, undefined, undefined, 2],
+          b: [undefined, undefined, 3],
+        })
 
-      expect(customSerializer.deserialize([
-        ['arr[1]', 1],
-        ['arr[499]', 2],
-        ['arr[500]', 3],
-      ])).toEqual({ arr: { 1: 1, 499: 2, 500: 3 } })
+        expect(limited.deserialize([['a[0]', 1], ['a[3]', 2], ['b[3]', 3]])).toEqual({
+          a: [1, undefined, undefined, 2],
+          b: { 3: 3 },
+        })
 
-      expect(customSerializer.deserialize([
-        ['arr[499]', 2],
-      ])).toEqual({ arr: (() => {
-        const arr = []
-        arr[499] = 2
-        return arr
-      })() })
+        // writing below an array's length leaves no empty slots
+        expect(limited.deserialize([['a[3]', 1], ['a[0]', 2], ['a[1]', 3], ['a[2]', 4], ['b[1]', 5]])).toEqual({
+          a: [2, 3, 4, 1],
+          b: [undefined, 5],
+        })
+      })
     })
 
-    it('does not allocate huge arrays for memory exhaustion attacks', () => {
-      const result = serializer.deserialize([['arr[4294967295]', 'x']]) as any
+    it('stores integer keys that leave gaps in objects sparsely, without a trace', () => {
+      setFlagsFromString('--allow-natives-syntax')
+      // eslint-disable-next-line no-new-func
+      const hasSparseIntegerKeys = new Function('o', 'return %HasDictionaryElements(o)') as (o: object) => boolean
 
-      expect(Array.isArray(result.arr)).toBe(false)
-      expect(result.arr).toEqual({ 4294967295: 'x' })
+      const result = serializer.deserialize([['a[x]', 1], ['a[999]', 2], ['b[x]', 3], ['b[0]', 4], ['b[1]', 5], ['999', 6]]) as any
+
+      expect(hasSparseIntegerKeys(result.a)).toBe(true)
+      expect(hasSparseIntegerKeys(result.b)).toBe(false)
+      expect(hasSparseIntegerKeys(result)).toBe(true)
+
+      expect(Object.keys(result.a)).toEqual(['999', 'x'])
+      expect(serializer.deserialize([['a[x]', 1], ['a[4294967294]', 2], ['a[5]', 3]])).toEqual({
+        a: { x: 1, 4294967294: 2, 5: 3 },
+      })
+
+      // objects passed in by the caller are left as they are
+      expect(serializer.deserialize([['a', Object.seal({ 5: 1 })], ['a[5]', 2]])).toEqual({ a: { 5: [1, 2] } })
     })
 
     it('can prevent prototype pollution attack', () => {
