@@ -69,6 +69,20 @@ describe('rpcHandler', () => {
     return expect(response!.text()).resolves.toBe('"intercepted"')
   })
 
+  it('rejects an oversized bigint string with 400 before running middleware', async () => {
+    const middleware = vi.fn(({ next }) => next())
+    const handler = new RPCHandler({ ping: os.use(middleware).handler(() => 'pong') })
+
+    const { response } = await handler.handle(new Request('https://example.com/ping', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ json: '9'.repeat(1_000_000), meta: [['bigint']] }),
+    }))
+
+    expect(response?.status).toBe(400)
+    expect(middleware).not.toHaveBeenCalled()
+  })
+
   it('treats GET requests as unmatched by default', async () => {
     const handler = new RPCHandler({
       ping: os.handler(() => 'pong'),
