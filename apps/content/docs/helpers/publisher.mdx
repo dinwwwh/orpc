@@ -97,6 +97,8 @@ import { RedisPublisher } from '@orpc/publisher/redis'
 
 const client = createClient({ url: 'redis://localhost:6379' })
 
+client.on('error', error => console.error('Redis client error', error))
+
 // RedisPublisher lazily connects to Redis when needed.
 // You can still call `client.connect()` manually, but it is optional.
 await client.connect()
@@ -205,6 +207,10 @@ const publisher = new BunRedisPublisher<Events>(redis, {
    * Redis subscriber instance.
    * Pub/Sub takes over the connection, so a client with subscriptions
    * cannot execute commands and must use a dedicated connection.
+   *
+   * @remarks
+   * The publisher takes over `onconnect` and `onclose` to detect lost subscriptions.
+   * Set your own handlers before the first listen, or they replace the publisher's.
    *
    * @default redis.duplicate() (lazily created on first listen)
    */

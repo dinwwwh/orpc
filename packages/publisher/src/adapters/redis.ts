@@ -1,3 +1,4 @@
+import type { ThrowableError } from '@orpc/shared'
 import type { RedisClientType } from 'redis'
 import type { BaseRedisPublisherOptions, RedisStreamEntry } from './base-redis'
 import { BaseRedisPublisher } from './base-redis'
@@ -28,6 +29,8 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
    */
   private readonly channelPrefix: string
 
+  private readonly onErrors: Array<(error: ThrowableError) => void> = []
+
   constructor(
     private readonly redis: RedisClientType<any, any, any, any, any>,
     { subscriber, ...options }: RedisPublisherOptions = {},
@@ -42,6 +45,11 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
 
     this.subscriber = subscriber ?? redis.duplicate()
     this.channelPrefix = keyPrefix ?? ''
+
+    this.subscriber.on('error', (error) => {
+      // Snapshot, since a callback may unsubscribe itself mid-dispatch.
+      this.onErrors.slice().forEach(onError => onError(error))
+    })
   }
 
   protected async publishMessage(channel: string, message: string): Promise<void> {
@@ -49,13 +57,30 @@ export class RedisPublisher<T extends Record<string, object>> extends BaseRedisP
     await this.redis.publish(`${this.channelPrefix}${channel}`, message)
   }
 
-  protected async subscribeChannel(channel: string, listener: (message: unknown) => void): Promise<() => Promise<void>> {
+  protected async subscribeChannel(
+    channel: string,
+    listener: (message: unknown) => void,
+    onError?: (error: ThrowableError) => void,
+  ): Promise<() => Promise<void>> {
     const prefixedChannel = `${this.channelPrefix}${channel}`
 
     await connectIfNeeded(this.subscriber)
     await this.subscriber.subscribe(prefixedChannel, listener)
 
+    // Registered after subscribing because a failed subscription rejects instead.
+    if (onError) {
+      this.onErrors.push(onError)
+    }
+
     return async () => {
+      if (onError) {
+        const index = this.onErrors.indexOf(onError)
+
+        if (index !== -1) {
+          this.onErrors.splice(index, 1)
+        }
+      }
+
       await this.subscriber.unsubscribe(prefixedChannel, listener)
     }
   }
