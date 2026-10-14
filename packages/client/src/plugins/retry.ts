@@ -110,6 +110,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       let lastEventRetry: undefined | number
       let callback: void | ((isSuccess: boolean) => void)
       let attempt = 1
+      let isIteratorAborted = false
 
       const callNext = async (initialError?: { error: unknown }) => {
         let currentError = initialError
@@ -119,7 +120,7 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           let retryDelayMs = 0
 
           if (currentError) {
-            if (attempt > maxAttempts) {
+            if (isIteratorAborted || attempt > maxAttempts) {
               throw currentError.error
             }
 
@@ -146,6 +147,10 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
           try {
             if (currentError) {
               await sleep(retryDelayMs, { signal: updatedCallOptions.signal })
+
+              if (isIteratorAborted) {
+                throw currentError.error
+              }
 
               attempt++
             }
@@ -174,7 +179,6 @@ export class RetryLinkPlugin<T extends RetryLinkPluginContext & ClientContext> i
       }
 
       let current = output
-      let isIteratorAborted = false
 
       return override(() => current, new AsyncIteratorClass(
         async () => {
