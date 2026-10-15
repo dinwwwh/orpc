@@ -122,6 +122,10 @@ async function bootstrap() {
 }
 ```
 
+:::warning
+NestJS only limits the bodies it parses itself. Bodies parsed by oRPC (other content types, or every body when `bodyParser: false` is set) have no size limit, so cap them with [Request Limit](/docs/plugins/request-limit) or [Tmp File Upload](/docs/plugins/tmp-file-upload).
+:::
+
 ## Configuration
 
 Configure `@orpc/nest` by importing `ORPCModule` into your NestJS module. It supports the same
