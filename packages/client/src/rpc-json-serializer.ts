@@ -34,6 +34,20 @@ function assertSerializedType(ok: boolean, type: string, expected: string): void
   }
 }
 
+function isWalkable(value: unknown): boolean {
+  return Array.isArray(value) || isPlainObject(value)
+}
+
+function walkInto(parent: any, key: Segment, original: unknown, restored?: Set<unknown>): any {
+  const value = parent[key]
+
+  if (!isWalkable(value) || restored?.has(value)) {
+    throw invalidSerializedData(`segment "${key}" cannot be walked into.`)
+  }
+
+  return value === original ? copyOnWrite(parent, key, original) : value
+}
+
 const DEFAULT_RPC_JSON_SERIALIZER_HANDLERS: Record<string, RPCJsonSerializerHandler> = {
   undefined: {
     condition(data: unknown): boolean {
@@ -415,7 +429,7 @@ export class RPCJsonSerializer {
 
         for (let j = 0; j < segments.length; j++) {
           original = original[preSegment]
-          currentRef = copyOnWrite(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original)
           preSegment = segments[j]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -428,6 +442,8 @@ export class RPCJsonSerializer {
     }
 
     if (serialized.meta) {
+      let restored: Set<unknown> | undefined
+
       for (const item of serialized.meta) {
         const type = item[0]
         const handler = this.handlers[type]
@@ -442,7 +458,7 @@ export class RPCJsonSerializer {
 
         for (let i = 1; i < item.length; i++) {
           original = original[preSegment]
-          currentRef = copyOnWrite(currentRef, preSegment, original)
+          currentRef = walkInto(currentRef, preSegment, original, restored)
           preSegment = item[i]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
@@ -450,7 +466,12 @@ export class RPCJsonSerializer {
           }
         }
 
-        currentRef[preSegment] = handler.deserialize(currentRef[preSegment])
+        const value = handler.deserialize(currentRef[preSegment])
+        currentRef[preSegment] = value
+
+        if (isWalkable(value)) {
+          (restored ??= new Set()).add(value)
+        }
       }
     }
 
