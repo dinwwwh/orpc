@@ -263,6 +263,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       }
 
       const peer = new ServerPeer(async (message) => {
+        if (mode === 'streaming') {
+          startStreaming()
+        }
+
         if (streamController === undefined) {
           bufferedMessages.push(message)
         }
@@ -276,8 +280,10 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
       /**
        * Opens the binary length-prefixed stream that every later message is written to,
        * starting with the messages buffered so far, which `flushed` waits for.
+       *
+       * A function declaration, since it and the peer above refer to each other.
        */
-      const startStreaming = () => {
+      function startStreaming() {
         if (streamController !== undefined) {
           return
         }
@@ -345,10 +351,6 @@ export class BatchHandlerPlugin<T extends Context> implements StandardHandlerPlu
         finally {
           signal?.removeEventListener('abort', closePeer)
         }
-      }
-
-      if (mode === 'streaming') {
-        startStreaming()
       }
 
       const subrequests = runSubrequests()

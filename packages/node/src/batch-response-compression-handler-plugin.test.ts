@@ -1,5 +1,6 @@
 import type { AnyRouter } from '@orpc/server'
 import type { BatchResponseCompressionHandlerPluginOptions } from './batch-response-compression-handler-plugin'
+import { Buffer } from 'node:buffer'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { BATCH_CONTENT_TYPE, BatchHandlerPlugin, ResponseCompressionHandlerPlugin } from '@orpc/server/plugins'
@@ -101,29 +102,36 @@ describe('batchResponseCompressionHandlerPlugin', () => {
   })
 
   /**
-   * Keep-alive frames hold the connection open while no subrequest has resolved, so a compressor
-   * that buffered them would let the very connection they protect time out.
+   * Keep-alive frames hold the connection open while the remaining subrequests are pending, so a
+   * compressor that buffered them would let the very connection they protect time out.
    */
   it('keeps sending keep-alive frames while the batch is idle', async () => {
     const pending = promiseWithResolvers<string>()
 
-    const handler = new RPCHandler({ pending: os.handler(() => pending.promise) }, {
+    const handler = new RPCHandler({ ping: os.handler(() => 'pong'), pending: os.handler(() => pending.promise) }, {
       plugins: [
         new BatchHandlerPlugin({ keepAlive: { enabled: true, interval: 20 } }),
         new BatchResponseCompressionHandlerPlugin(),
       ],
     })
 
-    const { response } = await handler.handle(createBatchRequest('streaming', ['/pending']))
+    const { response } = await handler.handle(createBatchRequest('streaming', ['/ping', '/pending']))
     const reader = response!.body!.pipeThrough(new DecompressionStream('gzip')).getReader()
+    let received = Buffer.alloc(0)
 
-    // Two zero-length length-prefixed frames, four bytes each
-    let bytes = 0
-    while (bytes < 8) {
-      const { done, value } = await reader.read()
-      expect(done).toBe(false)
-      bytes += value!.byteLength
+    const readAtLeast = async (length: number) => {
+      while (received.byteLength < length) {
+        const { done, value } = await reader.read()
+        expect(done).toBe(false)
+        received = Buffer.concat([received, value!])
+      }
     }
+
+    // The ping response frame, then two zero-length length-prefixed frames, four bytes each
+    await readAtLeast(4)
+    const messageEnd = 4 + received.readUInt32BE(0)
+    await readAtLeast(messageEnd + 8)
+    expect(received.subarray(messageEnd, messageEnd + 8)).toEqual(Buffer.alloc(8))
 
     pending.resolve('done')
     await reader.cancel()
