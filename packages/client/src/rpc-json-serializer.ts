@@ -441,10 +441,19 @@ export class RPCJsonSerializer {
       }
     }
 
-    if (serialized.meta) {
+    const meta = serialized.meta
+
+    if (meta) {
       let restored: Set<unknown> | undefined
 
-      for (const item of serialized.meta) {
+      /**
+       * `[segment, container, original]` per step of the previous entry's walk, reused for the shared path prefix.
+       * Only containers above its target are kept, so none can be a value a handler restored.
+       */
+      const chain: unknown[] | undefined = meta.length === 1 ? undefined : []
+      let chainDepth = 0
+
+      for (const item of meta) {
         const type = item[0]
         const handler = this.handlers[type]
 
@@ -452,19 +461,47 @@ export class RPCJsonSerializer {
           throw invalidSerializedData(`type "${type}" is not supported.`)
         }
 
+        const depth = item.length - 1
+        const shared = Math.min(depth, chainDepth)
+        let d = 0
         let original: any = serialized
         let currentRef: any = ref
         let preSegment: string | number = 'json'
 
-        for (let i = 1; i < item.length; i++) {
-          original = original[preSegment]
-          currentRef = walkInto(currentRef, preSegment, original, restored)
-          preSegment = item[i]!
+        if (chain !== undefined && shared > 0) {
+          d = 1
+
+          while (d < shared && chain[3 * d] === item[d]) {
+            d++
+          }
+
+          currentRef = chain[3 * d - 2]
+          original = chain[3 * d - 1]
+          preSegment = item[d]!
 
           if (!Object.hasOwn(currentRef, preSegment)) {
             throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
           }
         }
+
+        while (d < depth) {
+          original = original[preSegment]
+          currentRef = walkInto(currentRef, preSegment, original, restored)
+
+          if (chain !== undefined) {
+            chain[3 * d] = preSegment
+            chain[3 * d + 1] = currentRef
+            chain[3 * d + 2] = original
+          }
+
+          preSegment = item[++d]!
+
+          if (!Object.hasOwn(currentRef, preSegment)) {
+            throw invalidSerializedData(`segment "${preSegment}" does not exist.`)
+          }
+        }
+
+        chainDepth = depth
 
         const value = handler.deserialize(currentRef[preSegment])
         currentRef[preSegment] = value
