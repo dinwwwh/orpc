@@ -9,9 +9,9 @@ export default [
     "avatar": "https://avatars.githubusercontent.com/u/97035603?v=4",
     "link": "https://screenshotone.com/?ref=middleapi&utm_source=middleapi&utm_medium=sponsor",
     "rel": "sponsored",
-    "tierTitle": "Special Sponsor",
-    "tierLevel": 5,
-    "amount": 1000,
+    "tierTitle": "Premium Sponsor",
+    "tierLevel": 4,
+    "amount": 500,
     "createdAt": "2026-03-15T14:00:10Z",
     "type": "Organization"
   },
