@@ -77,6 +77,13 @@ describe('smartCoercionLinkPlugin', () => {
     } as any)).resolves.toEqual({ number: 456, boolean: false })
   })
 
+  it('passes maxStepsPerValue to the coercer', async () => {
+    const contract = oc.router({ get: oc.output(z.number()) })
+    const interceptor = new SmartCoercionLinkPlugin(contract, { maxStepsPerValue: 0 }).init({} as any).interceptors?.[0]
+
+    await expect(interceptor?.({ path: ['get'], next: vi.fn().mockResolvedValue('1') } as any)).resolves.toBe('1')
+  })
+
   it('throw the original error when it not defined ORPCError or has no data schema', async () => {
     const contract = oc.router({
       users: {

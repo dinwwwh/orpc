@@ -149,6 +149,10 @@ Supports arrays of key-value pairs with **unique keys**:
 
 - `[['key1', 'value1'], ['key2', 'value2']]` → `new Map([['key1', 'value1'], ['key2', 'value2']])`
 
+## Step Budget
+
+Both plugins accept `maxStepsPerValue` (default 1000), the maximum coercion steps per input value, where a step applies one schema to one value. Past it, the whole input is left uncoerced and validation still runs. Raise it if large inputs fail validation while smaller ones of the same shape pass.
+
 ## Advanced Usage
 
 You can also use this plugin in guides such as [Expanding Type Support for OpenAPI Link](/docs/openapi/expanding-type-support-for-link).

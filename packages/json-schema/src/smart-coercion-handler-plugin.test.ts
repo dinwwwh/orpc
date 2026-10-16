@@ -51,6 +51,16 @@ describe('smartCoercionHandlerPlugin', () => {
     expect(next).toHaveBeenNthCalledWith(2, { procedure, input: { number: 456, boolean: false } })
   })
 
+  it('passes maxStepsPerValue to the coercer', async () => {
+    const procedure = oc.input(z.object({ page: z.number() }))
+    const interceptor = new SmartCoercionHandlerPlugin({ maxStepsPerValue: 0 }).init({} as any).clientInterceptors?.[0]
+    const next = vi.fn()
+
+    await interceptor?.({ procedure, input: { page: '1' }, next } as any)
+
+    expect(next).toHaveBeenCalledWith({ procedure, input: { page: '1' } })
+  })
+
   it('passes maxBigIntDigits to the coercer', async () => {
     const plugin = new SmartCoercionHandlerPlugin({
       converters: [{

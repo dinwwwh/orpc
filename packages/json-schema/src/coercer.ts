@@ -1,5 +1,5 @@
 import type { JsonSchema } from './types'
-import { DEFAULT_MAX_BIGINT_DIGITS, get, getOwn, isPlainObject, parseBigIntString, toArray, tryOrUndefined } from '@orpc/shared'
+import { DEFAULT_MAX_BIGINT_DIGITS, get, getOwn, isPlainObject, isTypescriptObject, parseBigIntString, toArray, tryOrUndefined } from '@orpc/shared'
 import { decodeJsonPointerSegment } from './ref-utils'
 import { JsonSchemaXNativeType } from './types'
 
@@ -17,6 +17,8 @@ const LOOSELY_SATISFIED = 1
 const SATISFIED = 2
 
 type Satisfaction = typeof UNSATISFIED | typeof LOOSELY_SATISFIED | typeof SATISFIED
+
+type CoercionResult = [satisfied: Satisfaction, coerced: unknown]
 
 interface NativeCoerceOptions {
   maxBigIntDigits: number
@@ -65,6 +67,8 @@ function minSatisfaction(a: Satisfaction, b: Satisfaction): Satisfaction {
   return a < b ? a : b
 }
 
+const MIN_BUDGETED_VALUES = 100
+
 export interface JsonSchemaCoercerOptions {
   /**
    * Maximum digits, excluding a leading `-`, of a string coerced to `bigint`. Longer strings are left unchanged.
@@ -73,15 +77,45 @@ export interface JsonSchemaCoercerOptions {
    * @default 4300
    */
   maxBigIntDigits?: number | undefined
+
+  /**
+   * Maximum coercion steps per input value, where a step applies one schema to one value.
+   * Inputs with fewer than 100 values are budgeted as 100. Past the budget the whole input is left uncoerced,
+   * so validation still runs and reports any mismatch.
+   *
+   * @default 1000
+   */
+  maxStepsPerValue?: number | undefined
 }
+
+interface CoercionContext {
+  rootSchema: JsonSchema
+  memo: Map<JsonSchema, Map<unknown, CoercionResult>> | undefined
+  /** Memoizing `$ref` results only pays off once a keyword applies several schemas to the same value. */
+  memoize: boolean
+  steps: number
+  maxSteps: number
+  input: unknown
+}
+
+function createContext(): CoercionContext {
+  return { rootSchema: true, memo: undefined, memoize: false, steps: 0, maxSteps: 0, input: undefined }
+}
+
+class CoercionBudgetExceededError extends Error {}
 
 export class JsonSchemaCoercer {
   private readonly nativeCoerceOptions: NativeCoerceOptions
+  private readonly maxStepsPerValue: number
+
+  /** Reused between calls, since building a context is slow until V8 warms up. */
+  private idleContext: CoercionContext | undefined = createContext()
 
   constructor(options: JsonSchemaCoercerOptions = {}) {
     this.nativeCoerceOptions = {
       maxBigIntDigits: options.maxBigIntDigits ?? DEFAULT_MAX_BIGINT_DIGITS,
     }
+    this.maxStepsPerValue = options.maxStepsPerValue ?? 1_000
   }
 
   coerce([schema, optional]: [schema: JsonSchema, optional: boolean], value: unknown): unknown {
@@ -89,12 +123,37 @@ export class JsonSchemaCoercer {
       return value
     }
 
-    const [, coerced] = this.coerceInternal(schema, schema, value)
-    return coerced
+    const context = this.idleContext ?? createContext()
+    this.idleContext = undefined
+
+    context.rootSchema = schema
+    context.memoize = false
+    context.steps = 0
+    context.maxSteps = this.maxStepsPerValue * MIN_BUDGETED_VALUES
+    context.input = value
+
+    try {
+      const [, coerced] = this.coerceInternal(context, schema, value)
+      return coerced
+    }
+    catch (error) {
+      // partially coerced output would be harder to predict than the original input
+      if (error instanceof CoercionBudgetExceededError) {
+        return value
+      }
+
+      throw error
+    }
+    finally {
+      // keep no reference to this call's input or results
+      context.memo = undefined
+      context.input = undefined
+      this.idleContext = context
+    }
   }
 
   private coerceInternal(
-    rootSchema: JsonSchema,
+    context: CoercionContext,
     schema: JsonSchema,
     value: unknown,
     /**
@@ -102,14 +161,18 @@ export class JsonSchemaCoercer {
      * Only shared between keywords that re-apply a schema to the same value, never with nested values.
      */
     appliedRefs?: Set<JsonSchema>,
-  ): [satisfied: Satisfaction, coerced: unknown] {
+  ): CoercionResult {
+    if (++context.steps > context.maxSteps) {
+      this.extendBudget(context)
+    }
+
     if (typeof schema === 'boolean') {
       return [schema ? SATISFIED : UNSATISFIED, value]
     }
 
     if (Array.isArray(schema.type)) {
       return this.coerceInternal(
-        rootSchema,
+        context,
         { anyOf: schema.type.map(type => ({ ...schema, type })) },
         value,
         appliedRefs,
@@ -122,18 +185,17 @@ export class JsonSchemaCoercer {
     if (typeof schema.$ref === 'string') {
       const resolved
         = schema.$ref.startsWith('#/')
-          ? get(rootSchema, schema.$ref.slice('#/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
+          ? get(context.rootSchema, schema.$ref.slice('#/'.length).split('/').map(decodeJsonPointerSegment)) as JsonSchema | undefined
           : schema.$ref === '#'
-            ? rootSchema
+            ? context.rootSchema
             : undefined
 
       if (resolved !== undefined && !appliedRefs?.has(resolved)) {
-        appliedRefs ??= new Set()
-        appliedRefs.add(resolved)
+        if (schema.type === 'object' || schema.type === 'array') {
+          context.memoize = true
+        }
 
-        const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, resolved, coerced, appliedRefs)
-
-        appliedRefs.delete(resolved)
+        const [subSatisfied, subCoerced] = this.coerceRef(context, resolved, coerced, appliedRefs)
 
         coerced = subCoerced
         satisfied = minSatisfaction(satisfied, subSatisfied)
@@ -243,7 +305,7 @@ export class JsonSchemaCoercer {
                 return item
               }
 
-              const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, item)
+              const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, item)
 
               satisfied = minSatisfaction(satisfied, subSatisfied)
 
@@ -298,7 +360,7 @@ export class JsonSchemaCoercer {
                   satisfied = minSatisfaction(satisfied, LOOSELY_SATISFIED)
                 }
                 else {
-                  const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, value)
+                  const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, value)
                   coercedItems[key] = subCoerced
 
                   satisfied = minSatisfaction(satisfied, subSatisfied)
@@ -338,8 +400,10 @@ export class JsonSchemaCoercer {
     }
 
     if (schema.allOf) {
+      context.memoize = true
+
       for (const subSchema of schema.allOf) {
-        const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, coerced, appliedRefs)
+        const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, coerced, appliedRefs)
 
         coerced = subCoerced
         satisfied = minSatisfaction(satisfied, subSatisfied)
@@ -348,6 +412,8 @@ export class JsonSchemaCoercer {
 
     for (const key of ['anyOf', 'oneOf'] as const) {
       if (schema[key]) {
+        context.memoize = true
+
         /**
          * The best branch is the first one that accepts the value untouched,
          * then the most satisfied branch that accepts it after a conversion.
@@ -355,7 +421,7 @@ export class JsonSchemaCoercer {
         let best: { satisfied: Satisfaction, value: unknown } | undefined
 
         for (const subSchema of schema[key]) {
-          const [subSatisfied, subCoerced] = this.coerceInternal(rootSchema, subSchema, coerced, appliedRefs)
+          const [subSatisfied, subCoerced] = this.coerceInternal(context, subSchema, coerced, appliedRefs)
 
           if (subSatisfied === UNSATISFIED) {
             continue
@@ -383,7 +449,9 @@ export class JsonSchemaCoercer {
     }
 
     if (typeof schema.not !== 'undefined') {
-      const [notSatisfied] = this.coerceInternal(rootSchema, schema.not, coerced, appliedRefs)
+      context.memoize = true
+
+      const [notSatisfied] = this.coerceInternal(context, schema.not, coerced, appliedRefs)
 
       if (notSatisfied !== UNSATISFIED) {
         satisfied = UNSATISFIED
@@ -392,6 +460,81 @@ export class JsonSchemaCoercer {
 
     return [satisfied, coerced]
   }
+
+  private coerceRef(
+    context: CoercionContext,
+    resolved: JsonSchema,
+    value: unknown,
+    appliedRefs: Set<JsonSchema> | undefined,
+  ): CoercionResult {
+    let memo: Map<unknown, CoercionResult> | undefined
+
+    // while another `$ref` is applied to the value, the cycle check changes the result
+    if (context.memoize && !appliedRefs?.size && isTypescriptObject(value)) {
+      context.memo ??= new Map()
+      memo = context.memo.get(resolved)
+
+      if (!memo) {
+        memo = new Map()
+        context.memo.set(resolved, memo)
+      }
+
+      const cached = memo.get(value)
+
+      if (cached) {
+        return cached
+      }
+    }
+
+    appliedRefs ??= new Set()
+    appliedRefs.add(resolved)
+
+    const result = this.coerceInternal(context, resolved, value, appliedRefs)
+
+    appliedRefs.delete(resolved)
+    memo?.set(value, result)
+
+    return result
+  }
+
+  private extendBudget(context: CoercionContext): void {
+    const limit = 2 * context.steps / this.maxStepsPerValue
+    context.maxSteps = this.maxStepsPerValue * Math.max(countValues(context.input, limit), MIN_BUDGETED_VALUES)
+
+    if (context.steps > context.maxSteps) {
+      throw new CoercionBudgetExceededError()
+    }
+  }
+}
+
+function countValues(input: unknown, limit: number): number {
+  const walked = new Set<object>()
+  const stack = [input]
+  let count = 1
+
+  while (stack.length) {
+    const value = stack.pop()
+
+    if ((Array.isArray(value) || isPlainObject(value)) && !walked.has(value)) {
+      walked.add(value)
+
+      const items = Array.isArray(value) ? value : Object.values(value)
+
+      for (let i = 0; i < items.length; i++) {
+        if (++count >= limit) {
+          return count
+        }
+
+        const item = items[i]
+
+        if (isTypescriptObject(item)) {
+          stack.push(item)
+        }
+      }
+    }
+  }
+
+  return count
 }
 
 const NUMBER_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/

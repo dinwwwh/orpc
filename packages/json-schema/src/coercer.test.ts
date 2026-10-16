@@ -840,4 +840,168 @@ describe('jsonSchemaCoercer', () => {
       expect(coerced).toBe(value)
     })
   })
+
+  describe('recursive unions', () => {
+    // gives up, leaving the input uncoerced, if union branches each coerced the same nested value again
+    const linear = new JsonSchemaCoercer({ maxStepsPerValue: 20 })
+
+    function nested(depth: number, wrap: (inner: unknown) => unknown, leaf: unknown): unknown {
+      let value = leaf
+      for (let i = 0; i < depth; i++) {
+        value = wrap(value)
+      }
+      return value
+    }
+
+    it.each([
+      ['a matching discriminator', ['paragraph', 'text'], 'text', 14],
+      ['an unknown discriminator', ['paragraph', 'text'], 'zzz', 14],
+      ['many branches', ['doc', 'paragraph', 'heading', 'list', 'item', 'text'], 'text', 6],
+    ])('coerces a recursive discriminated union with %s', (_, kinds, type, depth) => {
+      // the shape `ZodToJsonSchemaConverter` emits for a recursive discriminated union
+      const schema: JsonSchema = {
+        type: 'object',
+        properties: { page: { type: 'integer' }, doc: { $ref: '#/$defs/node' } },
+        required: ['page', 'doc'],
+        $defs: {
+          node: {
+            oneOf: kinds.map(kind => ({
+              type: 'object',
+              properties: { type: { type: 'string', const: kind }, children: { type: 'array', items: { $ref: '#/$defs/node' } } },
+              required: ['type', 'children'],
+            })),
+          },
+        },
+      }
+
+      const doc = nested(depth, child => ({ type, children: [child] }), { type, children: [] })
+
+      expect(linear.coerce([schema, false], { page: '1', doc })).toEqual({ page: 1, doc })
+    })
+
+    it('coerces a record branch listed before an array branch', () => {
+      const schema: JsonSchema = { anyOf: [{ type: 'integer' }, { type: 'object', additionalProperties: { $ref: '#' } }, { type: 'array', items: { $ref: '#' } }] }
+
+      // the record branch is tried first, so it turns every array into an object
+      expect(linear.coerce([schema, false], nested(14, inner => [inner], '1'))).toEqual(nested(14, inner => ({ 0: inner }), 1))
+    })
+
+    const BASE: JsonSchema = { type: 'object', properties: { n: { type: 'integer' }, child: { $ref: '#' } } }
+    const REACH_CHILD: JsonSchema = { type: 'object', properties: { child: { $ref: '#' } } }
+
+    it.each<[string, JsonSchema]>([
+      ['$ref', { $defs: { base: BASE }, $ref: '#/$defs/base', ...REACH_CHILD }],
+      ['allOf', { ...BASE, allOf: [REACH_CHILD] }],
+      ['not', { ...BASE, not: REACH_CHILD }],
+    ])('coerces a schema whose %s reaches the same nested values as its properties', (_, schema) => {
+      expect(linear.coerce([schema, false], nested(14, child => ({ n: '1', child }), { n: '1' })))
+        .toEqual(nested(14, child => ({ n: 1, child }), { n: 1 }))
+    })
+
+    it('coerces every level of a deep recursive union', () => {
+      // z.lazy(() => z.union([z.object({ n: z.number(), children: z.array(Node) }), z.object({ s: z.string(), children: z.array(Node) })]))
+      const schema: JsonSchema = {
+        anyOf: [
+          { type: 'object', properties: { n: { type: 'number' }, children: { type: 'array', items: { $ref: '#' } } }, required: ['n', 'children'] },
+          { type: 'object', properties: { s: { type: 'string' }, children: { type: 'array', items: { $ref: '#' } } }, required: ['s', 'children'] },
+        ],
+      }
+
+      let value: unknown = { n: '0', children: [] }
+      let expected: unknown = { n: 0, children: [] }
+      for (let i = 1; i <= 200; i++) {
+        value = { n: String(i), children: [value, { s: '1', children: [] }] }
+        expected = { n: i, children: [expected, { s: '1', children: [] }] }
+      }
+
+      expect(linear.coerce([schema, false], value)).toEqual(expected)
+    })
+  })
+
+  it('keeps its state when the input calls back into the same coercer', () => {
+    const schema = { $defs: { int: { type: 'integer' } }, type: 'object', properties: { a: { $ref: '#/$defs/int' }, b: { $ref: '#/$defs/int' } } }
+    const value = {
+      get a(): unknown {
+        return coerce({ type: 'integer' }, '1')
+      },
+      b: '2',
+    }
+
+    expect(coerce(schema, value)).toEqual({ a: 1, b: 2 })
+  })
+
+  describe('step budget', () => {
+    // each level tries both branches on the same string, so the work doubles per level
+    const EXPONENTIAL_SCHEMA: JsonSchema = {
+      $defs: Object.fromEntries(Array.from({ length: 19 }, (_, i) => [
+        `d${i}`,
+        i === 18 ? { type: 'integer' } : { anyOf: [{ $ref: `#/$defs/d${i + 1}` }, { $ref: `#/$defs/d${i + 1}` }] },
+      ])),
+      type: 'object',
+      properties: { page: { type: 'integer' }, count: { $ref: '#/$defs/d0' } },
+    }
+
+    // four steps per item
+    const UNION_ITEMS: JsonSchema = { type: 'array', items: { anyOf: [{ type: 'boolean' }, { type: 'null' }, { type: 'integer' }] } }
+
+    const twoStepsPerValue = new JsonSchemaCoercer({ maxStepsPerValue: 2 })
+
+    it('leaves the whole input untouched once coercion runs out of steps', () => {
+      const value = { page: '2', count: '1' }
+
+      expect(twoStepsPerValue.coerce([EXPONENTIAL_SCHEMA, false], value)).toBe(value)
+      expect(value).toEqual({ page: '2', count: '1' })
+
+      // the coercer keeps no state from a coercion it gave up on
+      expect(twoStepsPerValue.coerce([{ type: 'object', properties: { page: { type: 'integer' } } }, false], { page: '2' })).toEqual({ page: 2 })
+    })
+
+    it('budgets inputs with fewer than 100 values as 100 values', () => {
+      expect(new JsonSchemaCoercer({ maxStepsPerValue: 1 }).coerce([UNION_ITEMS.items as JsonSchema, false], '1')).toBe(1)
+    })
+
+    it('extends the budget with the number of values in the input', () => {
+      const strings = Array.from({ length: 1_000 }, (_, i) => String(i))
+
+      expect(twoStepsPerValue.coerce([UNION_ITEMS, false], strings)).toBe(strings)
+      expect(new JsonSchemaCoercer({ maxStepsPerValue: 5 }).coerce([UNION_ITEMS, false], strings)).toEqual(strings.map(Number))
+    })
+
+    it('stops counting a wide array once the budget covers the steps taken', () => {
+      let reads = 0
+      const items = new Proxy(Array.from<string>({ length: 1_500 }).fill('1'), {
+        get(target, key, receiver) {
+          if (typeof key === 'string' && /^\d+$/.test(key)) {
+            reads++
+          }
+
+          return Reflect.get(target, key, receiver)
+        },
+      })
+
+      // runs past the minimum budget of 1_000 steps, so the input gets counted
+      expect(new JsonSchemaCoercer({ maxStepsPerValue: 10 }).coerce([{ type: 'array', items: { type: 'integer' } }, false], items))
+        .toEqual(Array.from({ length: 1_500 }).fill(1))
+      // coercion reads each item once, and counting only a few hundred more
+      expect(reads).toBeLessThan(2_000)
+    })
+
+    it('counts circular references and non-plain objects as one value each', () => {
+      const value: Record<string, unknown> = { strings: Array.from({ length: 300 }, (_, i) => String(i)), bytes: new Uint8Array(1_000) }
+      value.self = value
+
+      // counting `self` again or every byte would lift the budget enough to finish
+      expect(twoStepsPerValue.coerce([{ type: 'object', properties: { strings: UNION_ITEMS } }, false], value)).toBe(value)
+    })
+
+    it('still throws errors other than running out of steps', () => {
+      const value = {
+        get page(): string {
+          throw new Error('getter failed')
+        },
+      }
+
+      expect(() => coerce({ type: 'object', properties: { page: { type: 'integer' } } }, value)).toThrow('getter failed')
+    })
+  })
 })
