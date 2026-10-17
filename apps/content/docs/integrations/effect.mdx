@@ -317,7 +317,7 @@ import { EffectSchemaToJsonSchemaConverter } from '@orpc/experimental-effect'
 const generator = new OpenAPIGenerator({
   converters: [
     new EffectSchemaToJsonSchemaConverter({
-      onExcessProperty: 'error',
+      generateDescriptions: true,
     }),
   ],
 })
