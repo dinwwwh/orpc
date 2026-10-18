@@ -134,21 +134,40 @@ This integration preserves the original error whenever possible. If you call `Ef
 
 To customize this behavior, wrap the effect before execution using `effect/wrap` in the context:
 
-```ts
-import { Context, Effect } from 'effect'
+```ts twoslash
+import type { WithEffectContext } from '@orpc/experimental-effect'
+import { RPCHandler } from '@orpc/server/fetch'
 
 interface ServerContext extends WithEffectContext<never> {}
+
+declare const handler: RPCHandler<ServerContext>
+// ---cut---
+import { ORPCError } from '@orpc/server'
+import { Cause, Context, Data, Effect } from 'effect'
+
+class NotFoundError extends Data.TaggedError('NotFoundError')<{
+  readonly resource: string
+}> {}
 
 export async function fetch(request: Request) {
   const { matched, response } = await handler.handle(request, {
     context: {
       'effect/context': Context.empty(),
-      'effect/wrap': (effect, opts) => effect.pipe(
+      'effect/wrap': effect => effect.pipe(
         Effect.catchCause((cause) => {
+          const error = Cause.squash(cause)
 
-        })
+          if (error instanceof NotFoundError) {
+            return Effect.fail(new ORPCError('NOT_FOUND', {
+              message: `${error.resource} not found`,
+              cause: error,
+            }))
+          }
+
+          return Effect.failCause(cause)
+        }),
       ),
-    }
+    },
   })
 
   if (matched) {
@@ -158,6 +177,8 @@ export async function fetch(request: Request) {
   return new Response('Not Found', { status: 404 })
 }
 ```
+
+The wrap runs with `effect/context`, once per `handlerGen` and `middlewareGen` (see `opts.kind`). Keep it idempotent, since failures from inner layers pass through it again.
 
 :::info
 For app level error handling, we recommend [middleware](/docs/middleware) or interceptors.
