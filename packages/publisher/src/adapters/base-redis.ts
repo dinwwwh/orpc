@@ -1,5 +1,5 @@
 import type { RPCJsonSerialization } from '@orpc/client'
-import type { Public, ThrowableError } from '@orpc/shared'
+import type { ThrowableError } from '@orpc/shared'
 import type { EventMeta } from '@standard-server/core'
 import type { PublisherOptions, PublisherSubscribeListenerOptions } from '../publisher'
 import { RPCJsonSerializer } from '@orpc/client'
@@ -33,7 +33,7 @@ export interface BaseRedisPublisherOptions extends PublisherOptions {
    *
    * @default RPCJsonSerializer
    */
-  serializer?: undefined | Public<RPCJsonSerializer>
+  serializer?: undefined | Pick<RPCJsonSerializer, 'serializeJson' | 'deserializeJson'>
 
   /**
    * Configuration for event resume support.
@@ -99,7 +99,7 @@ interface SerializedEvent {
  */
 export abstract class BaseRedisPublisher<T extends Record<string, object>> extends Publisher<T> {
   protected readonly prefix: string
-  protected readonly serializer: Public<RPCJsonSerializer>
+  protected readonly serializer: Pick<RPCJsonSerializer, 'serializeJson' | 'deserializeJson'>
   protected readonly resumeEnabled: boolean
   protected readonly resumeSeconds: number
 
@@ -246,13 +246,13 @@ export abstract class BaseRedisPublisher<T extends Record<string, object>> exten
 
   private serializePayload(payload: object): SerializedEvent {
     const [original, meta] = unwrapEvent(payload)
-    const { json, meta: jsonMeta } = this.serializer.serialize(original)
+    const { json, meta: jsonMeta } = this.serializer.serializeJson(original)
     return { payload: { json, meta: jsonMeta }, meta }
   }
 
   private deserializePayload(id: string | undefined, { payload, meta }: SerializedEvent): object {
     return withEventMeta(
-      this.serializer.deserialize(payload) as object,
+      this.serializer.deserializeJson(payload) as object,
       id === undefined ? { ...meta } : { ...meta, id },
     )
   }

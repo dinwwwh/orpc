@@ -1,7 +1,7 @@
 import type { AnyProcedureContract, AnySchema, RouterContract } from '@orpc/contract'
 import type { JsonSchema, JsonSchemaConverter, JsonSchemaConverterDirection } from '@orpc/json-schema'
 import type { AnyProcedure, AnyRouter } from '@orpc/server'
-import type { Public, Value } from '@orpc/shared'
+import type { Value } from '@orpc/shared'
 import type { OpenAPIMeta } from './meta'
 import type { OpenAPIErrorBodyDefinition, OpenAPIOperationContext } from './openapi-generator-operation'
 import type { OpenAPIDocument, OpenAPIV3_2, OpenAPIVersion } from './types'
@@ -20,7 +20,7 @@ import {
   OpenAPIGeneratorError,
   toOpenAPIPath,
 } from './openapi-generator-operation'
-import { OpenAPISerializer } from './openapi-serializer'
+import { OpenAPIJsonSerializer } from './openapi-json-serializer'
 import { getDynamicPathParams } from './utils'
 
 export { OpenAPIGeneratorError } from './openapi-generator-operation'
@@ -32,7 +32,7 @@ export interface OpenAPIGeneratorOptions {
   /**
    * The serializer used to serialize the generated OpenAPI documentation
    */
-  serializer?: Public<OpenAPISerializer> | undefined
+  serializer?: Pick<OpenAPIJsonSerializer, 'serializeJson'> | undefined
 }
 
 export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion> {
@@ -100,11 +100,11 @@ export interface OpenAPIGeneratorGenerateOptions<TVersion extends OpenAPIVersion
  * @see {@link https://orpc.dev/docs/openapi/specification#openapi-generator | OpenAPI Specification - OpenAPI Generator}
  */
 export class OpenAPIGenerator {
-  private readonly serializer: Public<OpenAPISerializer>
+  private readonly serializer: Pick<OpenAPIJsonSerializer, 'serializeJson'>
   private readonly converter: Pick<JsonSchemaConverter, 'convert'>
 
   constructor(options: OpenAPIGeneratorOptions = {}) {
-    this.serializer = options.serializer ?? new OpenAPISerializer()
+    this.serializer = options.serializer ?? new OpenAPIJsonSerializer()
     this.converter = new DelegatingJsonSchemaConverter([
       ...toArray(options.converters),
       new StandardJsonSchemaConverter(),
@@ -196,7 +196,7 @@ export class OpenAPIGenerator {
     }
 
     const versioned = toVersionedOpenAPIDocument(doc, version)
-    return this.serializer.serialize(versioned, { asFormData: false, useFormDataForBlobFields: false }) as OpenAPIDocument<TVersion>
+    return this.serializer.serializeJson(versioned).json as OpenAPIDocument<TVersion>
   }
 
   private convertSchema(schema: AnySchema | undefined, direction: JsonSchemaConverterDirection): [JsonSchema, boolean] {
