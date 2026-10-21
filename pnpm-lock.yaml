@@ -196,9 +196,6 @@ importers:
       '@orpc/experimental-lock':
         specifier: workspace:*
         version: link:packages/lock
-      '@orpc/experimental-msw':
-        specifier: workspace:*
-        version: link:packages/msw
       '@orpc/hibernation':
         specifier: workspace:*
         version: link:packages/hibernation
@@ -208,6 +205,9 @@ importers:
       '@orpc/mcp':
         specifier: workspace:*
         version: link:packages/mcp
+      '@orpc/msw':
+        specifier: workspace:*
+        version: link:packages/msw
       '@orpc/next':
         specifier: workspace:*
         version: link:packages/next
