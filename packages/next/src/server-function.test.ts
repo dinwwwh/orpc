@@ -45,6 +45,19 @@ describe('createServerFunction', () => {
     await expect(serverFn({ input: 'ping' })).resolves.toEqual([new ORPCError('INTERNAL_SERVER_ERROR').toJSON(), undefined])
   })
 
+  it('passes form data as-is when called with a single argument', async () => {
+    const client = vi.fn().mockResolvedValue({ output: 'pong' })
+    createProcedureClientSpy.mockReturnValueOnce(client)
+
+    const serverFn = createServerFunction(procedure)
+
+    const form = new FormData()
+    form.append('name', 'alice')
+
+    await serverFn(form)
+    expect(client).toHaveBeenCalledWith(form)
+  })
+
   it.each([
     [() => next.redirect('/foo')],
     [() => next.forbidden()],

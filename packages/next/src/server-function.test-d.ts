@@ -1,5 +1,6 @@
 import type { ORPCErrorCode } from '@orpc/server'
 import { os } from '@orpc/server'
+import { useActionState } from 'react'
 import { z } from 'zod'
 import { createServerFunction } from './server-function'
 
@@ -50,5 +51,32 @@ describe('createServerFunction', () => {
     else {
       expectTypeOf(data).toEqualTypeOf<{ schema2: string }>()
     }
+  })
+
+  it('plugs into useActionState', () => {
+    const fn = createServerFunction(procedure, { context: () => ({ auth: true }) })
+
+    const [state, dispatch] = useActionState(fn, null)
+    expectTypeOf(state).toEqualTypeOf<Awaited<ReturnType<typeof fn>> | null>()
+    dispatch({ schema1: 123 })
+    dispatch(new FormData())
+    // @ts-expect-error invalid input
+    dispatch({ schema1: 'invalid' })
+
+    const [initialized] = useActionState(fn, [null, { schema2: '123' }])
+    expectTypeOf(initialized).toEqualTypeOf<Awaited<ReturnType<typeof fn>>>()
+
+    // @ts-expect-error initial state must match the result
+    useActionState(fn, [null, { schema2: 123 }])
+  })
+
+  it('plugs into useActionState for procedures without input', () => {
+    const fn = createServerFunction(os.handler(() => 'output'))
+
+    const [state, dispatch] = useActionState(fn, null)
+    if (state && !state[0]) {
+      expectTypeOf(state[1]).toEqualTypeOf<string>()
+    }
+    dispatch()
   })
 })

@@ -111,6 +111,27 @@ export const serverFunction = createServerFunction(procedure)
 
 </CodeGroup>
 
+### `useActionState`
+
+Server functions can be passed directly to React's [`useActionState`](https://react.dev/reference/react/useActionState). The previous state is ignored, `FormData` is parsed with [Bracket Notation](/docs/openapi/bracket-notation), and the form works before JavaScript loads.
+
+```tsx
+const [state, submit, isPending] = useActionState(serverFunction, null)
+const [error, data] = state ?? [null, undefined]
+
+return (
+  <form action={submit}>
+    <input name="title" />
+    <span>{getIssueMessage(error, 'title')}</span>
+    <button type="submit" disabled={isPending}>Submit</button>
+  </form>
+)
+```
+
+:::warning
+Don't pass extra input with `.bind`, since the bound value is treated as the previous state. Use hidden inputs instead.
+:::
+
 ### `createServerFunctionable`
 
 If you reuse the same options across multiple server functions, `createServerFunctionable` creates a preconfigured helper. The helper takes a procedure and returns a value that works as both a server function and the original [procedure](/docs/procedure) on the server.
