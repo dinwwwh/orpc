@@ -46,9 +46,14 @@ export function createRouterUtils<T extends AnyNestedClient>(
   const recursive = new Proxy(utils, {
     get(target, prop) {
       const value = Reflect.get(target, prop)
+
+      if (RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop)) {
+        return value ?? Reflect.get(Object.prototype, prop)
+      }
+
       const nextClient = Reflect.get(client, prop)
 
-      if (typeof prop !== 'string' || RECURSIVE_CLIENT_UNWRAP_KEYS.has(prop) || !isTypescriptObject(nextClient)) {
+      if (typeof prop !== 'string' || !isTypescriptObject(nextClient)) {
         return value
       }
 

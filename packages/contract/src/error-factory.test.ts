@@ -223,17 +223,19 @@ describe('createORPCErrorConstructorMap', () => {
     expect('ANY_THING' in constructors).toBe(false)
   })
 
-  it('not proxy on symbol and then keys', async () => {
+  it('not proxy on symbol and RECURSIVE_CLIENT_UNWRAP_KEYS', async () => {
     const map = constructors as any
     expect(map[Symbol('something')]).toBeUndefined()
     expect(map.then).toBeUndefined()
     expect(await map).toBe(map)
+    expect(map.toJSON).toBeUndefined()
+    expect(String(map)).toBe('[object Object]')
   })
 
   it('does not resolve error codes through Object.prototype', () => {
-    const e = (constructors as any).toString()
+    const e = (constructors as any).constructor()
 
-    expect(e.code).toEqual('toString')
+    expect(e.code).toEqual('constructor')
     expect(e.defined).toEqual(false)
   })
 })

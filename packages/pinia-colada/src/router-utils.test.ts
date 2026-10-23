@@ -100,6 +100,11 @@ describe('createRouterUtils', () => {
     expect(utils[Symbol.for('a')]).toBe(undefined)
   })
 
+  it('can be converted to primitive values', () => {
+    const utils = createRouterUtils(client) as any
+    expect(String(utils)).toBe('[object Object]')
+  })
+
   it('stops recursive on RECURSIVE_CLIENT_UNWRAP_KEYS', () => {
     client.then = vi.fn()
 

@@ -91,6 +91,11 @@ describe('createRouterUtils', () => {
     expect(utils[Symbol.for('a')]).toBe(undefined)
   })
 
+  it('can be converted to primitive values', () => {
+    const utils = createRouterUtils(client) as any
+    expect(String(utils)).toBe('[object Object]')
+  })
+
   it('stops recursive on symbol and RECURSIVE_CLIENT_UNWRAP_KEYS of conflicting method proxies', () => {
     const utils = createRouterUtils(client) as any
     const keyUtils = utils.key // "key" is both a util method and a nested client
