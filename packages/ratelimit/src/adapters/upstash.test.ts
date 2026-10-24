@@ -203,3 +203,11 @@ describe.concurrent('upstash rate limiter integration', {
     })
   })
 })
+
+it('prefix creates a limiter that appends the prefix and shares the client', async () => {
+  const redis = { eval: vi.fn(async () => [1, 1000]) }
+  const limiter = new UpstashRateLimiter(redis as any, { maxRequests: 1, window: 1000, prefix: 'app:' }).prefix('tenant:')
+
+  await expect(limiter.limit('key')).resolves.toMatchObject({ success: true, remaining: 0 })
+  expect(redis.eval).toHaveBeenCalledWith(expect.any(String), ['app:tenant:key'], ['1', '1000'])
+})

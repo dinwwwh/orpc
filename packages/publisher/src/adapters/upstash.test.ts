@@ -698,3 +698,11 @@ function withFakeSubscribe(redis: Redis, subscribe: () => unknown): Redis {
     },
   })
 }
+
+it('prefix creates a publisher that appends the prefix and shares the client', async () => {
+  const redis = { publish: vi.fn(async () => 1) }
+  const publisher = new UpstashPublisher<Record<string, object>>(redis as any).prefix('tenant:')
+
+  await publisher.publish('event', { order: 1 })
+  expect(redis.publish).toHaveBeenCalledWith('tenant:event', expect.any(String))
+})

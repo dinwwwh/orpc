@@ -171,3 +171,11 @@ describe.concurrent('upstash locker integration', {
     expect(count).toBe(5)
   })
 })
+
+it('prefix creates a locker that appends the prefix and shares the client', async () => {
+  const redis = { set: vi.fn(async () => 'OK'), eval: vi.fn(async () => 1) }
+  const locker = new UpstashLocker(redis as any, { ttl: 1000, prefix: 'app:' }).prefix('tenant:')
+
+  await expect(locker.lock('key', () => 'ok')).resolves.toBe('ok')
+  expect(redis.set).toHaveBeenCalledWith('app:tenant:key', expect.any(String), { nx: true, px: 1000 })
+})
