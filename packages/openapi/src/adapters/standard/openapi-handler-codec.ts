@@ -43,7 +43,7 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
    *
    * @default ((e) => e.toJSON())
    */
-  customErrorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
+  errorResponseBodyEncoder?: ((error: AnyORPCError) => unknown) | undefined
 
   /**
    * The `content-type` of error responses, e.g. `application/problem+json` for RFC 9457 Problem Details.
@@ -56,13 +56,13 @@ export interface OpenAPIHandlerCodecCoreOptions<_T extends Context> {
 export class OpenAPIHandlerCodecCore<T extends Context> {
   private readonly serializer: Public<OpenAPISerializer>
   private readonly errorStatusMap: Exclude<OpenAPIHandlerCodecOptions<T>['errorStatusMap'], undefined>
-  private readonly customErrorResponseBodySerializer: OpenAPIHandlerCodecOptions<T>['customErrorResponseBodyEncoder']
+  private readonly errorResponseBodyEncoder: OpenAPIHandlerCodecOptions<T>['errorResponseBodyEncoder']
   private readonly errorResponseContentType: OpenAPIHandlerCodecOptions<T>['errorResponseContentType']
 
   constructor(options: OpenAPIHandlerCodecCoreOptions<T> = {}) {
     this.serializer = options.serializer ?? new OpenAPISerializer()
     this.errorStatusMap = options.errorStatusMap ?? COMMON_ERROR_STATUS_MAP
-    this.customErrorResponseBodySerializer = options.customErrorResponseBodyEncoder
+    this.errorResponseBodyEncoder = options.errorResponseBodyEncoder
     this.errorResponseContentType = options.errorResponseContentType
   }
 
@@ -150,7 +150,7 @@ export class OpenAPIHandlerCodecCore<T extends Context> {
     return {
       status,
       headers: this.errorResponseContentType !== undefined ? { 'content-type': this.errorResponseContentType } : {},
-      body: this.serializer.serialize(this.customErrorResponseBodySerializer?.(error) ?? error.toJSON()),
+      body: this.serializer.serialize(this.errorResponseBodyEncoder?.(error) ?? error.toJSON()),
     }
   }
 

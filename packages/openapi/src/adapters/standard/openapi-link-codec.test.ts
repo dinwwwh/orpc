@@ -816,12 +816,12 @@ describe('openAPILinkCodec', () => {
 
     it('uses a custom error decoder when it returns a value', async () => {
       const customError = new ORPCError('BAD_GATEWAY', { data: 'custom' })
-      const customErrorResponseBodyDecoder = vi.fn(() => customError)
+      const errorResponseBodyDecoder = vi.fn(() => customError)
       const codec = new OpenAPILinkCodec({
         ping: oc.meta(openapi({})),
       }, {
         serializer,
-        customErrorResponseBodyDecoder,
+        errorResponseBodyDecoder,
       })
 
       const response = {
@@ -833,8 +833,8 @@ describe('openAPILinkCodec', () => {
       const result = await codec.decodeResponse(response, ['ping'], { context: {} })
 
       expect(result).toEqual({ kind: 'error', error: customError })
-      expect(customErrorResponseBodyDecoder).toHaveBeenCalledOnce()
-      expect(customErrorResponseBodyDecoder).toHaveBeenCalledWith({ detail: 'bad gateway' }, response)
+      expect(errorResponseBodyDecoder).toHaveBeenCalledOnce()
+      expect(errorResponseBodyDecoder).toHaveBeenCalledWith({ detail: 'bad gateway' }, response)
     })
 
     it('falls back to standard ORPC error decoding when the custom decoder returns null', async () => {
@@ -842,7 +842,7 @@ describe('openAPILinkCodec', () => {
         ping: oc.meta(openapi({})),
       }, {
         serializer,
-        customErrorResponseBodyDecoder: () => null,
+        errorResponseBodyDecoder: () => null,
       })
 
       const error = new ORPCError('NOT_FOUND', { message: 'Not found' })
