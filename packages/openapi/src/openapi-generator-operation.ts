@@ -283,6 +283,7 @@ function renderQueryParameters(
         'application/json': { schema: parameter.schema },
       }
       delete parameter.schema
+      delete parameter.allowReserved
     }
     else if (style === undefined) {
       if (flattenJsonUnionSchema(schema).some(s => !isJsonPrimitiveSchema(s))) {
